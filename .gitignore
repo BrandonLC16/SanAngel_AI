@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Repository-local agent and checkpoint files
+AGENTS.md
+plan_de_trabajo.md
+
 # Python virtual environments
 .venv/
 venv/

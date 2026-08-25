@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-25  
 **Fase activa:** Fase 1  
-**Subfase siguiente:** F1.8 — Prueba manual real con OpenAI
+**Subfase siguiente:** F1.8 — bloqueada por respuesta HTTP 429 del proveedor
 **Estado global:** 🟨 EN DESARROLLO  
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -514,34 +514,40 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.8 — Prueba manual real con OpenAI
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ⛔ BLOQUEADO
+
+**Fecha de inicio:** 2026-08-25
+
+**Bloqueo:** la credencial está presente solo en el entorno local y el backend alcanza Responses
+API, pero dos intentos controlados recibieron HTTP 429 del proveedor; no se obtuvo una respuesta
+real HTTP 200.
 
 
 ### Alcance
 
-- [ ] configurar key solo localmente.
+- [x] configurar key solo localmente.
 
-- [ ] iniciar backend.
+- [x] iniciar backend.
 
-- [ ] probar /api/v1/chat.
+- [x] probar /api/v1/chat.
 
 - [ ] comprobar respuesta real.
 
-- [ ] comprobar error seguro.
+- [x] comprobar error seguro.
 
 
 ### Criterios de aceptación
 
 - [ ] una llamada real funciona.
 
-- [ ] credencial nunca aparece en evidencia.
+- [x] credencial nunca aparece en evidencia.
 
 
 ### Seguridad
 
-- [ ] no commitear .env.
+- [x] no commitear .env.
 
-- [ ] no copiar key en plan/logs.
+- [x] no copiar key en plan/logs.
 
 
 ### Prompt para Codex
@@ -3887,12 +3893,12 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 1.  
-**Subfase activa:** ninguna.
+**Subfase activa:** ninguna; F1.8 está bloqueada por HTTP 429 del proveedor.
 **Última subfase completada:** F1.7 — Suite de pruebas y calidad.
-**Siguiente subfase:** F1.8 — Prueba manual real con OpenAI.
+**Siguiente subfase:** reanudar F1.8 cuando la cuenta/proyecto permita una llamada real.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.8 ni Fase 2 automáticamente sin instrucción del usuario.
+No iniciar F1.9 ni Fase 2 mientras F1.8 permanezca bloqueada.
 
 ---
 
@@ -4440,6 +4446,150 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.8 — Prueba manual real con OpenAI, sin iniciar hasta recibir instrucción del usuario.
+
+---
+
+## 2026-08-25 — Prueba manual real con OpenAI (bloqueada)
+
+**Fase:** Fase 1
+**Tarea:** F1.8 — Prueba manual real con OpenAI
+**Estado:** ⛔ BLOQUEADO
+
+Cambios:
+
+- agregado Uvicorn 0.52.x como dependencia de desarrollo para iniciar el backend local;
+- creado un probe manual que solo acepta `/api/v1/chat` en loopback y nunca imprime la clave,
+  el mensaje enviado ni el texto de respuesta;
+- agregadas pruebas del resumen seguro, forma de error y restricción de URL del probe;
+- creado `.env` local ignorado con `OPENAI_API_KEY=` vacío para que la credencial sea agregada
+  únicamente por el usuario en su equipo;
+- agregados `AGENTS.md` y `plan_de_trabajo.md` a `.gitignore` según instrucción explícita;
+- documentado el procedimiento local seguro en README.
+
+Archivos:
+
+- `.gitignore`
+- `pyproject.toml`
+- `scripts/__init__.py`
+- `scripts/manual_chat_probe.py`
+- `backend/tests/test_manual_chat_probe.py`
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+- `.env` local ignorado, no versionado y con la clave vacía
+
+Validación:
+
+- `git status --short --branch` al inicio -> árbol limpio sobre `main` antes de los cambios;
+- comprobación local sin revelar valores -> `.env` y `OPENAI_API_KEY` no existían al iniciar;
+- revisión de OpenAI Docs -> confirmada la operación vigente `responses.create` y su
+  autenticación backend;
+- `.venv\Scripts\python.exe -m pip index versions uvicorn` -> versión disponible 0.52.4;
+- `.venv\Scripts\python.exe -m pip install -e ".[dev]"` -> Uvicorn 0.52.4 instalado;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_manual_chat_probe.py ... -q`
+  -> 6 pruebas aprobadas;
+- backend iniciado en `127.0.0.1:8765`; `GET /health` -> HTTP 200;
+- probe con placeholder inválido y `--expect provider-error` -> proveedor respondió 401 y la
+  aplicación devolvió HTTP 503, request ID presente y error público seguro; no se imprimió el
+  cuerpo completo;
+- servidor detenido inmediatamente después de la prueba de error;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f18 -o
+  cache_dir=.venv\pytest-cache-f18` -> 58 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 34 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios; solo avisos informativos LF/CRLF;
+- revisión del diff -> sin patrones de API key; `.env` confirmado como ignorado.
+
+Seguridad:
+
+- ninguna credencial real fue recibida, mostrada, copiada o almacenada en evidencia;
+- `.env` está ignorado y no aparece en `git status`;
+- la prueba inválida usó un placeholder sin privilegios, reintentos en cero y `store=false`;
+- el probe muestra solo status, flags, request ID presente y longitud de respuesta;
+- el error real de autenticación se mapeó a la forma pública estable sin traceback ni detalle;
+- `AGENTS.md` y `plan_de_trabajo.md` tienen reglas de ignore, aunque siguen versionados por
+  haber estado rastreados antes de agregarlas.
+
+Bloqueo/Riesgos:
+
+- falta una API key local válida; por eso no se comprobó HTTP 200 ni respuesta real del modelo;
+- Git no aplica `.gitignore` retroactivamente: `AGENTS.md` y `plan_de_trabajo.md` continúan
+  rastreados. No se ejecutó `git rm --cached` porque el plan es el checkpoint oficial y el
+  usuario solo pidió agregar reglas de ignore;
+- el endpoint interno sigue sin autenticación y no debe exponerse públicamente.
+
+Siguiente:
+
+- reanudar F1.8 después de colocar la clave únicamente en `.env`; no iniciar F1.9 todavía.
+
+---
+
+## 2026-08-25 — Reanudación de prueba manual real con OpenAI (bloqueada por proveedor)
+
+**Fase:** Fase 1
+**Tarea:** F1.8 — Prueba manual real con OpenAI
+**Estado:** ⛔ BLOQUEADO
+
+Cambios:
+
+- reanudada F1.8 tras detectar una credencial presente únicamente en el `.env` local ignorado;
+- validada la configuración sin leer, imprimir ni copiar el valor secreto;
+- iniciado el backend exclusivamente en loopback y comprobado nuevamente `/health`;
+- ejecutados dos intentos reales y seguros contra `/api/v1/chat` mediante Responses API;
+- actualizado el procedimiento manual para indicar la revisión de cuota, facturación y límites
+  cuando OpenAI responda HTTP 429;
+- no se inició F1.9 ni ninguna tarea de Fase 2.
+
+Archivos:
+
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+- `.env` local ignorado, no leído ni versionado
+
+Validación:
+
+- revisión de OpenAI Docs -> confirmados `responses.create`, `output_text`, `instructions`,
+  `input` y `store` en la API/SDK vigentes;
+- comprobación local reducida a booleanos -> `.env` existe, la clave está presente, `Settings`
+  carga correctamente, `store=false` y timeout dentro del rango permitido;
+- `git check-ignore -v .env` -> `.env` está cubierto por `.gitignore`;
+- backend iniciado en `127.0.0.1:8765` sin access log;
+- `GET /health` -> HTTP 200 y request ID presente;
+- primer probe real de `/api/v1/chat` -> OpenAI respondió HTTP 429 y la aplicación devolvió
+  HTTP 503 con JSON y request ID, sin texto de respuesta;
+- segundo probe controlado con reintentos de aplicación desactivados -> OpenAI volvió a
+  responder HTTP 429 y la aplicación conservó el error público HTTP 503;
+- servidor detenido inmediatamente después de cada intento;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f18-resume -o
+  cache_dir=.venv\pytest-cache-f18-resume` -> 58 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 34 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios; solo avisos informativos LF/CRLF.
+
+Seguridad:
+
+- la credencial nunca apareció en comandos, salida, plan, logs ni evidencia;
+- `.env` permanece ignorado y ausente de `git status`;
+- el probe no imprime mensaje, prompt, respuesta del modelo ni cuerpo completo de error;
+- los logs observados contienen solo metadatos HTTP, request ID, estado y categoría segura;
+- el 429 del proveedor se mapea a HTTP 503 sin traceback ni detalle interno;
+- `store=false` conserva el valor conservador durante la prueba.
+
+Bloqueo/Riesgos:
+
+- no se obtuvo HTTP 200 ni texto real porque el proveedor respondió HTTP 429 en ambos intentos;
+- se debe revisar en la cuenta/proyecto de OpenAI la cuota, facturación y límites antes de
+  repetir; no se puede marcar el criterio de llamada real como cumplido;
+- el endpoint interno sigue sin autenticación y no debe exponerse públicamente;
+- `AGENTS.md` y `plan_de_trabajo.md` siguen rastreados aunque tengan reglas de ignore, porque
+  `.gitignore` no actúa retroactivamente.
+
+Siguiente:
+
+- reanudar exclusivamente F1.8 cuando el proveedor permita la llamada; no iniciar F1.9.
 
 ---
 

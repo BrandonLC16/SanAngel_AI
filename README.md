@@ -77,8 +77,8 @@ El prompt provisional se versiona en `backend/app/prompts/base_system_prompt.txt
 
 Los errores de timeout, limite de solicitudes, conexion, estado HTTP y respuesta vacia se
 convierten a excepciones internas seguras. El servicio no registra el prompt, el mensaje ni la
-respuesta completos. La conexion desde una ruta HTTP se agregara en F1.6; una llamada real y
-controlada al proveedor corresponde a F1.8.
+respuesta completos. La conexion desde una ruta HTTP se realiza mediante el servicio de
+aplicacion desacoplado.
 
 ## Chat interno de desarrollo
 
@@ -104,6 +104,29 @@ Response:
 El mensaje no puede estar vacio ni superar `CHAT_MAX_MESSAGE_CHARS`. Las solicitudes invalidas
 responden HTTP 422 sin devolver el contenido rechazado y los fallos del proveedor responden
 HTTP 503 con un mensaje publico estable.
+
+## Prueba manual local
+
+Guarda `OPENAI_API_KEY` solamente en `.env` o en el entorno del proceso local. No escribas la
+clave en comandos compartidos, logs, documentación ni evidencias. Inicia el backend:
+
+```powershell
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+En otra terminal ejecuta el probe seguro:
+
+```powershell
+python scripts/manual_chat_probe.py --expect success
+```
+
+El probe solo acepta el endpoint loopback, no imprime la respuesta del modelo y reporta
+únicamente estado HTTP, presencia de request ID y longitud de la respuesta.
+
+La prueba exitosa requiere que `OPENAI_API_KEY` tenga un valor válido en el `.env` local. El
+archivo está preparado e ignorado, pero Codex no crea, solicita ni copia credenciales reales.
+Si el proveedor responde HTTP 429, revisa la cuota, facturación y límites del proyecto antes de
+repetir la prueba; el backend devolverá únicamente su error público HTTP 503.
 
 ## Frontera HTTP
 
