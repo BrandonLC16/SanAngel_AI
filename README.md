@@ -7,11 +7,11 @@ promociones o pedidos.
 
 ## Estado actual
 
-F1.1-F1.6 inicializan el repositorio, implementan la configuracion central validada y crean la
+F1.1-F1.7 inicializan el repositorio, implementan la configuracion central validada y crean la
 aplicacion FastAPI con health check, errores HTTP seguros, request ID, logging minimo y CORS
 configurable. La integracion con OpenAI ya esta aislada en un servicio interno y utiliza
 Responses API. El endpoint interno de chat conecta esa frontera mediante un servicio de
-aplicacion desacoplado.
+aplicacion desacoplado y la suite automatizada impide conexiones externas.
 
 ## Health check
 
@@ -120,7 +120,13 @@ HTTP 503 con un mensaje publico estable.
 pytest
 ruff check .
 ruff format --check .
+python -m pip check
 ```
+
+`pytest` activa una barrera global que rechaza resolución DNS y conexiones a direcciones no
+loopback. Las pruebas HTTP en proceso siguen funcionando y OpenAI se sustituye por dobles de
+prueba. Los valores que ocupan el lugar de credenciales son placeholders explícitos, nunca
+claves reales.
 
 ## Estructura base
 

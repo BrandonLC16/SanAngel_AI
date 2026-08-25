@@ -1,5 +1,4 @@
 from pathlib import Path
-from secrets import token_urlsafe
 
 import pytest
 from pydantic import ValidationError
@@ -8,7 +7,7 @@ from backend.app.core.config import HttpSettings, Settings, get_settings
 
 
 def make_non_key_secret_marker() -> str:
-    return token_urlsafe(24)
+    return "test-only-credential-placeholder"
 
 
 def test_settings_use_safe_defaults() -> None:

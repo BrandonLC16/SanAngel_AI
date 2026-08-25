@@ -14,6 +14,8 @@ from backend.app.core.logging import HTTP_LOGGER_NAME
 from backend.app.main import create_app
 from backend.app.services.chat_service import ChatService
 
+INVALID_PAYLOAD_MARKER = "private-invalid-payload-marker"
+
 
 class FakeReplyGenerator:
     def __init__(
@@ -37,9 +39,16 @@ def make_app(service: ChatService) -> FastAPI:
 
 
 async def post_chat(application: FastAPI, message: str) -> httpx.Response:
+    return await post_chat_payload(application, {"message": message})
+
+
+async def post_chat_payload(
+    application: FastAPI,
+    payload: dict[str, object],
+) -> httpx.Response:
     transport = httpx.ASGITransport(app=application)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        return await client.post("/api/v1/chat", json={"message": message})
+        return await client.post("/api/v1/chat", json=payload)
 
 
 def test_valid_message_returns_answer_without_network_or_content_logs(
@@ -93,9 +102,10 @@ def test_message_over_configured_limit_is_rejected_without_calling_provider() ->
 
 def test_default_dependency_connects_application_service_to_reply_provider(
     monkeypatch: pytest.MonkeyPatch,
+    non_secret_credential: str,
 ) -> None:
     settings = Settings(
-        openai_api_key="backend-only-test-secret",
+        openai_api_key=non_secret_credential,
         chat_max_message_chars=5,
         _env_file=None,
     )
@@ -118,6 +128,32 @@ def test_default_dependency_connects_application_service_to_reply_provider(
     assert answer == "respuesta conectada"
     assert received_settings == [settings]
     assert generator.calls == ["Hola"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {},
+        {"message": None},
+        {"message": 123},
+        {"message": INVALID_PAYLOAD_MARKER + ("x" * 10_001)},
+    ),
+)
+def test_invalid_payload_is_rejected_without_echo_or_provider_call(
+    payload: dict[str, object],
+) -> None:
+    generator = FakeReplyGenerator()
+    application = make_app(ChatService(generator, max_message_chars=2000))
+
+    response = asyncio.run(post_chat_payload(application, payload))
+
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "invalid_request",
+        "message": "La solicitud no es válida.",
+    }
+    assert INVALID_PAYLOAD_MARKER not in response.text
+    assert generator.calls == []
 
 
 def test_provider_failure_returns_controlled_error_without_internal_detail() -> None:

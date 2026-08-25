@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-25  
 **Fase activa:** Fase 1  
-**Subfase siguiente:** F1.7 — Suite de pruebas y calidad
+**Subfase siguiente:** F1.8 — Prueba manual real con OpenAI
 **Estado global:** 🟨 EN DESARROLLO  
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -456,40 +456,44 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.7 — Suite de pruebas y calidad
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-25
+
+**Fecha de finalización:** 2026-08-25
 
 
 ### Alcance
 
-- [ ] mock OpenAI.
+- [x] mock OpenAI.
 
-- [ ] casos inválidos.
+- [x] casos inválidos.
 
-- [ ] casos de error.
+- [x] casos de error.
 
-- [ ] pytest.
+- [x] pytest.
 
-- [ ] Ruff check.
+- [x] Ruff check.
 
-- [ ] Ruff format --check.
+- [x] Ruff format --check.
 
-- [ ] pip check si aplica.
+- [x] pip check si aplica.
 
 
 ### Criterios de aceptación
 
-- [ ] suite pasa sin internet.
+- [x] suite pasa sin internet.
 
-- [ ] lint/formato pasan.
+- [x] lint/formato pasan.
 
-- [ ] cero consumo accidental de API.
+- [x] cero consumo accidental de API.
 
 
 ### Seguridad
 
-- [ ] fixtures sin secretos.
+- [x] fixtures sin secretos.
 
-- [ ] tests no salen a red.
+- [x] tests no salen a red.
 
 
 ### Prompt para Codex
@@ -3796,7 +3800,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | errores seguros | F1 | Sí | ✅ F1.4 |
 | logging sin secrets/PII | F1 | Sí | ✅ F1.4 |
 | CORS allowlist | F1 | Sí cuando haya navegador | ✅ F1.4 |
-| tests sin OpenAI real | F1 | Sí | ✅ F1.5 |
+| tests sin OpenAI real | F1 | Sí | ✅ F1.7 |
 | Meta tokens backend-only | F2 | Sí | ⬜ |
 | verificación GET webhook | F2 | Sí | ⬜ |
 | firma/autenticidad POST webhook | F2 | Sí | ⬜ |
@@ -3884,11 +3888,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 1.  
 **Subfase activa:** ninguna.
-**Última subfase completada:** F1.6 — Endpoint interno POST /api/v1/chat.
-**Siguiente subfase:** F1.7 — Suite de pruebas y calidad.
+**Última subfase completada:** F1.7 — Suite de pruebas y calidad.
+**Siguiente subfase:** F1.8 — Prueba manual real con OpenAI.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.7 ni Fase 2 automáticamente sin instrucción del usuario.
+No iniciar F1.8 ni Fase 2 automáticamente sin instrucción del usuario.
 
 ---
 
@@ -4365,6 +4369,77 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.7 — Suite de pruebas y calidad, sin iniciar hasta recibir instrucción del usuario.
+
+---
+
+## 2026-08-25 — Suite de pruebas y calidad
+
+**Fase:** Fase 1
+**Tarea:** F1.7 — Suite de pruebas y calidad
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregada una fixture `autouse` que bloquea DNS y conexiones externas para toda la suite y
+  conserva solo loopback para pruebas en proceso;
+- agregadas pruebas de la propia barrera para DNS, conexión por IP y resolución loopback;
+- sustituidos valores aleatorios con apariencia de credencial por placeholders explícitos y no
+  sensibles;
+- auditados los puntos de construcción de OpenAI: cliente inyectado o constructor reemplazado
+  por un doble antes de usarse;
+- ampliados los casos inválidos del chat con campo ausente, nulo, tipo incorrecto y longitud
+  absoluta excesiva, sin eco del contenido ni llamada al proveedor;
+- documentados los comandos de calidad y la política de red de los tests.
+
+Archivos:
+
+- `backend/tests/conftest.py`
+- `backend/tests/test_network_guard.py`
+- `backend/tests/test_chat.py`
+- `backend/tests/test_config.py`
+- `backend/tests/test_openai_service.py`
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `git status --short --branch` al inicio -> árbol limpio sobre `main` antes de los cambios;
+- revisión de OpenAI Docs -> confirmada la operación `responses.create` que la suite mantiene
+  detrás de dobles del servicio;
+- primera suite con bloqueo global -> 52 pruebas aprobadas;
+- primera revisión de Ruff -> detectó dos ajustes mecánicos de imports; ambos se corrigieron;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f17-target-2 -o
+  cache_dir=.venv\pytest-cache-f17-target-2 -q` -> 52 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f17 -o
+  cache_dir=.venv\pytest-cache-f17` -> 52 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 33 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios; solo avisos informativos LF/CRLF;
+- búsquedas con `rg` -> todos los usos de OpenAI en tests están inyectados/reemplazados, sin
+  patrones de API key real; F1.8 permanece pendiente.
+
+Seguridad:
+
+- toda prueba falla si intenta resolver un host externo o conectar a una IP no loopback;
+- el guard intercepta `getaddrinfo`, `connect`, `connect_ex` y `create_connection`;
+- los clientes OpenAI son simulados y no existe consumo accidental de API o créditos;
+- fixtures y archivos temporales contienen placeholders claros, nunca credenciales reales;
+- payloads inválidos no se reflejan en respuestas y no alcanzan el proveedor;
+- no se ejecutó ninguna prueba manual ni llamada real de F1.8.
+
+Riesgos/Pendientes:
+
+- el guard cubre networking Python a nivel socket y permite loopback; un futuro test que lance
+  un binario externo o use networking nativo deberá aislarse adicionalmente;
+- no hay un escáner especializado de secretos configurado todavía; la revisión de fixtures y
+  patrones conocidos pasó;
+- la comprobación real con una credencial local corresponde exclusivamente a F1.8.
+
+Siguiente:
+
+- F1.8 — Prueba manual real con OpenAI, sin iniciar hasta recibir instrucción del usuario.
 
 ---
 

@@ -2,7 +2,6 @@ import asyncio
 import logging
 import socket
 from dataclasses import dataclass
-from secrets import token_urlsafe
 
 import httpx2
 import pytest
@@ -50,7 +49,7 @@ class FakeOpenAIClient:
 
 def make_settings(**overrides: object) -> Settings:
     return Settings(
-        openai_api_key=token_urlsafe(24),
+        openai_api_key="test-only-credential-placeholder",
         openai_model="configured-model",
         _env_file=None,
         **overrides,
@@ -105,8 +104,9 @@ def test_generate_reply_uses_responses_api_with_configurable_store_without_netwo
 
 def test_real_client_factory_receives_secret_timeout_and_bounded_retries(
     monkeypatch: pytest.MonkeyPatch,
+    non_secret_credential: str,
 ) -> None:
-    secret_marker = token_urlsafe(24)
+    secret_marker = non_secret_credential
     captured_options: dict[str, object] = {}
     fake_client = FakeOpenAIClient()
 
