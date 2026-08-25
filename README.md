@@ -7,9 +7,9 @@ promociones o pedidos.
 
 ## Estado actual
 
-F1.1 inicializa el repositorio y su estructura. Todavia no se implementan FastAPI, la
-configuracion central, endpoints ni la integracion con OpenAI; corresponden a tareas
-posteriores de la Fase 1.
+F1.1 y F1.2 inicializan el repositorio e implementan la configuracion central validada.
+Todavia no se implementan FastAPI, endpoints ni la integracion con OpenAI; corresponden a
+tareas posteriores de la Fase 1.
 
 ## Requisitos
 
@@ -30,6 +30,23 @@ Copy-Item .env.example .env
 
 Completa `OPENAI_API_KEY` solamente en el archivo local `.env` cuando una tarea posterior
 requiera una prueba manual. Nunca guardes una clave real en archivos versionados.
+
+## Configuracion
+
+`backend.app.core.config.Settings` es el unico punto de lectura de variables de entorno. La
+configuracion se valida al solicitarla mediante `get_settings()`; importar el modulo no lee ni
+imprime secretos y tampoco realiza llamadas externas.
+
+Valores y limites iniciales:
+
+- `OPENAI_API_KEY` es obligatoria y se mantiene como valor secreto;
+- `OPENAI_MODEL` es configurable y usa `gpt-5.6` por defecto;
+- `OPENAI_STORE_RESPONSES` usa `false` por defecto;
+- `OPENAI_TIMEOUT_SECONDS` acepta valores mayores a 0 y hasta 120 segundos;
+- `CHAT_MAX_MESSAGE_CHARS` acepta valores entre 1 y 10000, con 2000 por defecto.
+
+Si falta configuración obligatoria, la aplicación genera un error de validación sin incluir el
+valor de ninguna credencial.
 
 ## Validaciones disponibles
 

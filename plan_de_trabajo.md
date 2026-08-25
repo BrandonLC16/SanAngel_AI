@@ -118,22 +118,23 @@ Seguridad:
 
 ## F1.2 — Configuración central
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-08-25
 
 Tareas:
 
-- [ ] implementar `Settings`;
-- [ ] cargar variables de entorno;
-- [ ] validar configuración requerida;
-- [ ] hacer modelo configurable;
-- [ ] hacer timeout configurable;
-- [ ] definir máximo de caracteres.
+- [x] implementar `Settings`;
+- [x] cargar variables de entorno;
+- [x] validar configuración requerida;
+- [x] hacer modelo configurable;
+- [x] hacer timeout configurable;
+- [x] definir máximo de caracteres.
 
 Seguridad:
 
-- [ ] configuración no imprime secretos;
-- [ ] error por secret faltante no revela valores;
-- [ ] defaults seguros.
+- [x] configuración no imprime secretos;
+- [x] error por secret faltante no revela valores;
+- [x] defaults seguros.
 
 ---
 
@@ -725,9 +726,9 @@ Seguridad:
 # 19. Checkpoint actual
 
 **Fase activa:** Fase 1  
-**Tarea activa:** ninguna; F1.1 finalizada sin iniciar tareas posteriores.
-**Última tarea completada:** F1.1 — Inicialización del repositorio.
-**Siguiente tarea sugerida:** F1.2 — Configuración central, solo con instrucción del usuario.
+**Tarea activa:** ninguna; F1.2 finalizada sin iniciar tareas posteriores.
+**Última tarea completada:** F1.2 — Configuración central.
+**Siguiente tarea sugerida:** F1.3 — Aplicación FastAPI y health check, solo con instrucción del usuario.
 
 ---
 
@@ -821,6 +822,64 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.2 — Configuración central, sin iniciar hasta recibir instrucción del usuario.
+
+---
+
+## 2026-08-25 — Configuración central
+
+**Fase:** Fase 1
+**Tarea:** F1.2 — Configuración central
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- implementado `Settings` como punto único de configuración con carga desde entorno y `.env`;
+- agregada validación de entorno, host, puerto, modelo, retención, timeout, límite de
+  mensaje y nivel de log;
+- configurada `OPENAI_API_KEY` como `SecretStr` obligatorio, excluido de representaciones y
+  protegido mediante errores que ocultan valores de entrada;
+- agregado `get_settings()` con caché por proceso, sin evaluar configuración al importar;
+- agregadas dependencias acotadas de Pydantic y pydantic-settings;
+- documentado el comportamiento de configuración y sus límites en README;
+- revisada la documentación oficial de OpenAI para mantener la clave en una variable de
+  entorno del servidor.
+
+Archivos:
+
+- `backend/app/core/config.py`
+- `backend/tests/test_config.py`
+- `pyproject.toml`
+- `README.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `.venv\\Scripts\\python.exe -m pip install -e ".[dev]"` -> instalación actualizada correcta;
+- `.venv\\Scripts\\python.exe -m pytest` -> 12 pruebas aprobadas;
+- `.venv\\Scripts\\ruff.exe check .` -> sin hallazgos;
+- `.venv\\Scripts\\ruff.exe format --check .` -> 15 archivos con formato correcto;
+- `.venv\\Scripts\\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios en los cambios.
+
+Seguridad:
+
+- `OPENAI_API_KEY` permanece vacía en `.env.example` y `.env` continúa ignorado;
+- no se detectaron claves con forma real en el repositorio;
+- representación, serialización y errores de validación comprobados sin revelar el secreto;
+- configuración comprobada sin `print` ni logging directo;
+- las pruebas usan un marcador aleatorio que no tiene formato de API key y no hacen llamadas
+  externas.
+
+Riesgos/Pendientes:
+
+- la configuración de CORS se abordará en F1.4;
+- la API key solo se exigirá cuando `get_settings()` sea solicitado; no existe integración con
+  OpenAI ni verificación de credenciales en F1.2;
+- el modelo configurado se validará operativamente durante la integración de OpenAI.
+
+Siguiente:
+
+- F1.3 — Aplicación FastAPI y health check, sin iniciar hasta recibir instrucción del usuario.
 
 ---
 
