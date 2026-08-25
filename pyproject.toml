@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
     "fastapi>=0.141,<0.142",
+    "openai>=3.3,<3.4",
     "pydantic>=2.13,<2.14",
     "pydantic-settings>=2.15,<2.16",
 ]
@@ -23,6 +24,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["backend", "backend.app*"]
+
+[tool.setuptools.package-data]
+"backend.app.prompts" = ["*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]

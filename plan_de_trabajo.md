@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-25  
 **Fase activa:** Fase 1  
-**Subfase siguiente:** F1.5 — OpenAIService con Responses API
+**Subfase siguiente:** F1.6 — Endpoint interno POST /api/v1/chat
 **Estado global:** 🟨 EN DESARROLLO  
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -344,42 +344,46 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.5 — OpenAIService con Responses API
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-25
+
+**Fecha de finalización:** 2026-08-25
 
 
 ### Alcance
 
-- [ ] agregar/validar SDK oficial.
+- [x] agregar/validar SDK oficial.
 
-- [ ] encapsular cliente OpenAI.
+- [x] encapsular cliente OpenAI.
 
-- [ ] Responses API.
+- [x] Responses API.
 
-- [ ] prompt base.
+- [x] prompt base.
 
-- [ ] timeout.
+- [x] timeout.
 
-- [ ] store configurable.
+- [x] store configurable.
 
-- [ ] errores de proveedor.
+- [x] errores de proveedor.
 
 
 ### Criterios de aceptación
 
-- [ ] servicio mockeable.
+- [x] servicio mockeable.
 
-- [ ] Responses API operativa.
+- [x] Responses API operativa.
 
-- [ ] rutas desacopladas del SDK.
+- [x] rutas desacopladas del SDK.
 
 
 ### Seguridad
 
-- [ ] API key backend-only.
+- [x] API key backend-only.
 
-- [ ] no Assistants API.
+- [x] no Assistants API.
 
-- [ ] no logs de prompt/chat completo.
+- [x] no logs de prompt/chat completo.
 
 
 ### Prompt para Codex
@@ -3780,15 +3784,15 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | Control | Primera fase | Obligatorio antes de producción | Estado |
 |---|---:|---:|---|
 | `.env` ignorado | F1 | Sí | ✅ |
-| OpenAI key backend-only | F1 | Sí | ✅ configuración |
+| OpenAI key backend-only | F1 | Sí | ✅ F1.5 |
 | configuración con secretos protegidos | F1 | Sí | ✅ F1.2 |
 | validación HTTP/Pydantic | F1 | Sí | ⬜ |
 | input size limit | F1 | Sí | ✅ configuración / pendiente endpoint |
-| timeout OpenAI | F1 | Sí | ✅ configuración / pendiente uso |
+| timeout OpenAI | F1 | Sí | ✅ F1.5 |
 | errores seguros | F1 | Sí | ✅ F1.4 |
 | logging sin secrets/PII | F1 | Sí | ✅ F1.4 |
 | CORS allowlist | F1 | Sí cuando haya navegador | ✅ F1.4 |
-| tests sin OpenAI real | F1 | Sí | 🟨 parcial |
+| tests sin OpenAI real | F1 | Sí | ✅ F1.5 |
 | Meta tokens backend-only | F2 | Sí | ⬜ |
 | verificación GET webhook | F2 | Sí | ⬜ |
 | firma/autenticidad POST webhook | F2 | Sí | ⬜ |
@@ -3876,11 +3880,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 1.  
 **Subfase activa:** ninguna.
-**Última subfase completada:** F1.4 — Errores, request ID, logging y CORS.
-**Siguiente subfase:** F1.5 — OpenAIService con Responses API.
+**Última subfase completada:** F1.5 — OpenAIService con Responses API.
+**Siguiente subfase:** F1.6 — Endpoint interno POST /api/v1/chat.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.5 ni Fase 2 automáticamente sin instrucción del usuario.
+No iniciar F1.6 ni Fase 2 automáticamente sin instrucción del usuario.
 
 ---
 
@@ -4199,6 +4203,84 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.5 — OpenAIService con Responses API, sin iniciar hasta recibir instrucción del usuario.
+
+---
+
+## 2026-08-25 — OpenAIService con Responses API
+
+**Fase:** Fase 1
+**Tarea:** F1.5 — OpenAIService con Responses API
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregado y acotado el SDK oficial `openai>=3.3,<3.4`; versión instalada y comprobada: 3.3.1;
+- creado `OpenAIService` asincrónico, con cliente inyectable y sin dependencias desde rutas HTTP;
+- implementada la llamada exclusiva a Responses API mediante `responses.create` y lectura de
+  `output_text`;
+- agregados prompt base versionado, modelo, timeout, reintentos acotados y `store` configurables;
+- agregada jerarquía interna para timeout, rate limit, conexión, estado HTTP y respuesta vacía;
+- agregadas pruebas completamente simuladas para parámetros, salida, errores y ausencia de red
+  o logs con contenido privado;
+- actualizados configuración, ejemplo de entorno, README, diseño y checkpoint oficial.
+
+Archivos:
+
+- `pyproject.toml`
+- `.env.example`
+- `backend/app/core/config.py`
+- `backend/app/core/exceptions.py`
+- `backend/app/prompts/base_system_prompt.txt`
+- `backend/app/services/openai_service.py`
+- `backend/tests/test_config.py`
+- `backend/tests/test_openai_service.py`
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `git status --short --branch` al inicio -> árbol limpio sobre `main` antes de los cambios;
+- `.venv\Scripts\python.exe -m pip index versions openai` -> versión oficial disponible 3.3.1;
+- `.venv\Scripts\python.exe -m pip install -e ".[dev]"` -> dependencia instalada en el entorno;
+- revisión de OpenAI Docs -> confirmados `AsyncOpenAI`, `responses.create`, `output_text`,
+  `instructions`, `input`, `model`, `store`, timeout y jerarquía de errores del SDK;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_config.py
+  backend\tests\test_openai_service.py --basetemp=.venv\pytest-f15-target -o
+  cache_dir=.venv\pytest-cache-f15-target -q` -> 29 pruebas aprobadas en la primera revisión;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f15 -o
+  cache_dir=.venv\pytest-cache-f15` -> 38 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 26 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios; solo avisos informativos LF/CRLF;
+- búsquedas con `rg` -> ninguna referencia a Assistants API y ninguna importación de OpenAI en
+  rutas HTTP.
+
+Seguridad:
+
+- la API key permanece como `SecretStr`, se entrega solo al cliente backend y no aparece en la
+  representación del servicio;
+- el servicio usa únicamente Responses API; no se agregó Assistants API;
+- `store` conserva el default `false` y solo cambia mediante configuración validada;
+- timeout y reintentos están configurados y acotados;
+- el servicio no emite logs con prompt, mensaje o respuesta; las pruebas usan marcadores y
+  comprueban su ausencia;
+- los errores del SDK se traducen a categorías internas sin URL, cuerpo, traceback ni detalle
+  del proveedor;
+- todas las pruebas usan clientes simulados y bloquean cualquier resolución de red.
+
+Riesgos/Pendientes:
+
+- no se hizo una llamada real con credenciales ni se consumieron créditos; esa comprobación
+  explícita corresponde a F1.8;
+- el servicio todavía no está conectado a una ruta HTTP; esa integración y la validación de
+  longitud del mensaje corresponden a F1.6;
+- el costo y la latencia reales dependen del modelo y deberán medirse en la prueba manual.
+
+Siguiente:
+
+- F1.6 — Endpoint interno POST /api/v1/chat, sin iniciar hasta recibir instrucción del usuario.
 
 ---
 

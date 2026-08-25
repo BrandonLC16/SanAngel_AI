@@ -85,6 +85,7 @@ class Settings(HttpSettings):
     openai_model: str = Field(default="gpt-5.6", min_length=1, max_length=100)
     openai_store_responses: bool = False
     openai_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    openai_max_retries: int = Field(default=2, ge=0, le=5)
 
     chat_max_message_chars: int = Field(default=2000, ge=1, le=10_000)
 

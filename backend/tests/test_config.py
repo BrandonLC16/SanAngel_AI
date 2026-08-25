@@ -21,6 +21,7 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.openai_model == "gpt-5.6"
     assert settings.openai_store_responses is False
     assert settings.openai_timeout_seconds == 30
+    assert settings.openai_max_retries == 2
     assert settings.chat_max_message_chars == 2000
     assert settings.log_level == "INFO"
 
@@ -31,6 +32,7 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("OPENAI_MODEL", "configured-model")
     monkeypatch.setenv("OPENAI_STORE_RESPONSES", "true")
     monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "45.5")
+    monkeypatch.setenv("OPENAI_MAX_RETRIES", "4")
     monkeypatch.setenv("CHAT_MAX_MESSAGE_CHARS", "1500")
 
     settings = Settings(_env_file=None)
@@ -39,6 +41,7 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.openai_model == "configured-model"
     assert settings.openai_store_responses is True
     assert settings.openai_timeout_seconds == 45.5
+    assert settings.openai_max_retries == 4
     assert settings.chat_max_message_chars == 1500
 
 
@@ -103,6 +106,8 @@ def test_invalid_secret_error_does_not_reveal_value() -> None:
     (
         ("openai_timeout_seconds", 0),
         ("openai_timeout_seconds", 121),
+        ("openai_max_retries", -1),
+        ("openai_max_retries", 6),
         ("chat_max_message_chars", 0),
         ("chat_max_message_chars", 10_001),
     ),

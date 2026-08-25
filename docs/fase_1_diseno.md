@@ -3,7 +3,7 @@
 
 **Fecha original:** 2026-08-25  
 **Actualizado:** 2026-08-25  
-**Estado de implementación actual:** F1.1-F1.4 completadas; F1.5 es la siguiente subfase.
+**Estado de implementación actual:** F1.1-F1.5 completadas; F1.6 es la siguiente subfase.
 **Objetivo:** construir un núcleo backend seguro y comprobable que después pueda ser consumido por WhatsApp sin acoplar la lógica del chatbot al canal.
 
 ---
@@ -55,6 +55,7 @@ F1.1 — Inicialización del repositorio  ✅ COMPLETADO
 F1.2 — Configuración central           ✅ COMPLETADO
 F1.3 — FastAPI + health check          ✅ COMPLETADO
 F1.4 — Errores, request ID y CORS      ✅ COMPLETADO
+F1.5 — OpenAIService                   ✅ COMPLETADO
 ```
 
 No rehacer F1.1/F1.2 salvo regresión.
@@ -201,6 +202,7 @@ OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_STORE_RESPONSES=false
 OPENAI_TIMEOUT_SECONDS=30
+OPENAI_MAX_RETRIES=2
 
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 CHAT_MAX_MESSAGE_CHARS=2000
@@ -224,7 +226,7 @@ F1.1 repositorio                         ✅
 F1.2 configuración                       ✅
 F1.3 FastAPI /health                     ✅
 F1.4 errores + logging + CORS            ✅
-F1.5 OpenAIService                       ⬜
+F1.5 OpenAIService                       ✅
 F1.6 endpoint interno /api/v1/chat       ⬜
 F1.7 pruebas/calidad                     ⬜
 F1.8 integración manual OpenAI           ⬜

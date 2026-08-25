@@ -15,3 +15,30 @@ class ServiceUnavailableError(ApplicationError):
     error_code = "service_unavailable"
     public_message = "El servicio no está disponible temporalmente."
     status_code = 503
+
+
+class AIProviderError(ServiceUnavailableError):
+    """Base exception for failures returned by the configured AI provider."""
+
+    error_code = "ai_service_unavailable"
+    public_message = "El asistente no está disponible temporalmente."
+
+
+class AIProviderTimeoutError(AIProviderError):
+    """Raised when the AI provider exceeds the configured timeout."""
+
+
+class AIProviderRateLimitError(AIProviderError):
+    """Raised when the AI provider rejects a request due to rate limits."""
+
+
+class AIProviderConnectionError(AIProviderError):
+    """Raised when the AI provider cannot be reached."""
+
+
+class AIProviderStatusError(AIProviderError):
+    """Raised when the AI provider returns a non-success HTTP status."""
+
+
+class AIProviderResponseError(AIProviderError):
+    """Raised when the AI provider response has no usable text output."""
