@@ -9,12 +9,14 @@ description = "Backend para el chatbot de atencion al cliente de una cadena de c
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
+    "fastapi>=0.141,<0.142",
     "pydantic>=2.13,<2.14",
     "pydantic-settings>=2.15,<2.16",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "httpx>=0.28,<0.29",
     "pytest>=9.1,<10.0",
     "ruff>=0.16,<0.17",
 ]

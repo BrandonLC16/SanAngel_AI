@@ -7,9 +7,20 @@ promociones o pedidos.
 
 ## Estado actual
 
-F1.1 y F1.2 inicializan el repositorio e implementan la configuracion central validada.
-Todavia no se implementan FastAPI, endpoints ni la integracion con OpenAI; corresponden a
-tareas posteriores de la Fase 1.
+F1.1, F1.2 y F1.3 inicializan el repositorio, implementan la configuracion central validada y
+crean la aplicacion FastAPI con su health check. Todavia no se implementan el endpoint de chat
+ni la integracion con OpenAI; corresponden a tareas posteriores de la Fase 1.
+
+## Health check
+
+`GET /health` responde sin cargar configuracion ni llamar a servicios externos:
+
+```json
+{
+  "status": "ok",
+  "service": "carniceria-ai-chatbot"
+}
+```
 
 ## Requisitos
 

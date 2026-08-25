@@ -1,109 +1,197 @@
 # AGENTS.md
-## Instrucciones para Codex — Carnicería AI Chatbot
+## Instrucciones permanentes para Codex — Chatbot IA para Carnicerías + WhatsApp
 
-Este archivo define las reglas permanentes de trabajo para cualquier agente que modifique este repositorio.
+Este archivo contiene reglas obligatorias para cualquier agente que modifique este repositorio.
 
 ---
 
-# 1. Misión del proyecto
+# 1. Objetivo del sistema
 
-Construir un chatbot de atención al cliente para una cadena de carnicerías.
+Construir un asistente automatizado de atención al cliente para una cadena de carnicerías.
 
-El sistema debe poder evolucionar para responder consultas relacionadas con:
+## Canal del cliente
 
+**WhatsApp Business Platform / Cloud API es la interfaz principal del cliente.**
+
+El cliente final NO utilizará directamente el endpoint interno de chat ni el panel administrativo.
+
+Flujo objetivo:
+
+```text
+Cliente
+  |
+  v
+WhatsApp
+  |
+  v
+Meta / WhatsApp Cloud API
+  |
+  | webhook HTTPS
+  v
+FastAPI
+  |
+  v
+Orquestador de conversación
+  |-------------------------|
+  v                         v
+OpenAI                  Servicios del negocio
+Responses API              |
+                            v
+                    Base de datos / FAQ
+                            |
+  |-------------------------|
+  v
+Respuesta
+  |
+  v
+WhatsApp Cloud API
+  |
+  v
+Cliente
+```
+
+## Interfaz del personal
+
+El panel web se implementará posteriormente y será únicamente para:
+
+- administración;
 - sucursales;
-- horarios;
 - productos;
 - precios;
-- preguntas frecuentes;
-- promociones;
-- pedidos;
-- información comercial.
+- FAQ;
+- carga de Excel;
+- conversaciones;
+- preguntas no resueltas;
+- atención humana;
+- auditoría y estadísticas.
 
-El modelo de IA sirve para interpretar lenguaje natural y redactar respuestas.
+---
 
-Los datos críticos del negocio, especialmente:
+# 2. Principio arquitectónico principal
+
+OpenAI NO es la fuente de verdad del negocio.
+
+OpenAI se utiliza para:
+
+- comprender lenguaje natural;
+- detectar intención;
+- decidir qué herramienta autorizada necesita;
+- redactar respuestas;
+- mantener una conversación controlada.
+
+Los datos críticos deben provenir de fuentes determinísticas.
+
+```text
+precio        -> servicio -> base de datos
+sucursal      -> servicio -> base de datos
+horario       -> servicio -> base de datos
+FAQ           -> servicio -> fuente validada
+inventario    -> fuente real o respuesta "no confirmado"
+pedido        -> lógica transaccional + confirmación explícita
+```
+
+Nunca permitir que el modelo invente:
 
 - precios;
 - existencias;
-- direcciones;
-- horarios;
 - promociones;
-- pedidos;
-
-NO deben ser inventados por el modelo.
-
-Cuando se implementen esas funciones, deberán provenir de fuentes determinísticas como SQLite/PostgreSQL, importaciones validadas de Excel o APIs internas.
+- horarios;
+- ubicaciones;
+- pedidos confirmados;
+- condiciones comerciales.
 
 ---
 
-# 2. Stack previsto
+# 3. Stack previsto
 
 Backend:
 
 - Python.
 - FastAPI.
 - Pydantic.
-- SDK oficial OpenAI.
-- Responses API.
+- pydantic-settings.
+- SDK oficial de OpenAI.
+- OpenAI Responses API.
 
-Persistencia futura:
+Canal:
 
-- SQLite inicialmente.
-- Posible migración a PostgreSQL.
+- WhatsApp Business Platform / Cloud API de Meta.
+- Webhooks HTTPS.
+- Graph API para mensajes salientes.
 
-Datos futuros:
+Persistencia:
 
-- Excel mediante pandas/openpyxl.
-- archivos TXT/Markdown para conocimiento simple.
+- SQLite durante el MVP.
+- SQLAlchemy.
+- Alembic cuando comience la fase de persistencia.
+- Evaluar PostgreSQL antes de escalar a múltiples instancias.
 
-Frontend futuro:
+Datos:
+
+- SQLite como fuente operativa.
+- Excel como mecanismo de importación/actualización, no como base consultada en cada mensaje.
+- TXT/Markdown para conocimiento simple cuando corresponda.
+
+Panel futuro:
 
 - React o Next.js.
+- autenticación y autorización en backend.
 
-Despliegue futuro:
+Producción:
 
 - Docker.
-- reverse proxy.
 - HTTPS.
+- reverse proxy.
+- secret manager.
+- observabilidad.
+- rate limiting.
+- backups.
 
 ---
 
-# 3. Archivos que debes leer ANTES de modificar código
+# 4. Documentos obligatorios antes de trabajar
 
-Siempre, en este orden:
+Antes de modificar código lee, en este orden:
 
-1. `AGENTS.md`
-2. `plan_de_trabajo.md`
-3. `README.md` si existe.
-4. documentación de la fase activa.
-5. código y tests relacionados con la tarea.
+1. `AGENTS.md`.
+2. `plan_de_trabajo.md`.
+3. `README.md`, si existe.
+4. `docs/fase_1_diseno.md` si estás en Fase 1.
+5. `docs/fase_2_whatsapp.md` si estás en Fase 2 o modificas integración WhatsApp.
+6. archivos de código y tests relacionados.
 
-No empieces a programar sin identificar:
+Antes de escribir código identifica explícitamente:
 
 - fase activa;
-- tarea activa;
-- criterio de aceptación;
-- riesgos de seguridad relacionados.
+- subfase activa;
+- estado actual;
+- criterios de aceptación;
+- controles de seguridad;
+- archivos probablemente afectados.
 
 ---
 
-# 4. Regla principal de avance
+# 5. Regla de alcance
 
 Trabaja solamente en:
 
-1. la tarea que el usuario haya solicitado explícitamente; o
-2. si no existe una tarea explícita, la primera tarea `⬜ PENDIENTE` de la fase activa.
+1. la subfase que el usuario solicite; o
+2. si no la especifica, la primera subfase `⬜ PENDIENTE` de la fase activa.
 
-No empieces automáticamente la siguiente fase.
+No empieces automáticamente la subfase siguiente.
 
-No mezcles múltiples fases en una misma modificación salvo instrucción explícita del usuario.
+No empieces automáticamente una fase nueva.
+
+No mezcles tareas de varias fases salvo que:
+
+- el usuario lo solicite explícitamente; o
+- sea estrictamente necesario para corregir una regresión y lo documentes.
 
 ---
 
-# 5. Estados oficiales
+# 6. Estados oficiales
 
-Usar únicamente estos estados en `plan_de_trabajo.md`:
+Usar únicamente:
 
 - `⬜ PENDIENTE`
 - `🟨 EN_PROGRESO`
@@ -116,18 +204,18 @@ Flujo normal:
 
 ```text
 ⬜ PENDIENTE
-     |
-     v
+    |
+    v
 🟨 EN_PROGRESO
-     |
-     v
+    |
+    v
 🧪 VALIDACION
-     |
-     v
+    |
+    v
 ✅ COMPLETADO
 ```
 
-Si una tarea falla después de completada:
+Si una función previamente cerrada falla:
 
 ```text
 ✅ COMPLETADO -> ↩️ REABIERTO
@@ -135,341 +223,435 @@ Si una tarea falla después de completada:
 
 ---
 
-# 6. Obligación de actualizar `plan_de_trabajo.md`
+# 7. Actualización obligatoria del plan
 
-Al comenzar una tarea:
+`plan_de_trabajo.md` es el checkpoint oficial.
 
-1. cambiar su estado a `🟨 EN_PROGRESO`;
-2. añadir fecha de inicio si corresponde.
+## Al iniciar una subfase
 
-Antes de marcar como completada:
+- cambiarla a `🟨 EN_PROGRESO`;
+- registrar fecha de inicio;
+- no modificar estados de subfases no trabajadas.
 
-1. ejecutar pruebas relevantes;
-2. ejecutar validaciones de calidad;
-3. revisar seguridad;
-4. verificar criterios de aceptación;
-5. cambiar temporalmente a `🧪 VALIDACION` si todavía se está comprobando.
+## Antes de completar
 
-Solo después:
+- cambiar a `🧪 VALIDACION`;
+- ejecutar tests relevantes;
+- ejecutar lint/formato;
+- revisar seguridad;
+- revisar criterios de aceptación.
+
+## Solo después
+
+Cambiar a:
 
 ```text
 ✅ COMPLETADO
 ```
 
-Al finalizar cada bloque de trabajo, agregar una entrada al historial del plan con:
+y agregar entrada al historial con:
 
 - fecha;
-- fase;
-- tarea;
-- cambios realizados;
-- archivos afectados;
-- tests/comandos ejecutados;
-- resultado;
-- riesgos o pendientes;
-- siguiente tarea recomendada.
+- fase/subfase;
+- cambios;
+- archivos;
+- comandos ejecutados;
+- resultados;
+- controles de seguridad;
+- riesgos;
+- siguiente subfase recomendada.
 
-No marques una tarea como completada si:
-
-- faltan tests requeridos;
-- los tests fallan;
-- existe un error conocido que invalida su criterio de aceptación;
-- la función depende de un secreto inexistente y no fue posible comprobarla;
-- existe un riesgo de seguridad crítico sin resolver.
+Nunca marques como completado algo que no hayas comprobado.
 
 ---
 
-# 7. Política de cambios pequeños
+# 8. Regla especial sobre el avance actual
 
-Prefiere cambios:
+El checkpoint recibido establece:
 
-- pequeños;
-- verificables;
-- reversibles;
-- relacionados con una sola tarea.
+- F1.1 `✅ COMPLETADO`.
+- F1.2 `✅ COMPLETADO`.
+- F1.3 `⬜ PENDIENTE`.
 
-Evita refactors masivos sin necesidad.
+No rehagas ni reviertas F1.1 o F1.2 salvo que encuentres una regresión real.
 
-No cambies arquitectura, framework, lenguaje o dependencias principales sin:
+Si necesitas tocarlas por compatibilidad:
 
-1. justificar el cambio;
-2. explicar impacto;
-3. actualizar documentación;
-4. contar con instrucción del usuario cuando el cambio sea significativo.
+1. preserva el comportamiento existente;
+2. ejecuta nuevamente sus tests;
+3. registra el motivo;
+4. usa `↩️ REABIERTO` si el criterio previamente cumplido dejó de cumplirse.
 
 ---
 
-# 8. Seguridad — reglas NO negociables
+# 9. Arquitectura por capas
 
-## 8.1 Secretos
+Evitar llamadas directas entre controladores HTTP y proveedores externos.
 
-NUNCA:
-
-- escribas una API key real;
-- inventes una API key;
-- copies una API key a código;
-- muestres una API key en logs;
-- agregues una API key a tests;
-- agregues `.env` a Git;
-- coloques credenciales en frontend;
-- imprimas headers `Authorization`.
-
-Usar variables de entorno.
-
-Debe existir:
+Preferir:
 
 ```text
-.env.example
+route/controller
+      |
+      v
+application/orchestrator
+      |
+      +------------------+
+      |                  |
+      v                  v
+OpenAIService       BusinessService
+                         |
+                         v
+                     Repository
 ```
 
-sin valores secretos.
+Para WhatsApp:
+
+```text
+WhatsApp webhook route
+      |
+      v
+WhatsAppWebhookService
+      |
+      v
+MessageOrchestrator
+      |
+      +----------+
+      |          |
+      v          v
+Chatbot       Business tools
+      |
+      v
+WhatsAppClient
+```
+
+El endpoint `/api/v1/chat` de Fase 1 es para desarrollo/pruebas y NO es el canal final del cliente.
 
 ---
 
-## 8.2 OpenAI
+# 10. Seguridad — reglas no negociables
 
-La OpenAI API key solo puede ser utilizada por el backend.
+## 10.1 Secretos
 
-El frontend debe hablar con nuestro backend.
+Nunca:
 
-Arquitectura permitida:
+- escribir claves reales en código;
+- inventar claves con apariencia real;
+- commitear `.env`;
+- imprimir secretos;
+- incluir secretos en excepciones;
+- incluir secretos en screenshots;
+- colocar secretos en frontend;
+- colocar tokens en URLs;
+- registrar `Authorization`.
+
+Secretos previstos:
 
 ```text
-frontend -> backend -> OpenAI
+OPENAI_API_KEY
+WHATSAPP_ACCESS_TOKEN
+META_APP_SECRET
+WHATSAPP_VERIFY_TOKEN
 ```
 
-Arquitectura prohibida:
+Todos son backend-only.
 
-```text
-frontend -> OpenAI con secret API key
-```
-
-Usar Responses API para nuevas integraciones.
-
-No introducir Assistants API como nueva dependencia.
-
-La configuración del modelo debe ser configurable por entorno y no depender de un literal disperso por el código.
+`.env.example` debe contener únicamente nombres y valores vacíos/no sensibles.
 
 ---
 
-## 8.3 Datos del negocio
+## 10.2 OpenAI
 
-Nunca permitas que el modelo invente datos críticos.
-
-Cuando existan herramientas de negocio:
-
-```text
-precio -> función -> base de datos
-horario -> función -> base de datos
-sucursal -> función -> base de datos
-inventario -> fuente en tiempo real o respuesta de incertidumbre
-```
-
-No usar memoria del modelo como fuente de verdad.
+- usar Responses API para nuevas integraciones;
+- no introducir Assistants API;
+- modelo configurable;
+- timeout configurable;
+- `store` configurable y con un default conservador;
+- tests normales siempre mockeados;
+- no registrar prompts, mensajes o respuestas completos por defecto;
+- controlar tamaño de input;
+- manejar rate limit y errores de proveedor;
+- no permitir que texto del usuario cambie privilegios.
 
 ---
 
-## 8.4 SQL
+## 10.3 WhatsApp — validación de webhook
 
-Cuando se implemente la base de datos:
+El webhook es una frontera pública y debe tratarse como input no confiable.
 
-- usar ORM o queries parametrizadas;
-- prohibido concatenar input del usuario en SQL;
-- prohibido exponer una herramienta `execute_sql(query)` directamente al modelo;
-- las tools de IA deben representar operaciones específicas y con mínimo privilegio.
+### GET de verificación
 
-Ejemplo correcto:
+- comparar el token de verificación con configuración del servidor;
+- devolver solamente el challenge cuando la verificación sea válida;
+- no registrar el token;
+- preferir comparación segura cuando sea razonable.
+
+### POST de eventos
+
+Antes de confiar en el payload:
+
+1. conservar el cuerpo HTTP crudo;
+2. validar la firma que corresponda a la configuración oficial vigente de Meta;
+3. solo después parsear/procesar el JSON;
+4. rechazar solicitudes no autenticadas;
+5. validar esquema;
+6. ignorar tipos de evento no utilizados.
+
+Cuando la integración use `X-Hub-Signature-256`, calcular el HMAC SHA-256 sobre el **raw body** con `META_APP_SECRET` y comparar de forma segura.
+
+Nunca "validar" el webhook solo porque conoce `WHATSAPP_VERIFY_TOKEN`; ese token corresponde al handshake de verificación, no reemplaza la autenticidad del POST.
+
+Antes de implementar o modificar este código, revisar la documentación oficial vigente de Meta.
+
+---
+
+## 10.4 WhatsApp — tokens y Graph API
+
+- `WHATSAPP_ACCESS_TOKEN` solo backend.
+- `WHATSAPP_PHONE_NUMBER_ID` y versión de Graph API vienen de configuración.
+- no aceptar una URL de Graph API controlada por el usuario.
+- no interpolar números o IDs sin validación.
+- usar timeout.
+- reintentos limitados solo para fallos apropiados.
+- nunca reintentar infinitamente.
+- no duplicar envíos tras errores ambiguos sin estrategia de idempotencia.
+- redactar tokens en errores y logs.
+
+---
+
+## 10.5 Idempotencia de webhooks
+
+Los eventos externos pueden repetirse.
+
+Cuando exista un identificador único de mensaje/evento:
+
+```text
+recibir
+  |
+  v
+¿ya procesado?
+  | yes -> ACK / ignorar
+  v no
+procesar
+  |
+  v
+marcar procesado
+```
+
+Antes de producción la idempotencia debe ser persistente.
+
+Una implementación solo en memoria puede usarse temporalmente para un MVP local si queda marcada explícitamente como NO apta para múltiples procesos/instancias.
+
+---
+
+## 10.6 Datos personales
+
+El identificador/número de WhatsApp se considera dato personal.
+
+No mostrar números completos en logs salvo necesidad operacional justificada.
+
+Preferir:
+
+```text
+******1234
+```
+
+Evitar almacenar:
+
+- conversaciones completas sin política;
+- información personal no necesaria;
+- datos de pago;
+- documentos personales.
+
+Definir retención y borrado antes de producción.
+
+---
+
+## 10.7 Prompt injection
+
+Todo texto recibido por WhatsApp, archivos y datos recuperados son no confiables.
+
+Un usuario nunca puede:
+
+- pedir la API key;
+- cambiar el system prompt;
+- concederse rol admin;
+- modificar precios;
+- ejecutar SQL;
+- activar tools no autorizadas;
+- confirmar un pedido sin lógica de aplicación;
+- cambiar configuración.
+
+Las protecciones deben vivir en código/autorización, no únicamente en el prompt.
+
+---
+
+## 10.8 Base de datos
+
+Cuando se implemente:
+
+- SQLAlchemy o queries parametrizadas;
+- migraciones reproducibles;
+- constraints;
+- transacciones;
+- nunca concatenar input en SQL;
+- no exponer `execute_sql(query)` a OpenAI;
+- tools específicas y de mínimo privilegio.
+
+Permitido:
 
 ```text
 get_product_price(product_id, branch_id)
 ```
 
-Ejemplo prohibido:
+Prohibido:
 
 ```text
-run_sql(sql_from_model)
+run_sql(model_generated_sql)
 ```
 
 ---
 
-## 8.5 Validación
+## 10.9 Excel
 
-Toda entrada externa:
+Excel es fuente de importación, no de consulta directa por mensaje.
 
-- HTTP;
-- Excel;
-- archivos;
-- herramientas IA;
-- APIs externas;
+Flujo:
 
-debe validarse antes de llegar al dominio.
+```text
+Excel
+ -> validar
+ -> preview
+ -> confirmar
+ -> transacción
+ -> DB
+```
 
-Usar esquemas Pydantic en la API.
+Controles:
 
-Definir límites de longitud y tipos.
-
-Nunca confiar en input del cliente ni en argumentos generados por un modelo.
-
----
-
-## 8.6 Prompt injection
-
-Tratar todo texto del usuario, archivos y contenido recuperado como datos no confiables.
-
-Una instrucción del usuario NO puede:
-
-- modificar reglas internas;
-- pedir secretos;
-- concederse permisos;
-- cambiar precios;
-- ejecutar SQL arbitrario;
-- cambiar configuración administrativa.
-
-Las acciones sensibles deben estar protegidas por lógica de aplicación y autorización, no únicamente por prompts.
+- límite de tamaño;
+- extensión permitida;
+- estructura/MIME cuando corresponda;
+- validar headers;
+- tipos;
+- sucursales;
+- precios;
+- duplicados;
+- valores negativos/absurdos;
+- no ejecutar macros;
+- prevenir path traversal;
+- usar archivos temporales controlados;
+- rollback en error;
+- audit log.
 
 ---
 
-## 8.7 Autorización
+## 10.10 Panel administrativo
 
-Cuando se implemente el panel:
+Cuando exista:
 
-- separar endpoints públicos y administrativos;
-- autenticación obligatoria;
-- roles mínimos;
-- autorización en backend;
-- nunca confiar solamente en ocultar botones del frontend.
-
----
-
-## 8.8 Passwords
-
-Cuando existan cuentas:
-
-- jamás guardar passwords en texto plano;
-- usar algoritmo de hashing de contraseñas apropiado, por ejemplo Argon2id o una alternativa actual recomendada;
-- usar salt administrado por la librería;
-- nunca implementar criptografía casera.
+- autenticación backend;
+- RBAC;
+- sesiones seguras;
+- rate limiting de login;
+- hash de password con algoritmo adecuado mantenido;
+- CSRF si la estrategia de sesión lo requiere;
+- CORS allowlist;
+- auditoría de cambios;
+- nunca confiar en controles visuales del frontend.
 
 ---
 
-## 8.9 CORS
+## 10.11 Pedidos y acciones de escritura
+
+OpenAI no confirma acciones comerciales por sí solo.
+
+Para pedidos o cambios:
+
+```text
+interpretar
+ -> validar contra datos reales
+ -> mostrar resumen
+ -> confirmación explícita
+ -> ejecutar
+ -> registrar resultado
+```
+
+Toda acción debe ser:
+
+- autorizada;
+- idempotente cuando aplique;
+- auditable;
+- validada de nuevo en backend.
+
+---
+
+# 11. CORS
+
+WhatsApp no depende de CORS porque los webhooks son servidor-a-servidor.
+
+CORS solo se necesita para:
+
+- endpoint web de desarrollo;
+- panel administrativo futuro.
 
 No usar `*` en producción.
 
-Permitir únicamente orígenes necesarios.
+---
+
+# 12. Logging
+
+Registrar solo lo necesario:
+
+- timestamp;
+- request ID;
+- endpoint;
+- tipo de evento;
+- HTTP status;
+- duración;
+- error category;
+- identificador externo redactado/hasheado cuando sea útil.
+
+No registrar por defecto:
+
+- OpenAI API key;
+- Meta token;
+- app secret;
+- verify token;
+- headers Authorization;
+- raw webhook body completo;
+- conversación completa;
+- prompt completo;
+- respuesta completa del modelo.
 
 ---
 
-## 8.10 Errores
-
-El usuario recibe mensajes genéricos y útiles.
+# 13. Errores
 
 No devolver:
 
 - tracebacks;
-- variables de entorno;
-- secretos;
-- queries internas;
+- secrets;
 - paths locales;
-- nombres de infraestructura innecesarios.
+- variables de entorno;
+- SQL;
+- información interna innecesaria.
+
+Crear excepciones de dominio/infraestructura y mapearlas en la frontera HTTP.
 
 ---
 
-## 8.11 Logs
+# 14. Pruebas
 
-Aplicar minimización.
+Los tests comunes NO usan internet.
 
-Permitido:
+Mockear:
 
-- request ID;
-- endpoint;
-- estado;
-- duración;
-- tipo de error.
+- OpenAI.
+- Graph API / WhatsApp.
+- servicios externos.
 
-Evitar:
-
-- cuerpo completo de chats;
-- API keys;
-- tokens;
-- passwords;
-- datos personales innecesarios.
-
-Si un log requiere contenido, redactar información sensible.
-
----
-
-## 8.12 Rate limiting
-
-Antes de hacer público el chatbot:
-
-- implementar límites de solicitud;
-- manejar HTTP 429;
-- evitar reintentos infinitos;
-- usar exponential backoff cuando sea apropiado.
-
----
-
-## 8.13 Archivos Excel
-
-Cuando se implemente importación:
-
-- validar extensión;
-- validar MIME cuando corresponda;
-- limitar tamaño;
-- no confiar en nombre del archivo;
-- validar columnas;
-- validar tipos;
-- validar rangos de precios;
-- no ejecutar macros;
-- procesar el archivo en un área controlada;
-- rechazar filas inválidas de forma explícita;
-- usar transacción para no dejar la base a medias.
-
----
-
-## 8.14 Dependencias
-
-Antes de añadir una dependencia:
-
-1. comprobar que es necesaria;
-2. preferir librerías mantenidas;
-3. evitar duplicar funcionalidad;
-4. fijar/acotar versión;
-5. documentar la razón si es relevante.
-
----
-
-# 9. Reglas de interacción con OpenAI
-
-Mantener la llamada al SDK fuera de las rutas HTTP.
-
-Usar una capa:
-
-```text
-route -> service -> OpenAI
-```
-
-La lógica de negocio no debe depender directamente del objeto HTTP.
-
-Configurar:
-
-- modelo;
-- timeout;
-- store/retención cuando corresponda;
-
-mediante configuración.
-
-Los tests normales deben mockear OpenAI.
-
-Nunca hagas que `pytest` consuma la API real por defecto.
-
----
-
-# 10. Pruebas
-
-Cada funcionalidad debe incluir o actualizar tests cuando sea razonable.
-
-Antes de cerrar una tarea ejecutar, según aplique:
+Antes de cerrar una subfase ejecutar según aplique:
 
 ```bash
 pytest
@@ -477,169 +659,106 @@ ruff check .
 ruff format --check .
 ```
 
-Si se introduce tipado estricto:
+Si el proyecto incorpora otros validadores, ejecutarlos también.
 
-```bash
-mypy ...
-```
+Pruebas reales contra OpenAI o Meta:
 
-Si un comando no existe todavía, documentarlo en el plan en vez de fingir que fue ejecutado.
-
-Nunca declares que una prueba pasó si no la ejecutaste.
-
----
-
-# 11. Manejo de errores
-
-Crear errores del dominio/servicio y mapearlos en la frontera HTTP.
-
-No esparcir `try/except Exception` por todas las capas.
-
-Capturar excepciones donde pueda:
-
-- agregarse contexto;
-- recuperarse;
-- transformarse en error del dominio;
-- generarse una respuesta segura.
+- explícitas;
+- separadas;
+- no ejecutadas automáticamente por defecto;
+- nunca guardan tokens en fixtures/evidencias.
 
 ---
 
-# 12. Código
+# 15. Dependencias
 
-Principios:
+Antes de agregar una:
 
-- nombres explícitos;
-- funciones pequeñas;
-- responsabilidades claras;
-- evitar duplicación;
-- comentarios para explicar el porqué, no lo obvio;
-- no crear abstracciones prematuras;
-- no mezclar infraestructura con dominio;
-- tipar interfaces públicas importantes.
+1. demostrar que hace falta;
+2. preferir una librería mantenida;
+3. evitar duplicar funcionalidad;
+4. acotar/fijar versión de forma razonable;
+5. actualizar lockfile si existe;
+6. documentar impacto cuando sea relevante.
 
 ---
 
-# 13. Endpoints
+# 16. Cambios pequeños
 
-Usar prefijo:
+Prefiere:
 
-```text
-/api/v1
-```
+- una subfase por cambio;
+- cambios reversibles;
+- tests junto a la implementación;
+- evitar refactors no relacionados.
 
-Endpoints administrativos futuros:
-
-```text
-/api/v1/admin/...
-```
-
-Endpoints públicos:
-
-```text
-/api/v1/chat
-```
-
-No realizar cambios breaking a contratos existentes sin actualizar:
-
-- tests;
-- README;
-- plan de trabajo;
-- consumidores conocidos.
+No cambies framework, lenguaje, ORM, arquitectura o proveedor sin instrucción explícita o justificación documentada.
 
 ---
 
-# 14. Política sobre datos inventados
+# 17. No destruir trabajo existente
 
-Para pruebas puedes crear fixtures claramente ficticios.
+Antes de editar:
 
-Ejemplo:
+- leer el archivo;
+- revisar `git status`;
+- preservar cambios ajenos.
 
-```text
-Sucursal Demo
-Producto Demo
-$123.45
-```
-
-Nunca hacer pasar datos ficticios por datos reales del negocio.
-
----
-
-# 15. Antes de editar un archivo
-
-Revisa primero su contenido actual.
-
-No sobrescribas trabajo del usuario sin entenderlo.
-
-Conserva cambios existentes que no pertenezcan a tu tarea.
-
-Si detectas cambios que parecen hechos por otra persona/agente:
-
-- no los borres;
-- adapta tu cambio;
-- documenta el conflicto si no puede resolverse con seguridad.
-
----
-
-# 16. Acciones destructivas
-
-No ejecutar sin necesidad:
+No usar sin instrucción explícita:
 
 ```text
 git reset --hard
 git clean -fd
+rm -rf
 DROP DATABASE
 DROP TABLE
-rm -rf
 ```
 
-No borrar archivos ajenos a la tarea.
-
-No reescribir historial de Git salvo instrucción explícita.
+No reescribir historial.
 
 ---
 
-# 17. Cambios de base de datos futuros
+# 18. Integraciones externas versionadas
 
-Toda modificación estructural debe convertirse en migración cuando la fase de persistencia lo requiera.
+OpenAI y Meta pueden cambiar APIs, modelos y versiones.
 
-Nunca depender de cambios manuales irrepetibles en producción.
+Antes de implementar una integración:
 
----
+- revisar documentación oficial vigente;
+- no copiar tutoriales antiguos sin verificar;
+- pin/configurar versiones cuando corresponda;
+- aislar detalles del proveedor detrás de servicios;
+- documentar incompatibilidades.
 
-# 18. Excel no será la fuente de consulta directa permanente
-
-La arquitectura prevista es:
-
-```text
-Excel -> validación/importación -> base de datos -> chatbot
-```
-
-No abrir el Excel en cada mensaje del cliente.
+No hardcodear una versión de Graph API en múltiples archivos.
 
 ---
 
-# 19. Definition of Done por tarea
+# 19. Definition of Done por subfase
 
-Una tarea puede pasar a `✅ COMPLETADO` solamente si:
+Una subfase pasa a `✅ COMPLETADO` solo si:
 
-- implementación terminada;
+- alcance implementado;
 - criterios de aceptación cumplidos;
 - tests relevantes pasan;
-- lint/calidad relevante pasa;
+- lint/formato pasan;
 - seguridad revisada;
 - documentación afectada actualizada;
 - plan actualizado;
-- no quedan TODO críticos ocultos.
+- no quedan TODO críticos ocultos;
+- no se ha iniciado trabajo de la subfase siguiente.
 
 ---
 
-# 20. Formato obligatorio del reporte final de Codex
-
-Al terminar trabajo, reportar brevemente:
+# 20. Formato del reporte final de Codex
 
 ```text
 Resumen:
 - ...
+
+Subfase:
+- Fx.y — nombre
+- estado final: ...
 
 Archivos modificados:
 - ...
@@ -648,64 +767,45 @@ Validación:
 - comando -> resultado
 
 Seguridad:
-- controles verificados
+- ...
 
 Plan:
-- tarea marcada como ...
-- siguiente tarea sugerida: ...
+- estado actualizado
+- siguiente subfase sugerida
 
-Pendientes/riesgos:
+Riesgos/Pendientes:
 - ...
 ```
 
-No afirmar éxito sin evidencia de ejecución.
+No afirmar que una validación pasó si no se ejecutó.
 
 ---
 
-# 21. Regla de checkpoint
+# 21. Checkpoint cuando se interrumpe una sesión
 
-Si la ventana de contexto empieza a llenarse o el trabajo se interrumpe:
+Antes de detener trabajo largo:
 
-1. NO intentes reconstruir el proyecto de memoria.
-2. actualiza `plan_de_trabajo.md`;
-3. agrega una entrada al historial;
-4. deja indicada la tarea exacta en curso;
-5. describe lo implementado;
-6. describe lo que falta;
-7. incluye comandos ejecutados y su resultado;
-8. indica archivos relevantes.
+1. actualizar `plan_de_trabajo.md`;
+2. registrar exactamente la subfase;
+3. indicar estado;
+4. anotar archivos modificados;
+5. registrar comandos y resultados;
+6. describir qué falta;
+7. describir el siguiente paso.
 
-Al iniciar una nueva sesión, usar ese plan como checkpoint.
-
----
-
-# 22. Documentación externa
-
-Cuando una tarea dependa de una API que puede cambiar, especialmente OpenAI:
-
-- priorizar documentación oficial vigente;
-- no copiar tutoriales antiguos sin comprobarlos;
-- no migrar a APIs deprecadas;
-- si hay una incompatibilidad de versión, documentarla.
-
-Referencias base:
-
-- https://platform.openai.com/docs/quickstart
-- https://platform.openai.com/
-- https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety
-- https://platform.openai.com/docs/models/default-usage-policies-by-endpoint
+En una sesión nueva, reconstruir contexto leyendo archivos; no confiar en memoria del agente.
 
 ---
 
-# 23. Prioridad de instrucciones
+# 22. Prioridad
 
-En caso de conflicto:
+Si existen conflictos:
 
-1. instrucciones explícitas actuales del usuario;
-2. seguridad y protección de datos;
+1. instrucciones actuales explícitas del usuario;
+2. seguridad, privacidad e integridad de datos;
 3. `AGENTS.md`;
 4. `plan_de_trabajo.md`;
-5. documentación de la fase;
-6. convenciones existentes del repositorio.
+5. documentación de fase;
+6. convenciones del repositorio.
 
-Si una instrucción solicitada pudiera exponer secretos, destruir datos o crear una vulnerabilidad crítica, no implementarla silenciosamente; reportar el riesgo y elegir la alternativa segura.
+Si una solicitud expondría secretos, permitiría acceso no autorizado o destruiría datos, no implementarla silenciosamente: explicar el riesgo y aplicar una alternativa segura.
