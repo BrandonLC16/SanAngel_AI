@@ -85,33 +85,34 @@ y registrar exactamente:
 
 **Objetivo:** FastAPI operativo y primera respuesta real mediante OpenAI Responses API.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
 
 ## F1.1 — Inicialización del repositorio
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-08-25
 
 Tareas:
 
-- [ ] crear estructura de carpetas;
-- [ ] crear `pyproject.toml`;
-- [ ] configurar Python;
-- [ ] crear `.gitignore`;
-- [ ] crear `.env.example`;
-- [ ] crear README inicial;
-- [ ] verificar que `.env` no sea rastreado.
+- [x] crear estructura de carpetas;
+- [x] crear `pyproject.toml`;
+- [x] configurar Python;
+- [x] crear `.gitignore`;
+- [x] crear `.env.example`;
+- [x] crear README inicial;
+- [x] verificar que `.env` no sea rastreado.
 
 Criterios:
 
-- [ ] proyecto instalable;
-- [ ] estructura coincide con diseño;
-- [ ] ningún secreto versionado.
+- [x] proyecto instalable;
+- [x] estructura coincide con diseño;
+- [x] ningún secreto versionado.
 
 Seguridad:
 
-- [ ] `.env` ignorado;
-- [ ] secrets no aparecen en README;
-- [ ] API key solo se referencia por nombre de variable.
+- [x] `.env` ignorado;
+- [x] secrets no aparecen en README;
+- [x] API key solo se referencia por nombre de variable.
 
 ---
 
@@ -724,9 +725,9 @@ Seguridad:
 # 19. Checkpoint actual
 
 **Fase activa:** Fase 1  
-**Tarea activa:** ninguna; comenzar por F1.1 salvo instrucción del usuario.  
-**Última tarea completada:** diseño inicial.  
-**Siguiente tarea sugerida:** F1.1 — Inicialización del repositorio.
+**Tarea activa:** ninguna; F1.1 finalizada sin iniciar tareas posteriores.
+**Última tarea completada:** F1.1 — Inicialización del repositorio.
+**Siguiente tarea sugerida:** F1.2 — Configuración central, solo con instrucción del usuario.
 
 ---
 
@@ -760,6 +761,66 @@ Pendientes:
 - todavía no se ha implementado código.
 - todavía no existe prueba real con OpenAI.
 - comenzar F1.1.
+
+---
+
+## 2026-08-25 — Inicialización del repositorio
+
+**Fase:** Fase 1
+**Tarea:** F1.1 — Inicialización del repositorio
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- creada la estructura base de paquetes para `backend/app`, rutas, núcleo, prompts,
+  esquemas, servicios y tests, sin implementar tareas F1.2 o posteriores;
+- agregado empaquetado instalable con Python 3.12–3.14 y herramientas de desarrollo acotadas;
+- agregados `.gitignore`, `.env.example` sin secretos y README inicial;
+- agregada prueba mínima de importación del paquete.
+
+Archivos:
+
+- `.gitignore`
+- `.env.example`
+- `pyproject.toml`
+- `README.md`
+- `backend/__init__.py`
+- `backend/app/**/__init__.py`
+- `backend/tests/__init__.py`
+- `backend/tests/test_package.py`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `python -m venv .venv` -> entorno creado con Python 3.14.7;
+- `.venv\\Scripts\\python.exe -m pip install -e ".[dev]"` -> instalación editable correcta;
+- `.venv\\Scripts\\python.exe -m pytest` -> 1 prueba aprobada;
+- `.venv\\Scripts\\ruff.exe check .` -> sin hallazgos;
+- `.venv\\Scripts\\ruff.exe format --check .` -> 13 archivos con formato correcto;
+- `.venv\\Scripts\\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios en los cambios;
+- `git status --short --ignored` -> entorno, cachés y artefactos de instalación ignorados;
+- el primer chequeo de formato detectó ejemplos no ejecutables del documento de diseño;
+  se excluyó ese documento del formateador y la repetición pasó;
+- el primer escaneo de secretos detectó los placeholders documentales `sk-...` y
+  `OPENAI_API_KEY=...`; el escaneo ajustado para claves con forma real no encontró secretos.
+
+Seguridad:
+
+- `.env`, sus variantes locales y `.venv` comprobados como ignorados;
+- `.env.example` comprobado como versionable y sin valor para `OPENAI_API_KEY`;
+- ningún archivo `.env` local está rastreado;
+- no se detectaron patrones con forma de API key real fuera del entorno virtual.
+
+Riesgos/Pendientes:
+
+- FastAPI, configuración central y OpenAI no están implementados por estar fuera de F1.1;
+- la versión de modelo de `.env.example` proviene del diseño y deberá validarse al abordar
+  la integración de OpenAI.
+
+Siguiente:
+
+- F1.2 — Configuración central, sin iniciar hasta recibir instrucción del usuario.
 
 ---
 
