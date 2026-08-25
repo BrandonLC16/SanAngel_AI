@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-25  
 **Fase activa:** Fase 1  
-**Subfase siguiente:** F1.4 — Errores, request ID, logging y CORS
+**Subfase siguiente:** F1.5 — OpenAIService con Responses API
 **Estado global:** 🟨 EN DESARROLLO  
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -290,36 +290,40 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.4 — Errores, request ID, logging y CORS
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-25
+
+**Fecha de finalización:** 2026-08-25
 
 
 ### Alcance
 
-- [ ] excepciones internas.
+- [x] excepciones internas.
 
-- [ ] mapeo HTTP seguro.
+- [x] mapeo HTTP seguro.
 
-- [ ] request/correlation ID.
+- [x] request/correlation ID.
 
-- [ ] logging mínimo.
+- [x] logging mínimo.
 
-- [ ] CORS allowlist para desarrollo/panel futuro.
+- [x] CORS allowlist para desarrollo/panel futuro.
 
 
 ### Criterios de aceptación
 
-- [ ] errores no filtran stack traces.
+- [x] errores no filtran stack traces.
 
-- [ ] request ID propagable.
+- [x] request ID propagable.
 
-- [ ] CORS configurable.
+- [x] CORS configurable.
 
 
 ### Seguridad
 
-- [ ] no wildcard en producción.
+- [x] no wildcard en producción.
 
-- [ ] no body completo ni Authorization en logs.
+- [x] no body completo ni Authorization en logs.
 
 
 ### Prompt para Codex
@@ -3781,9 +3785,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | validación HTTP/Pydantic | F1 | Sí | ⬜ |
 | input size limit | F1 | Sí | ✅ configuración / pendiente endpoint |
 | timeout OpenAI | F1 | Sí | ✅ configuración / pendiente uso |
-| errores seguros | F1 | Sí | ⬜ |
-| logging sin secrets/PII | F1 | Sí | ⬜ |
-| CORS allowlist | F1 | Sí cuando haya navegador | ⬜ |
+| errores seguros | F1 | Sí | ✅ F1.4 |
+| logging sin secrets/PII | F1 | Sí | ✅ F1.4 |
+| CORS allowlist | F1 | Sí cuando haya navegador | ✅ F1.4 |
 | tests sin OpenAI real | F1 | Sí | 🟨 parcial |
 | Meta tokens backend-only | F2 | Sí | ⬜ |
 | verificación GET webhook | F2 | Sí | ⬜ |
@@ -3872,11 +3876,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 1.  
 **Subfase activa:** ninguna.
-**Última subfase completada:** F1.3 — Aplicación FastAPI + health check.
-**Siguiente subfase:** F1.4 — Errores, request ID, logging y CORS.
+**Última subfase completada:** F1.4 — Errores, request ID, logging y CORS.
+**Siguiente subfase:** F1.5 — OpenAIService con Responses API.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.4 ni Fase 2 automáticamente sin instrucción del usuario.
+No iniciar F1.5 ni Fase 2 automáticamente sin instrucción del usuario.
 
 ---
 
@@ -4124,6 +4128,77 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.4 — Errores, request ID, logging y CORS, sin iniciar hasta recibir instrucción del usuario.
+
+---
+
+## 2026-08-25 — Errores, request ID, logging y CORS
+
+**Fase:** Fase 1
+**Tarea:** F1.4 — Errores, request ID, logging y CORS
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregada una jerarquía mínima de excepciones internas con mensajes públicos fijos;
+- agregado mapeo HTTP estable para errores de aplicación y errores inesperados;
+- agregado `X-Request-ID` validado, generado cuando falta y propagado en respuestas;
+- agregado logging HTTP de metadatos mínimos con método, plantilla de endpoint, estado,
+  duración, categoría y request ID;
+- agregada configuración HTTP no sensible para iniciar FastAPI sin requerir credenciales de
+  OpenAI;
+- agregado CORS con allowlist configurable, default vacío y métodos/headers explícitos;
+- agregadas pruebas de errores, logging, request ID, allowlist y preflight CORS;
+- actualizados README, diseño de Fase 1, matriz de seguridad y checkpoint oficial.
+
+Archivos:
+
+- `backend/app/core/config.py`
+- `backend/app/core/exceptions.py`
+- `backend/app/core/logging.py`
+- `backend/app/api/errors.py`
+- `backend/app/api/middleware.py`
+- `backend/app/main.py`
+- `backend/tests/test_config.py`
+- `backend/tests/test_http_safety.py`
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `.venv\\Scripts\\python.exe -m pytest backend\\tests\\test_config.py
+  backend\\tests\\test_health.py backend\\tests\\test_http_safety.py
+  --basetemp=.venv\\pytest-f14-target -o cache_dir=.venv\\pytest-cache-f14-target -q`
+  -> 24 pruebas aprobadas;
+- la primera revisión de Ruff detectó un orden de imports y una línea de formato; ambos se
+  corrigieron mecánicamente y la repetición pasó;
+- `.venv\\Scripts\\python.exe -m pytest --basetemp=.venv\\pytest-f14 -o
+  cache_dir=.venv\\pytest-cache-f14` -> 25 pruebas aprobadas;
+- `.venv\\Scripts\\ruff.exe check .` -> sin hallazgos;
+- `.venv\\Scripts\\ruff.exe format --check .` -> 24 archivos con formato correcto;
+- `.venv\\Scripts\\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores de espacios; solo avisos informativos LF/CRLF.
+
+Seguridad:
+
+- respuestas 500/503 comprobadas sin traceback, detalle interno, paths ni secretos;
+- request IDs entrantes se aceptan solo con caracteres seguros y longitud acotada;
+- logs comprobados sin body, query string, headers ni contenido de `Authorization`;
+- CORS usa orígenes exactos y rechaza wildcard, paths, credenciales, queries y duplicados;
+- el default CORS vacío evita habilitar acceso desde navegador por omisión;
+- preflight y errores conservan request ID; errores para orígenes permitidos conservan CORS.
+
+Riesgos/Pendientes:
+
+- el logging todavía usa la infraestructura estándar del proceso; agregación y observabilidad
+  productiva corresponden a fases posteriores;
+- el request ID es correlación, no autenticación ni autorización;
+- los orígenes reales del panel deberán configurarse explícitamente antes de desplegarlo;
+- OpenAIService y sus errores de proveedor siguen fuera de alcance hasta F1.5.
+
+Siguiente:
+
+- F1.5 — OpenAIService con Responses API, sin iniciar hasta recibir instrucción del usuario.
 
 ---
 

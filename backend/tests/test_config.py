@@ -4,7 +4,7 @@ from secrets import token_urlsafe
 import pytest
 from pydantic import ValidationError
 
-from backend.app.core.config import Settings, get_settings
+from backend.app.core.config import HttpSettings, Settings, get_settings
 
 
 def make_non_key_secret_marker() -> str:
@@ -17,6 +17,7 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.app_env == "development"
     assert settings.app_host == "127.0.0.1"
     assert settings.app_port == 8000
+    assert settings.cors_allowed_origins == ()
     assert settings.openai_model == "gpt-5.6"
     assert settings.openai_store_responses is False
     assert settings.openai_timeout_seconds == 30
@@ -130,3 +131,38 @@ def test_get_settings_caches_validated_configuration(monkeypatch: pytest.MonkeyP
         assert get_settings().openai_model == "first-model"
     finally:
         get_settings.cache_clear()
+
+
+def test_http_settings_parse_configurable_cors_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "CORS_ALLOWED_ORIGINS",
+        "https://panel.example.com, http://localhost:3000/",
+    )
+
+    settings = HttpSettings(_env_file=None)
+
+    assert settings.cors_allowed_origins == (
+        "https://panel.example.com",
+        "http://localhost:3000",
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_origins",
+    (
+        "*",
+        "https://panel.example.com/private",
+        "https://user:password@panel.example.com",
+        "https://panel.example.com?debug=true",
+        "https://panel.example.com,https://panel.example.com",
+    ),
+)
+def test_http_settings_reject_unsafe_cors_origins(invalid_origins: str) -> None:
+    with pytest.raises(ValidationError):
+        HttpSettings(
+            app_env="production",
+            cors_allowed_origins=invalid_origins,
+            _env_file=None,
+        )

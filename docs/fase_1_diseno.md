@@ -3,7 +3,7 @@
 
 **Fecha original:** 2026-08-25  
 **Actualizado:** 2026-08-25  
-**Estado de implementación actual:** F1.1, F1.2 y F1.3 completadas; F1.4 es la siguiente subfase.
+**Estado de implementación actual:** F1.1-F1.4 completadas; F1.5 es la siguiente subfase.
 **Objetivo:** construir un núcleo backend seguro y comprobable que después pueda ser consumido por WhatsApp sin acoplar la lógica del chatbot al canal.
 
 ---
@@ -54,6 +54,7 @@ De acuerdo con el checkpoint existente:
 F1.1 — Inicialización del repositorio  ✅ COMPLETADO
 F1.2 — Configuración central           ✅ COMPLETADO
 F1.3 — FastAPI + health check          ✅ COMPLETADO
+F1.4 — Errores, request ID y CORS      ✅ COMPLETADO
 ```
 
 No rehacer F1.1/F1.2 salvo regresión.
@@ -222,7 +223,7 @@ Resumen:
 F1.1 repositorio                         ✅
 F1.2 configuración                       ✅
 F1.3 FastAPI /health                     ✅
-F1.4 errores + logging + CORS            ⬜
+F1.4 errores + logging + CORS            ✅
 F1.5 OpenAIService                       ⬜
 F1.6 endpoint interno /api/v1/chat       ⬜
 F1.7 pruebas/calidad                     ⬜
