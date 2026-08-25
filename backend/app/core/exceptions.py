@@ -17,6 +17,14 @@ class ServiceUnavailableError(ApplicationError):
     status_code = 503
 
 
+class InvalidRequestError(ApplicationError):
+    """Raised when application-level input validation rejects a request."""
+
+    error_code = "invalid_request"
+    public_message = "La solicitud no es válida."
+    status_code = 422
+
+
 class AIProviderError(ServiceUnavailableError):
     """Base exception for failures returned by the configured AI provider."""
 

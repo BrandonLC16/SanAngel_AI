@@ -7,10 +7,11 @@ promociones o pedidos.
 
 ## Estado actual
 
-F1.1-F1.5 inicializan el repositorio, implementan la configuracion central validada y crean la
+F1.1-F1.6 inicializan el repositorio, implementan la configuracion central validada y crean la
 aplicacion FastAPI con health check, errores HTTP seguros, request ID, logging minimo y CORS
 configurable. La integracion con OpenAI ya esta aislada en un servicio interno y utiliza
-Responses API. Todavia no se implementa el endpoint de chat; corresponde a F1.6.
+Responses API. El endpoint interno de chat conecta esa frontera mediante un servicio de
+aplicacion desacoplado.
 
 ## Health check
 
@@ -78,6 +79,31 @@ Los errores de timeout, limite de solicitudes, conexion, estado HTTP y respuesta
 convierten a excepciones internas seguras. El servicio no registra el prompt, el mensaje ni la
 respuesta completos. La conexion desde una ruta HTTP se agregara en F1.6; una llamada real y
 controlada al proveedor corresponde a F1.8.
+
+## Chat interno de desarrollo
+
+`POST /api/v1/chat` sirve exclusivamente para desarrollo, pruebas e integracion interna; no es
+el canal final del cliente y no debe exponerse como API publica en produccion.
+
+Request:
+
+```json
+{
+  "message": "Hola"
+}
+```
+
+Response:
+
+```json
+{
+  "answer": "..."
+}
+```
+
+El mensaje no puede estar vacio ni superar `CHAT_MAX_MESSAGE_CHARS`. Las solicitudes invalidas
+responden HTTP 422 sin devolver el contenido rechazado y los fallos del proveedor responden
+HTTP 503 con un mensaje publico estable.
 
 ## Frontera HTTP
 

@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-25  
 **Fase activa:** Fase 1  
-**Subfase siguiente:** F1.6 — Endpoint interno POST /api/v1/chat
+**Subfase siguiente:** F1.7 — Suite de pruebas y calidad
 **Estado global:** 🟨 EN DESARROLLO  
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -404,34 +404,38 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.6 — Endpoint interno POST /api/v1/chat
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-25
+
+**Fecha de finalización:** 2026-08-25
 
 
 ### Alcance
 
-- [ ] ChatRequest/ChatResponse.
+- [x] ChatRequest/ChatResponse.
 
-- [ ] validación del mensaje.
+- [x] validación del mensaje.
 
-- [ ] conexión al servicio de aplicación/OpenAI.
+- [x] conexión al servicio de aplicación/OpenAI.
 
-- [ ] tests de éxito/error.
+- [x] tests de éxito/error.
 
 
 ### Criterios de aceptación
 
-- [ ] mensaje válido responde.
+- [x] mensaje válido responde.
 
-- [ ] vacío/largo se rechaza.
+- [x] vacío/largo se rechaza.
 
-- [ ] fallo proveedor es controlado.
+- [x] fallo proveedor es controlado.
 
 
 ### Seguridad
 
-- [ ] límite de entrada.
+- [x] límite de entrada.
 
-- [ ] endpoint identificado como desarrollo/interno.
+- [x] endpoint identificado como desarrollo/interno.
 
 
 ### Prompt para Codex
@@ -3786,8 +3790,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | `.env` ignorado | F1 | Sí | ✅ |
 | OpenAI key backend-only | F1 | Sí | ✅ F1.5 |
 | configuración con secretos protegidos | F1 | Sí | ✅ F1.2 |
-| validación HTTP/Pydantic | F1 | Sí | ⬜ |
-| input size limit | F1 | Sí | ✅ configuración / pendiente endpoint |
+| validación HTTP/Pydantic | F1 | Sí | ✅ F1.6 |
+| input size limit | F1 | Sí | ✅ F1.6 |
 | timeout OpenAI | F1 | Sí | ✅ F1.5 |
 | errores seguros | F1 | Sí | ✅ F1.4 |
 | logging sin secrets/PII | F1 | Sí | ✅ F1.4 |
@@ -3880,11 +3884,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 1.  
 **Subfase activa:** ninguna.
-**Última subfase completada:** F1.5 — OpenAIService con Responses API.
-**Siguiente subfase:** F1.6 — Endpoint interno POST /api/v1/chat.
+**Última subfase completada:** F1.6 — Endpoint interno POST /api/v1/chat.
+**Siguiente subfase:** F1.7 — Suite de pruebas y calidad.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.6 ni Fase 2 automáticamente sin instrucción del usuario.
+No iniciar F1.7 ni Fase 2 automáticamente sin instrucción del usuario.
 
 ---
 
@@ -4281,6 +4285,86 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.6 — Endpoint interno POST /api/v1/chat, sin iniciar hasta recibir instrucción del usuario.
+
+---
+
+## 2026-08-25 — Endpoint interno POST /api/v1/chat
+
+**Fase:** Fase 1
+**Tarea:** F1.6 — Endpoint interno POST /api/v1/chat
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregados los esquemas `ChatRequest` y `ChatResponse` con validación de tipo, vacío y límite;
+- agregado `ChatService` como frontera de aplicación entre HTTP y el generador de respuestas;
+- agregada composición diferida `ChatService -> OpenAIService` para no cargar credenciales al
+  iniciar FastAPI ni al consultar `/health`;
+- creado y registrado `POST /api/v1/chat` con metadatos explícitos de uso interno/desarrollo;
+- agregado mapeo HTTP 422 estable que no devuelve el contenido rechazado por Pydantic;
+- conservado el mapeo seguro HTTP 503 para fallos del proveedor;
+- agregadas pruebas de éxito, vacío, espacios, exceso configurable, composición, error de
+  proveedor, ausencia de red/logs de contenido e identificación OpenAPI;
+- actualizados README, diseño de Fase 1, matriz de seguridad y checkpoint oficial.
+
+Archivos:
+
+- `backend/app/schemas/chat.py`
+- `backend/app/services/chat_service.py`
+- `backend/app/api/dependencies.py`
+- `backend/app/api/routes/chat.py`
+- `backend/app/api/errors.py`
+- `backend/app/core/exceptions.py`
+- `backend/app/main.py`
+- `backend/tests/test_chat.py`
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `git status --short --branch` al inicio -> árbol limpio sobre `main` antes de los cambios;
+- revisión de OpenAI Docs -> confirmada la frontera vigente `responses.create` usada por el
+  servicio encapsulado de F1.5;
+- primera ejecución dirigida de `pytest` -> 23 pruebas aprobadas;
+- primera revisión de Ruff -> detectó únicamente una línea de 102 caracteres y formato en el
+  test nuevo; se corrigió mecánicamente;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_chat.py
+  backend\tests\test_http_safety.py backend\tests\test_openai_service.py
+  --basetemp=.venv\pytest-f16-target-3 -o cache_dir=.venv\pytest-cache-f16-target-3 -q`
+  -> 24 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f16 -o
+  cache_dir=.venv\pytest-cache-f16` -> 45 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 31 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` y revisión de archivos nuevos -> sin errores de espacios; solo avisos
+  informativos LF/CRLF;
+- búsquedas con `rg` -> ruta y servicio de aplicación sin imports del SDK ni Assistants API;
+  F1.7 permanece pendiente.
+
+Seguridad:
+
+- `CHAT_MAX_MESSAGE_CHARS` se aplica sobre el mensaje original antes de llamar al proveedor;
+- mensajes vacíos, solo espacios o demasiado largos responden 422 y no invocan el generador;
+- errores de validación usan respuesta pública fija sin eco del body rechazado;
+- fallos del proveedor responden 503 sin detalle interno ni traceback;
+- la ruta depende de `ChatService`, no del SDK, y la API key permanece en composición backend;
+- los tests comprueban que mensaje y respuesta completos no aparecen en logs y bloquean la red
+  en el flujo exitoso;
+- OpenAPI y README identifican el endpoint como interno/de desarrollo y no como canal final.
+
+Riesgos/Pendientes:
+
+- la etiqueta interno/desarrollo no es autenticación; antes de producción el endpoint debe
+  deshabilitarse, restringirse o protegerse;
+- no se realizó una llamada real a OpenAI; corresponde explícitamente a F1.8;
+- la revisión integral de mocks, casos inválidos y bloqueo de red de toda la suite corresponde
+  a F1.7.
+
+Siguiente:
+
+- F1.7 — Suite de pruebas y calidad, sin iniciar hasta recibir instrucción del usuario.
 
 ---
 

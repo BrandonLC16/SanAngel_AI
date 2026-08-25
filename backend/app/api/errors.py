@@ -1,4 +1,5 @@
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from backend.app.core.exceptions import ApplicationError
@@ -41,4 +42,19 @@ async def application_error_handler(
         status_code=exc.status_code,
         error_code=exc.error_code,
         public_message=exc.public_message,
+    )
+
+
+async def request_validation_error_handler(
+    request: Request,
+    _exc: RequestValidationError,
+) -> JSONResponse:
+    """Return validation errors without echoing rejected request content."""
+
+    request.state.error_category = "invalid_request"
+    return create_error_response(
+        request,
+        status_code=422,
+        error_code="invalid_request",
+        public_message="La solicitud no es válida.",
     )

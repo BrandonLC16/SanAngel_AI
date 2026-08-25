@@ -1,8 +1,14 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.errors import REQUEST_ID_HEADER, application_error_handler
+from backend.app.api.errors import (
+    REQUEST_ID_HEADER,
+    application_error_handler,
+    request_validation_error_handler,
+)
 from backend.app.api.middleware import request_context_middleware, safe_exception_middleware
+from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.core.config import HttpSettings, get_http_settings
 from backend.app.core.exceptions import ApplicationError
@@ -17,6 +23,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
 
     application = FastAPI(title=http_settings.app_name)
     application.add_exception_handler(ApplicationError, application_error_handler)
+    application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.middleware("http")(safe_exception_middleware)
     application.add_middleware(
         CORSMiddleware,
@@ -28,6 +35,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     )
     application.middleware("http")(request_context_middleware)
     application.include_router(health_router)
+    application.include_router(chat_router)
     return application
 
 
