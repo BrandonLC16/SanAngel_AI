@@ -12,9 +12,9 @@ configuracion central validada, health check, errores HTTP seguros, request ID, 
 CORS configurable y una integracion desacoplada con OpenAI Responses API. El endpoint interno
 de chat fue validado con pruebas sin red y con una llamada manual real.
 
-Fase 2 cuenta con la configuracion central de Meta/WhatsApp y el handshake GET del webhook.
-WhatsApp sera el canal principal del cliente, pero la recepcion autenticada de eventos POST y el
-cliente de Graph API todavia no estan implementados.
+Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET y la autenticacion
+HMAC-SHA256 del webhook POST. WhatsApp sera el canal principal del cliente, pero el parsing de
+eventos y el cliente de Graph API todavia no estan implementados.
 
 ## Health check
 
@@ -91,8 +91,16 @@ challenge; solicitudes incorrectas reciben HTTP 403 sin cuerpo. Si el verify tok
 configurado, el endpoint falla de forma cerrada con HTTP 503 sin cuerpo.
 
 El token se compara de forma segura, no se refleja en respuestas y la aplicacion no registra el
-query string. Esta ruta solo realiza el handshake GET: el POST y su validacion de firma pertenecen
-a una subfase posterior.
+query string.
+
+El mismo path acepta POST y, antes de acceder a JSON, conserva los bytes exactos del body y valida
+`X-Hub-Signature-256` mediante HMAC-SHA256 con `META_APP_SECRET`. La firma debe usar el formato
+`sha256=<64 caracteres hexadecimales>` y se compara en tiempo constante. Una firma valida recibe
+HTTP 200 sin cuerpo; firmas ausentes, duplicadas, malformadas o incorrectas reciben HTTP 403 sin
+cuerpo. Si falta el App Secret, responde HTTP 503 sin cuerpo.
+
+F2.3 autentica el payload pero no lo interpreta. El schema, los tipos soportados y la
+normalizacion corresponden a una subfase posterior.
 
 ## Servicio OpenAI
 

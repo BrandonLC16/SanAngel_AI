@@ -1,3 +1,4 @@
+import hashlib
 import hmac
 import re
 from typing import Annotated
@@ -10,7 +11,9 @@ from backend.app.core.config import Settings, get_settings
 router = APIRouter(prefix="/api/v1/whatsapp", tags=["whatsapp"])
 
 _CHALLENGE_PATTERN = re.compile(r"[0-9]{1,20}")
+_META_SIGNATURE_PATTERN = re.compile(r"sha256=([0-9a-f]{64})")
 _MAX_VERIFY_TOKEN_BYTES = 1024
+_META_SIGNATURE_HEADER = "X-Hub-Signature-256"
 
 
 def _get_single_query_value(request: Request, name: str) -> str | None:
@@ -18,6 +21,29 @@ def _get_single_query_value(request: Request, name: str) -> str | None:
     if len(values) != 1:
         return None
     return values[0]
+
+
+def _get_single_header_value(request: Request, name: str) -> str | None:
+    values = request.headers.getlist(name)
+    if len(values) != 1:
+        return None
+    return values[0]
+
+
+def _has_valid_meta_signature(
+    raw_body: bytes,
+    signature_header: str | None,
+    app_secret: bytes,
+) -> bool:
+    if signature_header is None:
+        return False
+
+    signature_match = _META_SIGNATURE_PATTERN.fullmatch(signature_header)
+    if signature_match is None:
+        return False
+
+    expected_signature = hmac.new(app_secret, raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(signature_match.group(1), expected_signature)
 
 
 @router.get(
@@ -51,3 +77,28 @@ def verify_whatsapp_webhook(
         return Response(status_code=status.HTTP_403_FORBIDDEN)
 
     return PlainTextResponse(content=challenge)
+
+
+@router.post(
+    "/webhook",
+    status_code=status.HTTP_200_OK,
+    summary="Recibir webhook autenticado de WhatsApp",
+)
+async def receive_whatsapp_webhook(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    """Authenticate Meta's signature over the untouched body before any JSON processing."""
+
+    configured_app_secret = settings.meta_app_secret
+    if configured_app_secret is None:
+        return Response(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    raw_body = await request.body()
+    signature_header = _get_single_header_value(request, _META_SIGNATURE_HEADER)
+    app_secret = configured_app_secret.get_secret_value().encode("utf-8")
+
+    if not _has_valid_meta_signature(raw_body, signature_header, app_secret):
+        return Response(status_code=status.HTTP_403_FORBIDDEN)
+
+    return Response(status_code=status.HTTP_200_OK)

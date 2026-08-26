@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-26
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.3 — Validación de firma del webhook POST (no iniciada)
+**Subfase siguiente:** F2.4 — Parser y normalización de eventos (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -733,34 +733,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.3 — Validación de firma del webhook POST
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-08-26
+**Fecha de finalización:** 2026-08-26
 
 
 ### Alcance
 
-- [ ] leer raw body.
+- [x] leer raw body.
 
-- [ ] validar firma oficial vigente.
+- [x] validar firma oficial vigente.
 
-- [ ] HMAC SHA-256 cuando aplique.
+- [x] HMAC SHA-256 cuando aplique.
 
-- [ ] comparación segura.
+- [x] comparación segura.
 
-- [ ] tests firmas.
+- [x] tests firmas.
 
 
 ### Criterios de aceptación
 
-- [ ] payload no autenticado no se procesa.
+- [x] payload no autenticado no se procesa.
 
-- [ ] firma válida permite continuar.
+- [x] firma válida permite continuar.
 
 
 ### Seguridad
 
-- [ ] usar META_APP_SECRET.
+- [x] usar META_APP_SECRET.
 
-- [ ] validar antes de confiar en JSON.
+- [x] validar antes de confiar en JSON.
 
 
 ### Prompt para Codex
@@ -3910,13 +3912,13 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 2 — WhatsApp Cloud API (`🟨 EN_PROGRESO`).
 **Subfase activa:** ninguna.
-**Última subfase completada:** F2.2 — Handshake GET del webhook.
-**Siguiente subfase:** F2.3 — Validación de firma del webhook POST, pendiente de instrucción
+**Última subfase completada:** F2.3 — Validación de firma del webhook POST.
+**Siguiente subfase:** F2.4 — Parser y normalización de eventos, pendiente de instrucción
 explícita.
-**WhatsApp:** configuración base y handshake GET completados; webhook POST y cliente Graph API
-todavía no implementados.
+**WhatsApp:** configuración, handshake GET y autenticación del POST completados; parser y cliente
+Graph API todavía no implementados.
 
-No iniciar F2.3 automáticamente.
+No iniciar F2.4 automáticamente.
 
 ---
 
@@ -4949,6 +4951,81 @@ Siguiente:
 
 - F2.3 — Validación de firma del webhook POST, sin iniciar hasta recibir instrucción explícita
   del usuario.
+
+---
+
+## 2026-08-26 — Validación de firma del webhook POST
+
+**Fase:** Fase 2
+**Tarea:** F2.3 — Validación de firma del webhook POST
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregada la ruta `POST /api/v1/whatsapp/webhook` sobre el path existente;
+- leído el body crudo mediante `Request.body()` antes de cualquier acceso a JSON;
+- validado exactamente un header `X-Hub-Signature-256` con prefijo `sha256=` y digest de 64
+  caracteres hexadecimales;
+- calculado HMAC-SHA256 sobre los bytes exactos recibidos usando `META_APP_SECRET`;
+- comparados los digests mediante `hmac.compare_digest`;
+- aceptadas firmas válidas con ACK HTTP 200 sin cuerpo;
+- rechazadas firmas ausentes, duplicadas, malformadas, incorrectas o correspondientes a otros
+  bytes mediante HTTP 403 sin cuerpo;
+- aplicada respuesta cerrada HTTP 503 sin cuerpo cuando `META_APP_SECRET` no está configurado;
+- agregadas pruebas de bytes crudos, firmas válidas/inválidas, orden previo a JSON y ausencia de
+  body, firma y secreto en logs;
+- actualizados README, diseño de Fase 2 y checkpoint;
+- no se implementó ni inició F2.4, parsing, schema o normalización de eventos.
+
+Archivos:
+
+- `backend/app/api/routes/whatsapp.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- documentación oficial de Webhooks de Meta recuperada desde `developers.facebook.com` -> HTTP
+  200; confirmó SHA-256, header `X-Hub-Signature-256`, prefijo `sha256=` y uso del App Secret;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_whatsapp_webhook.py
+  --basetemp=.venv\pytest-f23-target-2 -o cache_dir=.venv\pytest-cache-f23-target-2 -q` -> 17
+  pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f23 -o
+  cache_dir=.venv\pytest-cache-f23 -q` -> 91 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 37 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado, `.env.example`
+  sin secretos y cero valores sensibles versionados;
+- auditoría de superficie -> POST usa `request.body()` y no usa `request.json()`;
+- revisión de estados -> F2.3 completada; F2.4-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- `META_APP_SECRET` permanece como `SecretStr` y solo se revela localmente para calcular HMAC;
+- la firma cubre el body crudo exacto, incluidos espacios y representación de bytes;
+- una prueba instrumentada confirma que un payload no autenticado se rechaza antes de acceder a
+  JSON;
+- secreto, body y firma no se incluyen en respuestas, logs o excepciones;
+- parámetros de firma ausentes, duplicados o malformados fallan de forma cerrada;
+- no se realizaron llamadas a Meta ni se usaron credenciales reales;
+- F2.4 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- un payload autenticado solo recibe ACK; el schema, parsing y tipos soportados comienzan en F2.4;
+- la ruta almacena el body completo en memoria; debe definirse un límite compatible con Meta antes
+  de producción;
+- no existe todavía idempotencia ni protección contra replays de eventos válidamente firmados;
+- una prueba real contra Meta requiere HTTPS público y configuración local válida.
+
+Siguiente:
+
+- F2.4 — Parser y normalización de eventos, sin iniciar hasta recibir instrucción explícita del
+  usuario.
 
 ---
 

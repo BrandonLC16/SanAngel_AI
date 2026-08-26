@@ -3,7 +3,7 @@
 
 **Fecha:** 2026-08-25  
 **Actualizado:** 2026-08-26
-**Estado:** F2.1-F2.2 completadas; F2.3 y subfases posteriores permanecen pendientes.
+**Estado:** F2.1-F2.3 completadas; F2.4 y subfases posteriores permanecen pendientes.
 
 ---
 
@@ -172,6 +172,18 @@ Antes de procesar:
 7. ignorar eventos no soportados.
 
 No confiar en que un payload tiene forma correcta solo porque es JSON.
+
+F2.3 implementa `POST /api/v1/whatsapp/webhook`. La ruta obtiene el body crudo mediante
+`Request.body()` y no accede a JSON antes de autenticarlo. Exige exactamente un header
+`X-Hub-Signature-256` con formato `sha256=<64 hex minúsculas>`, calcula HMAC-SHA256 sobre esos
+bytes con `META_APP_SECRET` y compara los digests mediante `hmac.compare_digest`.
+
+Una firma válida permite continuar hasta un ACK HTTP 200 sin cuerpo. Firma ausente, duplicada,
+malformada, calculada con otro secreto o correspondiente a otros bytes recibe HTTP 403 sin
+cuerpo. Si `META_APP_SECRET` no está configurado, la ruta falla cerrada con HTTP 503 sin cuerpo.
+Ni body, firma ni secreto se registran o reflejan.
+
+Esta subfase no parsea ni valida el JSON autenticado. Esa responsabilidad comienza en F2.4.
 
 ---
 
