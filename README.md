@@ -12,8 +12,8 @@ configuracion central validada, health check, errores HTTP seguros, request ID, 
 CORS configurable y una integracion desacoplada con OpenAI Responses API. El endpoint interno
 de chat fue validado con pruebas sin red y con una llamada manual real.
 
-Fase 2 permanece sin iniciar. WhatsApp sera el canal principal del cliente, pero su webhook y la
-integracion con Meta solo deben implementarse mediante una instruccion explicita posterior.
+Fase 2 inicio con la configuracion central de Meta/WhatsApp. WhatsApp sera el canal principal del
+cliente, pero el webhook y el cliente de Graph API todavia no estan implementados.
 
 ## Health check
 
@@ -59,6 +59,13 @@ Valores y limites iniciales:
 - `OPENAI_STORE_RESPONSES` usa `false` por defecto;
 - `OPENAI_TIMEOUT_SECONDS` acepta valores mayores a 0 y hasta 120 segundos;
 - `OPENAI_MAX_RETRIES` acepta de 0 a 5 y usa 2 por defecto;
+- `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN` y `META_APP_SECRET` son secretos opcionales
+  hasta habilitar los adaptadores que los consumen y se mantienen protegidos por `SecretStr`;
+- `WHATSAPP_PHONE_NUMBER_ID` es opcional y, cuando se configura, acepta solamente digitos;
+- `META_GRAPH_API_VERSION` es configurable y usa `v26.0` como version oficial vigente al
+  implementar F2.1;
+- `WHATSAPP_REQUEST_TIMEOUT_SECONDS` acepta valores mayores a 0 y hasta 120 segundos, con 15
+  segundos por defecto;
 - `CORS_ALLOWED_ORIGINS` acepta una lista separada por comas de origenes HTTP/HTTPS exactos;
 - `CHAT_MAX_MESSAGE_CHARS` acepta valores entre 1 y 10000, con 2000 por defecto.
 
@@ -69,6 +76,10 @@ Sin `CORS_ALLOWED_ORIGINS`, el acceso desde navegador queda deshabilitado. Cada 
 contener solo esquema, host y puerto opcional; no se permiten comodines, paths, credenciales,
 query strings ni duplicados. `.env.example` incluye exclusivamente los origenes locales de
 desarrollo.
+
+La version de Graph API vive en `Settings`; futuros clientes deben construir sus endpoints desde
+esa configuracion y no repetir una version hardcodeada. Antes de una prueba real o despliegue se
+debe confirmar que la version configurada continue soportada por Meta.
 
 ## Servicio OpenAI
 

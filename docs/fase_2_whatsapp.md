@@ -2,7 +2,8 @@
 ## WhatsApp como interfaz principal del cliente
 
 **Fecha:** 2026-08-25  
-**Estado:** PENDIENTE hasta cerrar Fase 1.
+**Actualizado:** 2026-08-26
+**Estado:** F2.1 completada; F2.2 y subfases posteriores permanecen pendientes.
 
 ---
 
@@ -122,13 +123,20 @@ WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_VERIFY_TOKEN=
 META_APP_SECRET=
-META_GRAPH_API_VERSION=
+META_GRAPH_API_VERSION=v26.0
 WHATSAPP_REQUEST_TIMEOUT_SECONDS=15
 ```
 
-No inventar valores.
+No inventar valores sensibles. Los secretos permanecen opcionales en `Settings` hasta que se
+habilite el adaptador que los consume; cuando se configuran se validan y se protegen con
+`SecretStr`. `WHATSAPP_PHONE_NUMBER_ID` acepta un identificador numérico y el timeout está
+acotado a un máximo de 120 segundos.
 
-`META_GRAPH_API_VERSION` debe fijarse/configurarse según una versión oficial soportada en el momento de implementación.
+`META_GRAPH_API_VERSION` se centraliza en `Settings`. El default `v26.0` corresponde a la versión
+más reciente declarada por el
+[changelog oficial de Graph API](https://developers.facebook.com/docs/graph-api/changelog/) al
+implementar F2.1 (introducida el 2026-07-29). Debe confirmarse nuevamente antes de una prueba real
+o despliegue porque el ciclo de versiones de Meta es externo al repositorio.
 
 ---
 

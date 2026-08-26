@@ -22,6 +22,12 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.openai_timeout_seconds == 30
     assert settings.openai_max_retries == 2
     assert settings.chat_max_message_chars == 2000
+    assert settings.whatsapp_access_token is None
+    assert settings.whatsapp_phone_number_id is None
+    assert settings.whatsapp_verify_token is None
+    assert settings.meta_app_secret is None
+    assert settings.meta_graph_api_version == "v26.0"
+    assert settings.whatsapp_request_timeout_seconds == 15
     assert settings.log_level == "INFO"
 
 
@@ -33,6 +39,12 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "45.5")
     monkeypatch.setenv("OPENAI_MAX_RETRIES", "4")
     monkeypatch.setenv("CHAT_MAX_MESSAGE_CHARS", "1500")
+    monkeypatch.setenv("WHATSAPP_ACCESS_TOKEN", secret_marker)
+    monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "123456789012345")
+    monkeypatch.setenv("WHATSAPP_VERIFY_TOKEN", secret_marker)
+    monkeypatch.setenv("META_APP_SECRET", secret_marker)
+    monkeypatch.setenv("META_GRAPH_API_VERSION", "v25.0")
+    monkeypatch.setenv("WHATSAPP_REQUEST_TIMEOUT_SECONDS", "22.5")
 
     settings = Settings(_env_file=None)
 
@@ -42,6 +54,15 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.openai_timeout_seconds == 45.5
     assert settings.openai_max_retries == 4
     assert settings.chat_max_message_chars == 1500
+    assert settings.whatsapp_access_token is not None
+    assert settings.whatsapp_access_token.get_secret_value() == secret_marker
+    assert settings.whatsapp_phone_number_id == "123456789012345"
+    assert settings.whatsapp_verify_token is not None
+    assert settings.whatsapp_verify_token.get_secret_value() == secret_marker
+    assert settings.meta_app_secret is not None
+    assert settings.meta_app_secret.get_secret_value() == secret_marker
+    assert settings.meta_graph_api_version == "v25.0"
+    assert settings.whatsapp_request_timeout_seconds == 22.5
 
 
 def test_settings_load_dotenv_file(tmp_path: Path) -> None:
@@ -55,6 +76,12 @@ def test_settings_load_dotenv_file(tmp_path: Path) -> None:
                 "OPENAI_MODEL=dotenv-model",
                 "OPENAI_TIMEOUT_SECONDS=12",
                 "CHAT_MAX_MESSAGE_CHARS=750",
+                f"WHATSAPP_ACCESS_TOKEN={secret_marker}",
+                "WHATSAPP_PHONE_NUMBER_ID=123456789012345",
+                f"WHATSAPP_VERIFY_TOKEN={secret_marker}",
+                f"META_APP_SECRET={secret_marker}",
+                "META_GRAPH_API_VERSION=v25.0",
+                "WHATSAPP_REQUEST_TIMEOUT_SECONDS=18",
             )
         ),
         encoding="utf-8",
@@ -66,6 +93,15 @@ def test_settings_load_dotenv_file(tmp_path: Path) -> None:
     assert settings.openai_model == "dotenv-model"
     assert settings.openai_timeout_seconds == 12
     assert settings.chat_max_message_chars == 750
+    assert settings.whatsapp_access_token is not None
+    assert settings.whatsapp_access_token.get_secret_value() == secret_marker
+    assert settings.whatsapp_phone_number_id == "123456789012345"
+    assert settings.whatsapp_verify_token is not None
+    assert settings.whatsapp_verify_token.get_secret_value() == secret_marker
+    assert settings.meta_app_secret is not None
+    assert settings.meta_app_secret.get_secret_value() == secret_marker
+    assert settings.meta_graph_api_version == "v25.0"
+    assert settings.whatsapp_request_timeout_seconds == 18
 
 
 def test_settings_require_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -100,6 +136,44 @@ def test_invalid_secret_error_does_not_reveal_value() -> None:
     assert secret_marker not in error_text
 
 
+def test_whatsapp_secrets_are_hidden_from_text_representations() -> None:
+    markers = {
+        "whatsapp_access_token": "test-only-whatsapp-access-token",
+        "whatsapp_verify_token": "test-only-whatsapp-verify-token",
+        "meta_app_secret": "test-only-meta-app-secret",
+    }
+    settings = Settings(
+        openai_api_key=make_non_key_secret_marker(),
+        _env_file=None,
+        **markers,
+    )
+
+    rendered_settings = f"{settings!r}\n{settings}\n{settings.model_dump_json()}"
+
+    for marker in markers.values():
+        assert marker not in rendered_settings
+    assert "**********" in rendered_settings
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ("whatsapp_access_token", "whatsapp_verify_token", "meta_app_secret"),
+)
+def test_invalid_whatsapp_secret_error_does_not_reveal_value(field_name: str) -> None:
+    secret_marker = f"test-only-{field_name}-marker"
+
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(
+            openai_api_key=make_non_key_secret_marker(),
+            _env_file=None,
+            **{field_name: f" {secret_marker} "},
+        )
+
+    error_text = str(exc_info.value)
+    assert field_name in error_text
+    assert secret_marker not in error_text
+
+
 @pytest.mark.parametrize(
     ("field_name", "invalid_value"),
     (
@@ -109,6 +183,8 @@ def test_invalid_secret_error_does_not_reveal_value() -> None:
         ("openai_max_retries", 6),
         ("chat_max_message_chars", 0),
         ("chat_max_message_chars", 10_001),
+        ("whatsapp_request_timeout_seconds", 0),
+        ("whatsapp_request_timeout_seconds", 121),
     ),
 )
 def test_settings_reject_unsafe_numeric_limits(field_name: str, invalid_value: int) -> None:
@@ -120,6 +196,30 @@ def test_settings_reject_unsafe_numeric_limits(field_name: str, invalid_value: i
     error_text = str(exc_info.value)
     assert field_name in error_text
     assert secret_marker not in error_text
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("whatsapp_phone_number_id", "123-invalid"),
+        ("whatsapp_phone_number_id", " 123456 "),
+        ("whatsapp_phone_number_id", "1" * 65),
+        ("meta_graph_api_version", "26.0"),
+        ("meta_graph_api_version", "v26"),
+        ("meta_graph_api_version", "v26.1"),
+        ("meta_graph_api_version", "https://graph.facebook.com/v26.0"),
+    ),
+)
+def test_settings_reject_invalid_whatsapp_identifiers(
+    field_name: str,
+    invalid_value: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            openai_api_key=make_non_key_secret_marker(),
+            _env_file=None,
+            **{field_name: invalid_value},
+        )
 
 
 def test_get_settings_caches_validated_configuration(monkeypatch: pytest.MonkeyPatch) -> None:

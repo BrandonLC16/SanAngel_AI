@@ -2,9 +2,9 @@
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
 **Última actualización:** 2026-08-26
-**Fase activa:** ninguna; Fase 1 completada y Fase 2 no iniciada
-**Subfase siguiente:** ninguna; Fase 2 requiere instrucción explícita
-**Estado global:** 🟨 EN DESARROLLO — Fase 1 completada
+**Fase activa:** Fase 2
+**Subfase siguiente:** F2.2 — Handshake GET del webhook (no iniciada)
+**Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -626,41 +626,47 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Recibir mensajes de WhatsApp mediante webhook, procesarlos con el núcleo de chat y responder por WhatsApp de forma segura.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+
+**Fecha de inicio:** 2026-08-26
 
 **Documento guía:** `docs/fase_2_whatsapp.md`
 
 
 ## F2.1 — Configuración Meta/WhatsApp
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-26
+
+**Fecha de finalización:** 2026-08-26
 
 
 ### Alcance
 
-- [ ] variables WhatsApp/Meta en Settings.
+- [x] variables WhatsApp/Meta en Settings.
 
-- [ ] .env.example.
+- [x] .env.example.
 
-- [ ] timeout.
+- [x] timeout.
 
-- [ ] versión Graph API configurable.
+- [x] versión Graph API configurable.
 
-- [ ] tests de secretos.
+- [x] tests de secretos.
 
 
 ### Criterios de aceptación
 
-- [ ] configuración carga sin exponer secretos.
+- [x] configuración carga sin exponer secretos.
 
-- [ ] no valores reales versionados.
+- [x] no valores reales versionados.
 
 
 ### Seguridad
 
-- [ ] SecretStr para tokens sensibles.
+- [x] SecretStr para tokens sensibles.
 
-- [ ] Graph API version no dispersa.
+- [x] Graph API version no dispersa.
 
 
 ### Prompt para Codex
@@ -3900,14 +3906,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 # 18. Checkpoint actual
 
-**Fase activa:** ninguna; Fase 1 está `✅ COMPLETADO`.
+**Fase activa:** Fase 2 — WhatsApp Cloud API (`🟨 EN_PROGRESO`).
 **Subfase activa:** ninguna.
-**Última subfase completada:** F1.9 — Cierre Fase 1.
-**Siguiente fase posible:** Fase 2 — WhatsApp Cloud API, únicamente mediante instrucción
-explícita del usuario; permanece `⬜ PENDIENTE`.
-**WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
+**Última subfase completada:** F2.1 — Configuración Meta/WhatsApp.
+**Siguiente subfase:** F2.2 — Handshake GET del webhook, pendiente de instrucción explícita.
+**WhatsApp:** configuración base completada; webhook y cliente Graph API todavía no
+implementados.
 
-No iniciar Fase 2 automáticamente.
+No iniciar F2.2 automáticamente.
 
 ---
 
@@ -4790,6 +4796,82 @@ Riesgos/Pendientes:
 Siguiente:
 
 - ninguna fase iniciada; Fase 2 solo puede comenzar mediante instrucción explícita del usuario.
+
+---
+
+## 2026-08-26 — Configuración Meta/WhatsApp
+
+**Fase:** Fase 2
+**Tarea:** F2.1 — Configuración Meta/WhatsApp
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregadas a `Settings` las variables de access token, phone-number ID, verify token, app
+  secret, versión Graph API y timeout de WhatsApp;
+- protegidos `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN` y `META_APP_SECRET` mediante
+  `SecretStr`, campos sin representación y validación segura;
+- mantenidos los secretos opcionales hasta habilitar los adaptadores posteriores para preservar
+  el funcionamiento independiente del chat interno de Fase 1;
+- validado `WHATSAPP_PHONE_NUMBER_ID` como identificador numérico cuando está configurado;
+- centralizado el default de Graph API en `Settings` con formato configurable `vN.0`;
+- fijado `v26.0` como default tras verificar el changelog oficial vigente de Meta;
+- acotado `WHATSAPP_REQUEST_TIMEOUT_SECONDS` a valores mayores que 0 y hasta 120 segundos, con
+  default de 15;
+- ampliado `.env.example` únicamente con nombres vacíos/no sensibles;
+- actualizados README, diseño de Fase 2, pruebas y checkpoint;
+- no se implementó ni inició F2.2, webhook, firma o cliente Graph API.
+
+Archivos:
+
+- `backend/app/core/config.py`
+- `backend/tests/test_config.py`
+- `backend/tests/test_repository_security.py`
+- `.env.example`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- changelog oficial de Meta recuperado desde `developers.facebook.com` -> HTTP 200; `v26.0`
+  declarada como versión más reciente e introducida el 2026-07-29;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_config.py
+  backend\tests\test_repository_security.py --basetemp=.venv\pytest-f21-target-2 -o
+  cache_dir=.venv\pytest-cache-f21-target-2 -q` -> 35 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f21 -o
+  cache_dir=.venv\pytest-cache-f21 -q` -> 74 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 35 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- auditoría normalizada -> cero secretos no vacíos y cero patrones de token en archivos
+  rastreados;
+- búsqueda de versiones en `backend/app` -> solo `backend/app/core/config.py` contiene una
+  versión Graph API;
+- `git ls-files .env .env.example` y `git check-ignore -v .env` -> `.env` permanece ignorado y
+  solo `.env.example` está rastreado;
+- revisión de estados -> F2.1 completada; F2.2-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- secretos Meta/WhatsApp usan `SecretStr`, no aparecen en `repr`, serialización ni errores de
+  validación;
+- `.env.example` contiene campos sensibles vacíos y la prueba de repositorio lo exige;
+- phone-number ID, versión y timeout rechazan valores con formato o límites inseguros;
+- no se modificó ni mostró el contenido del `.env` local;
+- no se realizaron llamadas a Meta ni se usaron credenciales reales;
+- la versión Graph API no está hardcodeada en rutas o servicios;
+- F2.2 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- los adaptadores futuros deben rechazar configuración ausente antes de usar cada secreto;
+- `v26.0` depende del ciclo externo de Meta y debe revisarse antes de pruebas reales/despliegue;
+- todavía no existen handshake, autenticación POST, parser, idempotencia ni cliente saliente.
+
+Siguiente:
+
+- F2.2 — Handshake GET del webhook, sin iniciar hasta recibir instrucción explícita del usuario.
 
 ---
 

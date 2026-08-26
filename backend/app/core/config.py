@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -6,6 +7,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 CorsOrigins = Annotated[tuple[str, ...], NoDecode]
+DEFAULT_META_GRAPH_API_VERSION = "v26.0"
 
 
 class HttpSettings(BaseSettings):
@@ -89,6 +91,13 @@ class Settings(HttpSettings):
 
     chat_max_message_chars: int = Field(default=2000, ge=1, le=10_000)
 
+    whatsapp_access_token: SecretStr | None = Field(default=None, repr=False)
+    whatsapp_phone_number_id: str | None = Field(default=None, repr=False)
+    whatsapp_verify_token: SecretStr | None = Field(default=None, repr=False)
+    meta_app_secret: SecretStr | None = Field(default=None, repr=False)
+    meta_graph_api_version: str = DEFAULT_META_GRAPH_API_VERSION
+    whatsapp_request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
+
     @field_validator("openai_api_key")
     @classmethod
     def validate_openai_api_key(cls, value: SecretStr) -> SecretStr:
@@ -106,6 +115,34 @@ class Settings(HttpSettings):
         if not normalized:
             raise ValueError("value must not be blank")
         return normalized
+
+    @field_validator("whatsapp_access_token", "whatsapp_verify_token", "meta_app_secret")
+    @classmethod
+    def validate_optional_whatsapp_secret(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        secret = value.get_secret_value()
+        if not secret.strip():
+            raise ValueError("configured secret must not be blank")
+        if secret != secret.strip():
+            raise ValueError("configured secret must not contain surrounding whitespace")
+        return value
+
+    @field_validator("whatsapp_phone_number_id")
+    @classmethod
+    def validate_whatsapp_phone_number_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value != value.strip() or not re.fullmatch(r"[0-9]{1,64}", value):
+            raise ValueError("WHATSAPP_PHONE_NUMBER_ID must contain only digits")
+        return value
+
+    @field_validator("meta_graph_api_version")
+    @classmethod
+    def validate_meta_graph_api_version(cls, value: str) -> str:
+        if value != value.strip() or not re.fullmatch(r"v[1-9][0-9]*\.0", value):
+            raise ValueError("META_GRAPH_API_VERSION must use the vN.0 format")
+        return value
 
 
 @lru_cache

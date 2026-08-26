@@ -1,6 +1,13 @@
+import re
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+SENSITIVE_ENV_NAMES = {
+    "OPENAI_API_KEY",
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_VERIFY_TOKEN",
+    "META_APP_SECRET",
+}
 
 
 def parse_environment_example() -> dict[str, str]:
@@ -17,11 +24,12 @@ def parse_environment_example() -> dict[str, str]:
     return values
 
 
-def test_environment_example_keeps_openai_secret_empty() -> None:
+def test_environment_example_keeps_all_secrets_empty() -> None:
     values = parse_environment_example()
 
-    assert "OPENAI_API_KEY" in values
-    assert values["OPENAI_API_KEY"] == ""
+    assert SENSITIVE_ENV_NAMES <= values.keys()
+    assert all(values[name] == "" for name in SENSITIVE_ENV_NAMES)
+    assert values["WHATSAPP_PHONE_NUMBER_ID"] == ""
 
 
 def test_gitignore_protects_local_environment_without_hiding_example() -> None:
@@ -34,3 +42,14 @@ def test_gitignore_protects_local_environment_without_hiding_example() -> None:
     assert ".env" in ignore_rules
     assert ".env.*" in ignore_rules
     assert "!.env.example" in ignore_rules
+
+
+def test_graph_api_version_default_is_centralized_in_application_config() -> None:
+    version_pattern = re.compile(r"\bv[1-9][0-9]*\.0\b")
+    files_with_versions = {
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in (REPOSITORY_ROOT / "backend" / "app").rglob("*.py")
+        if version_pattern.search(path.read_text(encoding="utf-8"))
+    }
+
+    assert files_with_versions == {"backend/app/core/config.py"}
