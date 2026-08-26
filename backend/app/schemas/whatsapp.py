@@ -63,3 +63,11 @@ class InboundMessage(BaseModel):
     message_type: Literal["text"] = "text"
     text: str = Field(min_length=1, max_length=MAX_WHATSAPP_TEXT_CHARS)
     timestamp: int | None = Field(default=None, ge=0)
+
+
+class WhatsAppSentMessage(WhatsAppProviderModel):
+    id: str = Field(min_length=1, max_length=512)
+
+
+class WhatsAppSendResponse(WhatsAppProviderModel):
+    messages: tuple[WhatsAppSentMessage, ...] = Field(min_length=1, max_length=1000)

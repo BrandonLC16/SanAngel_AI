@@ -50,3 +50,38 @@ class AIProviderStatusError(AIProviderError):
 
 class AIProviderResponseError(AIProviderError):
     """Raised when the AI provider response has no usable text output."""
+
+
+class WhatsAppClientInputError(InvalidRequestError):
+    """Raised when an outbound WhatsApp message violates client-side validation."""
+
+
+class WhatsAppClientConfigurationError(ServiceUnavailableError):
+    """Raised when required backend-only WhatsApp configuration is absent."""
+
+
+class WhatsAppProviderError(ServiceUnavailableError):
+    """Base exception for failures returned by Meta's Graph API."""
+
+    error_code = "whatsapp_service_unavailable"
+    public_message = "El canal de WhatsApp no está disponible temporalmente."
+
+
+class WhatsAppProviderTimeoutError(WhatsAppProviderError):
+    """Raised when Graph API exceeds the configured timeout."""
+
+
+class WhatsAppProviderRateLimitError(WhatsAppProviderError):
+    """Raised when Graph API rejects a request due to rate limits."""
+
+
+class WhatsAppProviderConnectionError(WhatsAppProviderError):
+    """Raised when Graph API cannot be reached."""
+
+
+class WhatsAppProviderStatusError(WhatsAppProviderError):
+    """Raised when Graph API returns a non-success HTTP status."""
+
+
+class WhatsAppProviderResponseError(WhatsAppProviderError):
+    """Raised when a successful Graph API response has no usable message ID."""

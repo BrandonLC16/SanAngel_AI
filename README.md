@@ -13,8 +13,9 @@ CORS configurable y una integracion desacoplada con OpenAI Responses API. El end
 de chat fue validado con pruebas sin red y con una llamada manual real.
 
 Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET, la autenticacion
-HMAC-SHA256 del webhook POST y el parser de mensajes de texto. WhatsApp sera el canal principal
-del cliente, pero la orquestacion y el cliente de Graph API todavia no estan implementados.
+HMAC-SHA256 del webhook POST, el parser de mensajes de texto y un cliente saliente mockeable para
+Graph API. WhatsApp sera el canal principal del cliente, pero la orquestacion completa todavia no
+esta implementada.
 
 ## Health check
 
@@ -108,6 +109,23 @@ Webhooks de estado, objetos/cambios ajenos, productos distintos de WhatsApp y ti
 como imagen, audio, documento, ubicacion, contactos e interactivos se ignoran con ACK HTTP 200.
 JSON malformado o estructuras inesperadas tampoco generan HTTP 500. Todavia no se responde al
 cliente ni se deduplican mensajes; esas responsabilidades pertenecen a subfases posteriores.
+
+## Cliente saliente de WhatsApp
+
+`WhatsAppClient.send_text` envia mensajes mediante
+`https://graph.facebook.com/{META_GRAPH_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages`. La base
+de Graph API es fija y version, phone-number ID, timeout y access token proceden exclusivamente de
+`Settings`. El token se envia solo en `Authorization: Bearer`, nunca en URL o body.
+
+El payload declara producto WhatsApp, destinatario individual y tipo texto. Destinatarios deben
+usar formato internacional validado y el texto no puede estar vacio ni superar 4096 caracteres.
+Una respuesta valida devuelve el message ID asignado por Meta.
+
+El cliente usa `httpx` asincrono, acepta un transporte inyectado para pruebas y expone `aclose()` o
+context manager asincrono para cerrar el cliente propio. No sigue redirecciones ni realiza
+reintentos automaticos, evitando duplicados ante resultados ambiguos. Timeout, conexion, rate
+limit, estados HTTP y respuestas invalidas se convierten en excepciones internas sin incluir
+token, destinatario, texto o cuerpo del proveedor.
 
 ## Servicio OpenAI
 

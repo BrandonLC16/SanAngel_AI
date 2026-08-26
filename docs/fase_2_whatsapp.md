@@ -3,7 +3,7 @@
 
 **Fecha:** 2026-08-25  
 **Actualizado:** 2026-08-26
-**Estado:** F2.1-F2.4 completadas; F2.5 y subfases posteriores permanecen pendientes.
+**Estado:** F2.1-F2.5 completadas; F2.6 y subfases posteriores permanecen pendientes.
 
 ---
 
@@ -286,6 +286,24 @@ No intentar procesarlos como texto accidentalmente.
 - mapear errores;
 - ser mockeable;
 - evitar logs con token o cuerpo sensible.
+
+F2.5 implementa `WhatsAppClient.send_text` con `httpx` asíncrono y cliente HTTP inyectable. El
+endpoint se construye únicamente como
+`https://graph.facebook.com/{META_GRAPH_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages`; la base
+no es configurable por input externo. El access token permanece backend-only y se envía solo en
+`Authorization: Bearer`.
+
+El payload usa `messaging_product=whatsapp`, `recipient_type=individual`, `type=text`, destinatario
+validado y objeto `text` con `preview_url` explícito. El texto se normaliza, no admite blancos y se
+limita a 4096 caracteres. Una respuesta exitosa se valida y devuelve el message ID de Meta.
+
+El timeout procede de `WHATSAPP_REQUEST_TIMEOUT_SECONDS`. El cliente no sigue redirecciones ni
+reintenta automáticamente; timeout, conexión, HTTP 429, otros estados no exitosos y respuestas
+inválidas se mapean a excepciones internas seguras. Token, destinatario, texto y respuesta del
+proveedor no se registran ni se incorporan a errores. El cliente propio puede cerrarse mediante
+`aclose()` o context manager; uno inyectado permanece bajo control del caller.
+
+F2.5 no conecta todavía el cliente con el webhook o el chatbot.
 
 ---
 

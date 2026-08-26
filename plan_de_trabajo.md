@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-26
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.5 — WhatsAppClient para mensajes salientes (no iniciada)
+**Subfase siguiente:** F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -831,36 +831,38 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.5 — WhatsAppClient para mensajes salientes
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-08-26
+**Fecha de finalización:** 2026-08-26
 
 
 ### Alcance
 
-- [ ] cliente Graph API.
+- [x] cliente Graph API.
 
-- [ ] send_text.
+- [x] send_text.
 
-- [ ] timeout.
+- [x] timeout.
 
-- [ ] errores.
+- [x] errores.
 
-- [ ] tests HTTP mockeados.
+- [x] tests HTTP mockeados.
 
 
 ### Criterios de aceptación
 
-- [ ] payload correcto.
+- [x] payload correcto.
 
-- [ ] errores mapeados.
+- [x] errores mapeados.
 
-- [ ] cliente mockeable.
+- [x] cliente mockeable.
 
 
 ### Seguridad
 
-- [ ] token solo header/backend.
+- [x] token solo header/backend.
 
-- [ ] URL controlada por configuración.
+- [x] URL controlada por configuración.
 
 
 ### Prompt para Codex
@@ -3914,13 +3916,13 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 2 — WhatsApp Cloud API (`🟨 EN_PROGRESO`).
 **Subfase activa:** ninguna.
-**Última subfase completada:** F2.4 — Parser y normalización de eventos.
-**Siguiente subfase:** F2.5 — WhatsAppClient para mensajes salientes, pendiente de instrucción
-explícita.
+**Última subfase completada:** F2.5 — WhatsAppClient para mensajes salientes.
+**Siguiente subfase:** F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp, pendiente de
+instrucción explícita.
 **WhatsApp:** configuración, handshake GET, autenticación del POST y parser completados; cliente
-Graph API todavía no implementado.
+Graph API completado; orquestación todavía no implementada.
 
-No iniciar F2.5 automáticamente.
+No iniciar F2.6 automáticamente.
 
 ---
 
@@ -5110,6 +5112,91 @@ Siguiente:
 
 - F2.5 — WhatsAppClient para mensajes salientes, sin iniciar hasta recibir instrucción explícita
   del usuario.
+
+---
+
+## 2026-08-26 — WhatsAppClient para mensajes salientes
+
+**Fase:** Fase 2
+**Tarea:** F2.5 — WhatsAppClient para mensajes salientes
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- implementado `WhatsAppClient` asíncrono con `send_text` y cliente HTTP inyectable;
+- fijada la base `https://graph.facebook.com` y construido el endpoint con versión y phone-number
+  ID validados desde `Settings`;
+- enviado `WHATSAPP_ACCESS_TOKEN` únicamente mediante `Authorization: Bearer`;
+- construido el payload oficial para producto WhatsApp, destinatario individual y texto;
+- validados destinatarios internacionales y texto no vacío de hasta 4096 caracteres;
+- aplicado `WHATSAPP_REQUEST_TIMEOUT_SECONDS` en cada request;
+- deshabilitados redirects y reintentos automáticos para no reenviar tokens ni duplicar envíos
+  ante resultados ambiguos;
+- validada la respuesta exitosa de Meta y devuelto su message ID;
+- mapeados timeout, conexión, rate limit, estados HTTP y respuesta inválida a excepciones internas
+  sin encadenar detalles del proveedor;
+- soportados `aclose()` y context manager asíncrono para el cliente HTTP propio;
+- movido `httpx>=0.28,<0.29` de extra de desarrollo a dependencia de ejecución;
+- agregadas pruebas con `httpx.MockTransport`, sin red ni credenciales reales;
+- actualizados README, diseño de Fase 2 y checkpoint;
+- no se implementó ni inició F2.6 ni la conexión webhook -> chatbot -> WhatsApp.
+
+Archivos:
+
+- `backend/app/services/whatsapp_client.py`
+- `backend/app/core/exceptions.py`
+- `backend/app/schemas/whatsapp.py`
+- `backend/tests/test_whatsapp_client.py`
+- `pyproject.toml`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- documentación oficial de mensajes de texto de WhatsApp recuperada desde
+  `developers.facebook.com` -> HTTP 200; confirmó endpoint versionado, phone-number ID,
+  `Authorization: Bearer` y payload de texto;
+- `.venv\Scripts\python.exe -m pip install -e ".[dev]"` -> editable reinstalado; `httpx 0.28.1`
+  satisface la dependencia de ejecución;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_whatsapp_client.py
+  --basetemp=.venv\pytest-f25-target-3 -o cache_dir=.venv\pytest-cache-f25-target-3 -q` -> 23
+  pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f25 -o
+  cache_dir=.venv\pytest-cache-f25 -q` -> 143 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 42 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores;
+- metadata del paquete -> `httpx` declarada entre las dependencias requeridas;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado y `.env.example`
+  sin secretos;
+- revisión de estados -> F2.5 completada; F2.6-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- el token permanece backend-only, no aparece en URL, body, logs o excepciones;
+- la URL no acepta base controlada por usuario y usa solo configuración validada;
+- destinatario y texto se validan antes de cualquier request;
+- redirects están deshabilitados incluso con un cliente inyectado;
+- no se realizan reintentos automáticos tras fallos ambiguos;
+- cuerpos y detalles de error de Graph API no se incorporan a excepciones internas;
+- todas las pruebas HTTP usan `MockTransport` y la barrera global de red;
+- F2.6 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- el cliente todavía no está conectado al webhook o al chatbot; comienza en F2.6;
+- idempotencia y estrategia ante timeouts ambiguos comienzan en F2.7;
+- `send_text` solo debe usarse dentro de la ventana/reglas vigentes de servicio; mensajes iniciados
+  por negocio requieren plantillas y validación posterior;
+- no se realizó una llamada real a Meta; corresponde a F2.9;
+- el caller debe cerrar clientes propios mediante context manager o `aclose()`.
+
+Siguiente:
+
+- F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp, sin iniciar hasta recibir instrucción
+  explícita del usuario.
 
 ---
 
