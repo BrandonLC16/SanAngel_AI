@@ -2,9 +2,9 @@
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
 **Última actualización:** 2026-08-26
-**Fase activa:** Fase 1  
-**Subfase siguiente:** F1.9 — Cierre Fase 1 (no iniciada)
-**Estado global:** 🟨 EN DESARROLLO  
+**Fase activa:** ninguna; Fase 1 completada y Fase 2 no iniciada
+**Subfase siguiente:** ninguna; Fase 2 requiere instrucción explícita
+**Estado global:** 🟨 EN DESARROLLO — Fase 1 completada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -123,7 +123,9 @@ F1.2 implementó `Settings`, protección de `OPENAI_API_KEY`, configuración y 1
 
 **Objetivo:** Crear un núcleo FastAPI seguro y desacoplado del canal, validarlo con OpenAI y dejarlo listo para ser reutilizado por WhatsApp.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
+
+**Fecha de finalización:** 2026-08-26
 
 **Documento guía:** `docs/fase_1_diseno.md`
 
@@ -570,34 +572,38 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.9 — Cierre Fase 1
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-26
+
+**Fecha de finalización:** 2026-08-26
 
 
 ### Alcance
 
-- [ ] revisar DoD.
+- [x] revisar DoD.
 
-- [ ] README.
+- [x] README.
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] lint.
+- [x] lint.
 
-- [ ] secrets.
+- [x] secrets.
 
-- [ ] checkpoint.
+- [x] checkpoint.
 
 
 ### Criterios de aceptación
 
-- [ ] F1.1-F1.9 verificadas.
+- [x] F1.1-F1.9 verificadas.
 
-- [ ] Fase 1 marcada completa.
+- [x] Fase 1 marcada completa.
 
 
 ### Seguridad
 
-- [ ] no abrir Fase 2 automáticamente.
+- [x] no abrir Fase 2 automáticamente.
 
 
 ### Prompt para Codex
@@ -3894,13 +3900,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 1.  
+**Fase activa:** ninguna; Fase 1 está `✅ COMPLETADO`.
 **Subfase activa:** ninguna.
-**Última subfase completada:** F1.8 — Prueba manual real con OpenAI.
-**Siguiente subfase:** F1.9 — Cierre Fase 1, pendiente de instrucción explícita.
+**Última subfase completada:** F1.9 — Cierre Fase 1.
+**Siguiente fase posible:** Fase 2 — WhatsApp Cloud API, únicamente mediante instrucción
+explícita del usuario; permanece `⬜ PENDIENTE`.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.9 ni Fase 2 automáticamente.
+No iniciar Fase 2 automáticamente.
 
 ---
 
@@ -4717,6 +4724,72 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F1.9 — Cierre Fase 1, sin iniciar hasta recibir instrucción explícita del usuario.
+
+---
+
+## 2026-08-26 — Cierre de Fase 1
+
+**Fase:** Fase 1
+**Tarea:** F1.9 — Cierre Fase 1
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- revisado el Definition of Done de Fase 1 y los criterios de F1.1-F1.9;
+- actualizado README para declarar Fase 1 completada y Fase 2 no iniciada;
+- actualizado el diseño técnico con F1.9 y el cierre de Fase 1;
+- agregadas pruebas de repositorio para mantener vacía la credencial de `.env.example` y
+  conservar las reglas de ignore de `.env`;
+- auditados código, pruebas, dependencias, documentación, secretos y checkpoint;
+- no se modificó funcionalidad de aplicación ni se inició ninguna subfase de Fase 2.
+
+Archivos:
+
+- `backend/tests/test_repository_security.py`
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_repository_security.py
+  --basetemp=.venv\pytest-f19-security -o cache_dir=.venv\pytest-cache-f19-security -q`
+  -> 2 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f19-final -o
+  cache_dir=.venv\pytest-cache-f19-final -q` -> 60 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 35 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- backend iniciado con Uvicorn en `127.0.0.1:8765` sin access log;
+- `GET /health` -> HTTP 200, respuesta mínima correcta y request ID presente;
+- `git diff --check` -> sin errores de espacios;
+- auditoría normalizada de archivos rastreados -> cero asignaciones de secretos no vacías y
+  cero patrones con apariencia de API key;
+- `git ls-files .env .env.example` y `git check-ignore -v .env` -> solo `.env.example` está
+  rastreado y `.env` permanece ignorado;
+- revisión de código -> sin TODO/FIXME/HACK críticos y sin Assistants API;
+- revisión de estados -> F1.1-F1.9 completas y las 11 entradas de Fase 2 pendientes.
+
+Seguridad:
+
+- `.env.example` conserva `OPENAI_API_KEY` vacío y la nueva prueba evita su regresión;
+- `.env` local no está rastreado ni apareció en el diff;
+- la suite bloqueó conexiones externas y utilizó dobles de OpenAI;
+- no se ejecutó una nueva llamada real ni se consumieron créditos durante F1.9;
+- no se imprimieron credenciales, prompts, mensajes ni respuestas;
+- Fase 2 y todas sus subfases permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- `/api/v1/chat` es interno, no tiene autenticación y no debe exponerse públicamente;
+- no hay todavía un escáner especializado de secretos; existen prueba determinística y auditoría
+  por patrones, pero conviene incorporar secret scanning en la fase de hardening;
+- disponibilidad, cuota y costo de OpenAI siguen siendo dependencias externas;
+- `.env` debe mantenerse local y fuera de Git.
+
+Siguiente:
+
+- ninguna fase iniciada; Fase 2 solo puede comenzar mediante instrucción explícita del usuario.
 
 ---
 

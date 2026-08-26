@@ -3,9 +3,9 @@
 
 **Fecha original:** 2026-08-25  
 **Actualizado:** 2026-08-26
-**Estado de implementación actual:** F1.1-F1.8 completadas; la prueba manual real de F1.8 obtuvo
-HTTP 200 el 2026-08-26 sin exponer la credencial ni el contenido de la respuesta. F1.9 permanece
-pendiente y no se ha iniciado.
+**Estado de implementación actual:** F1.1-F1.9 completadas; Fase 1 cerrada el 2026-08-26. La
+prueba manual real obtuvo HTTP 200 sin exponer la credencial ni el contenido de la respuesta,
+la suite automatizada pasó sin internet y Fase 2 permanece sin iniciar.
 **Objetivo:** construir un núcleo backend seguro y comprobable que después pueda ser consumido por WhatsApp sin acoplar la lógica del chatbot al canal.
 
 ---
@@ -61,6 +61,7 @@ F1.5 — OpenAIService                   ✅ COMPLETADO
 F1.6 — Endpoint interno /api/v1/chat   ✅ COMPLETADO
 F1.7 — Suite de pruebas y calidad      ✅ COMPLETADO
 F1.8 — Prueba manual real con OpenAI   ✅ COMPLETADO
+F1.9 — Cierre Fase 1                   ✅ COMPLETADO
 ```
 
 No rehacer F1.1/F1.2 salvo regresión.
@@ -235,7 +236,7 @@ F1.5 OpenAIService                       ✅
 F1.6 endpoint interno /api/v1/chat       ✅
 F1.7 pruebas/calidad                     ✅
 F1.8 integración manual OpenAI           ✅
-F1.9 cierre                              ⬜
+F1.9 cierre                              ✅
 ```
 
 ---

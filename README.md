@@ -7,12 +7,13 @@ promociones o pedidos.
 
 ## Estado actual
 
-F1.1-F1.8 inicializan el repositorio, implementan la configuracion central validada y crean la
-aplicacion FastAPI con health check, errores HTTP seguros, request ID, logging minimo y CORS
-configurable. La integracion con OpenAI ya esta aislada en un servicio interno y utiliza
-Responses API. El endpoint interno de chat conecta esa frontera mediante un servicio de
-aplicacion desacoplado, la suite automatizada impide conexiones externas y la llamada manual
-real fue validada correctamente.
+La Fase 1 (F1.1-F1.9) esta completada. El repositorio cuenta con una aplicacion FastAPI,
+configuracion central validada, health check, errores HTTP seguros, request ID, logging minimo,
+CORS configurable y una integracion desacoplada con OpenAI Responses API. El endpoint interno
+de chat fue validado con pruebas sin red y con una llamada manual real.
+
+Fase 2 permanece sin iniciar. WhatsApp sera el canal principal del cliente, pero su webhook y la
+integracion con Meta solo deben implementarse mediante una instruccion explicita posterior.
 
 ## Health check
 
