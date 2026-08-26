@@ -3,7 +3,7 @@
 
 **Fecha:** 2026-08-25  
 **Actualizado:** 2026-08-26
-**Estado:** F2.1 completada; F2.2 y subfases posteriores permanecen pendientes.
+**Estado:** F2.1-F2.2 completadas; F2.3 y subfases posteriores permanecen pendientes.
 
 ---
 
@@ -147,6 +147,15 @@ o despliegue porque el ciclo de versiones de Meta es externo al repositorio.
 Validar los parámetros requeridos por Meta y comparar el verify token configurado.
 
 No loguearlo.
+
+F2.2 expone `GET /api/v1/whatsapp/webhook`. Exige una sola instancia de `hub.mode`,
+`hub.verify_token` y `hub.challenge`; el modo debe ser `subscribe` y el challenge un entero
+decimal acotado. El token se compara en tiempo constante contra `WHATSAPP_VERIFY_TOKEN`.
+
+Una solicitud válida devuelve únicamente el challenge como texto plano. Mode, token o challenge
+inválidos reciben HTTP 403 sin cuerpo; la ausencia de configuración del verify token recibe HTTP
+503 sin cuerpo. La ruta y el middleware no registran el query string ni el token. Esta subfase no
+implementa el método POST.
 
 ## POST
 

@@ -12,8 +12,9 @@ configuracion central validada, health check, errores HTTP seguros, request ID, 
 CORS configurable y una integracion desacoplada con OpenAI Responses API. El endpoint interno
 de chat fue validado con pruebas sin red y con una llamada manual real.
 
-Fase 2 inicio con la configuracion central de Meta/WhatsApp. WhatsApp sera el canal principal del
-cliente, pero el webhook y el cliente de Graph API todavia no estan implementados.
+Fase 2 cuenta con la configuracion central de Meta/WhatsApp y el handshake GET del webhook.
+WhatsApp sera el canal principal del cliente, pero la recepcion autenticada de eventos POST y el
+cliente de Graph API todavia no estan implementados.
 
 ## Health check
 
@@ -80,6 +81,18 @@ desarrollo.
 La version de Graph API vive en `Settings`; futuros clientes deben construir sus endpoints desde
 esa configuracion y no repetir una version hardcodeada. Antes de una prueba real o despliegue se
 debe confirmar que la version configurada continue soportada por Meta.
+
+## Handshake del webhook de WhatsApp
+
+`GET /api/v1/whatsapp/webhook` implementa la verificacion inicial solicitada por Meta. Requiere
+una unica instancia de `hub.mode=subscribe`, `hub.verify_token` y un `hub.challenge` decimal. Si
+el token coincide con `WHATSAPP_VERIFY_TOKEN`, responde como texto plano con solamente el
+challenge; solicitudes incorrectas reciben HTTP 403 sin cuerpo. Si el verify token no esta
+configurado, el endpoint falla de forma cerrada con HTTP 503 sin cuerpo.
+
+El token se compara de forma segura, no se refleja en respuestas y la aplicacion no registra el
+query string. Esta ruta solo realiza el handshake GET: el POST y su validacion de firma pertenecen
+a una subfase posterior.
 
 ## Servicio OpenAI
 

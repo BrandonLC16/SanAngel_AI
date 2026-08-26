@@ -10,6 +10,7 @@ from backend.app.api.errors import (
 from backend.app.api.middleware import request_context_middleware, safe_exception_middleware
 from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
+from backend.app.api.routes.whatsapp import router as whatsapp_router
 from backend.app.core.config import HttpSettings, get_http_settings
 from backend.app.core.exceptions import ApplicationError
 from backend.app.core.logging import configure_logging
@@ -36,6 +37,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     application.middleware("http")(request_context_middleware)
     application.include_router(health_router)
     application.include_router(chat_router)
+    application.include_router(whatsapp_router)
     return application
 
 

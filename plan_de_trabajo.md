@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-26
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.2 — Handshake GET del webhook (no iniciada)
+**Subfase siguiente:** F2.3 — Validación de firma del webhook POST (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -687,30 +687,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.2 — Handshake GET del webhook
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-08-26
+**Fecha de finalización:** 2026-08-26
 
 
 ### Alcance
 
-- [ ] ruta GET webhook.
+- [x] ruta GET webhook.
 
-- [ ] validar mode/token/challenge.
+- [x] validar mode/token/challenge.
 
-- [ ] tests válido/inválido.
+- [x] tests válido/inválido.
 
 
 ### Criterios de aceptación
 
-- [ ] Meta puede verificar endpoint en prueba.
+- [x] Meta puede verificar endpoint en prueba.
 
-- [ ] token incorrecto rechazado.
+- [x] token incorrecto rechazado.
 
 
 ### Seguridad
 
-- [ ] no log verify token.
+- [x] no log verify token.
 
-- [ ] respuesta mínima.
+- [x] respuesta mínima.
 
 
 ### Prompt para Codex
@@ -3908,12 +3910,13 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 2 — WhatsApp Cloud API (`🟨 EN_PROGRESO`).
 **Subfase activa:** ninguna.
-**Última subfase completada:** F2.1 — Configuración Meta/WhatsApp.
-**Siguiente subfase:** F2.2 — Handshake GET del webhook, pendiente de instrucción explícita.
-**WhatsApp:** configuración base completada; webhook y cliente Graph API todavía no
-implementados.
+**Última subfase completada:** F2.2 — Handshake GET del webhook.
+**Siguiente subfase:** F2.3 — Validación de firma del webhook POST, pendiente de instrucción
+explícita.
+**WhatsApp:** configuración base y handshake GET completados; webhook POST y cliente Graph API
+todavía no implementados.
 
-No iniciar F2.2 automáticamente.
+No iniciar F2.3 automáticamente.
 
 ---
 
@@ -4872,6 +4875,80 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F2.2 — Handshake GET del webhook, sin iniciar hasta recibir instrucción explícita del usuario.
+
+---
+
+## 2026-08-26 — Handshake GET del webhook
+
+**Fase:** Fase 2
+**Tarea:** F2.2 — Handshake GET del webhook
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregada la ruta `GET /api/v1/whatsapp/webhook` y registrada en la aplicación FastAPI;
+- validadas instancias únicas de `hub.mode`, `hub.verify_token` y `hub.challenge`;
+- exigido `hub.mode=subscribe` y challenge decimal de hasta 20 dígitos conforme al contrato de
+  verificación documentado por Meta;
+- comparado el verify token configurado mediante `hmac.compare_digest` sin reflejarlo ni
+  registrarlo;
+- devuelto únicamente el challenge como texto plano para solicitudes válidas;
+- rechazados mode, token, challenge, parámetros ausentes o duplicados con HTTP 403 sin cuerpo;
+- aplicada respuesta cerrada HTTP 503 sin cuerpo cuando `WHATSAPP_VERIFY_TOKEN` no está
+  configurado;
+- agregadas pruebas HTTP sin red para casos válidos, inválidos y controles de logs;
+- actualizados README, diseño de Fase 2 y checkpoint;
+- no se implementó ni inició F2.3 ni ningún método POST.
+
+Archivos:
+
+- `backend/app/api/routes/whatsapp.py`
+- `backend/app/main.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- documentación oficial de Webhooks de Meta recuperada desde `developers.facebook.com` -> HTTP
+  200; confirmó `hub.mode=subscribe`, verify token y devolución del challenge entero;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_whatsapp_webhook.py
+  --basetemp=.venv\pytest-f22-target-2 -o cache_dir=.venv\pytest-cache-f22-target-2 -q` -> 7
+  pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f22 -o
+  cache_dir=.venv\pytest-cache-f22 -q` -> 81 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 37 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado, `.env.example`
+  sin secretos y cero valores sensibles versionados;
+- auditoría de superficie -> una única ruta GET de WhatsApp; ninguna ruta POST añadida;
+- revisión de estados -> F2.2 completada; F2.3-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- el verify token permanece como `SecretStr` en configuración y solo se revela localmente para
+  la comparación segura;
+- ni el token recibido ni el configurado se incluyen en respuestas, logs o excepciones;
+- el middleware registra la plantilla del endpoint, no el query string;
+- respuestas válidas contienen solo el challenge; rechazos y configuración ausente no contienen
+  cuerpo;
+- parámetros ausentes o duplicados fallan de forma cerrada;
+- no se realizaron llamadas a Meta ni se usaron credenciales reales;
+- F2.3 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- la prueba verifica el endpoint dentro de la aplicación; una verificación real de Meta requiere
+  HTTPS público y configuración local válida;
+- el método POST, su firma, el raw body y el procesamiento de eventos todavía no existen;
+- el verify token debe mantenerse únicamente en el entorno backend y fuera de logs y Git.
+
+Siguiente:
+
+- F2.3 — Validación de firma del webhook POST, sin iniciar hasta recibir instrucción explícita
+  del usuario.
 
 ---
 
