@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import PlainTextResponse
 
 from backend.app.core.config import Settings, get_settings
+from backend.app.services.whatsapp_webhook_service import WhatsAppWebhookService
 
 router = APIRouter(prefix="/api/v1/whatsapp", tags=["whatsapp"])
 
@@ -101,4 +102,6 @@ async def receive_whatsapp_webhook(
     if not _has_valid_meta_signature(raw_body, signature_header, app_secret):
         return Response(status_code=status.HTTP_403_FORBIDDEN)
 
+    webhook_service = WhatsAppWebhookService(max_text_chars=settings.chat_max_message_chars)
+    webhook_service.parse_messages(raw_body)
     return Response(status_code=status.HTTP_200_OK)

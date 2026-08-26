@@ -257,3 +257,49 @@ def test_missing_meta_app_secret_fails_closed() -> None:
 
     assert response.status_code == 503
     assert response.content == b""
+
+
+@pytest.mark.parametrize(
+    "raw_body",
+    (
+        b"not-json",
+        b"[]",
+        b'{"object":"whatsapp_business_account","entry":"unexpected"}',
+    ),
+)
+def test_authenticated_unusual_payload_does_not_break_webhook(raw_body: bytes) -> None:
+    app_secret = "test-only-meta-app-secret-marker"
+    application = make_application(app_secret=app_secret)
+    signature = sign_payload(app_secret, raw_body)
+
+    response = asyncio.run(
+        send_webhook(application, raw_body, [("X-Hub-Signature-256", signature)])
+    )
+
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+def test_authenticated_payload_body_is_not_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app_secret = "test-only-meta-app-secret-marker"
+    body_marker = "test-only-private-text-body-marker"
+    raw_body = (
+        '{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages",'
+        '"value":{"messaging_product":"whatsapp","messages":[{"from":"5215550000001",'
+        '"id":"wamid.test-only-id","type":"text","text":{"body":"'
+        f"{body_marker}"
+        '"}}]}}]}]}'
+    ).encode()
+    application = make_application(app_secret=app_secret)
+    signature = sign_payload(app_secret, raw_body)
+
+    with caplog.at_level(logging.INFO, logger=HTTP_LOGGER_NAME):
+        response = asyncio.run(
+            send_webhook(application, raw_body, [("X-Hub-Signature-256", signature)])
+        )
+
+    assert response.status_code == 200
+    assert body_marker not in caplog.text
+    assert raw_body.decode() not in caplog.text

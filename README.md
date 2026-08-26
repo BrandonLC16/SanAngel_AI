@@ -12,9 +12,9 @@ configuracion central validada, health check, errores HTTP seguros, request ID, 
 CORS configurable y una integracion desacoplada con OpenAI Responses API. El endpoint interno
 de chat fue validado con pruebas sin red y con una llamada manual real.
 
-Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET y la autenticacion
-HMAC-SHA256 del webhook POST. WhatsApp sera el canal principal del cliente, pero el parsing de
-eventos y el cliente de Graph API todavia no estan implementados.
+Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET, la autenticacion
+HMAC-SHA256 del webhook POST y el parser de mensajes de texto. WhatsApp sera el canal principal
+del cliente, pero la orquestacion y el cliente de Graph API todavia no estan implementados.
 
 ## Health check
 
@@ -99,8 +99,15 @@ El mismo path acepta POST y, antes de acceder a JSON, conserva los bytes exactos
 HTTP 200 sin cuerpo; firmas ausentes, duplicadas, malformadas o incorrectas reciben HTTP 403 sin
 cuerpo. Si falta el App Secret, responde HTTP 503 sin cuerpo.
 
-F2.3 autentica el payload pero no lo interpreta. El schema, los tipos soportados y la
-normalizacion corresponden a una subfase posterior.
+Tras autenticarlo, el backend valida la estructura relevante mediante modelos Pydantic tolerantes
+a campos futuros. Los mensajes `type=text` se normalizan como `InboundMessage` interno con
+provider, message id, sender, texto y timestamp. El texto se recorta y se limita mediante
+`CHAT_MAX_MESSAGE_CHARS`; texto vacio o excesivo se ignora.
+
+Webhooks de estado, objetos/cambios ajenos, productos distintos de WhatsApp y tipos no soportados
+como imagen, audio, documento, ubicacion, contactos e interactivos se ignoran con ACK HTTP 200.
+JSON malformado o estructuras inesperadas tampoco generan HTTP 500. Todavia no se responde al
+cliente ni se deduplican mensajes; esas responsabilidades pertenecen a subfases posteriores.
 
 ## Servicio OpenAI
 

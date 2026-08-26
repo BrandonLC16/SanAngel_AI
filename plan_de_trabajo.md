@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-26
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.4 — Parser y normalización de eventos (no iniciada)
+**Subfase siguiente:** F2.5 — WhatsAppClient para mensajes salientes (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -783,32 +783,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.4 — Parser y normalización de eventos
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-08-26
+**Fecha de finalización:** 2026-08-26
 
 
 ### Alcance
 
-- [ ] Pydantic/models de eventos necesarios.
+- [x] Pydantic/models de eventos necesarios.
 
-- [ ] extraer message id/sender/text.
+- [x] extraer message id/sender/text.
 
-- [ ] ignorar status/eventos no relevantes.
+- [x] ignorar status/eventos no relevantes.
 
-- [ ] tipos no soportados.
+- [x] tipos no soportados.
 
 
 ### Criterios de aceptación
 
-- [ ] mensaje texto produce InboundMessage interno.
+- [x] mensaje texto produce InboundMessage interno.
 
-- [ ] payload raro no rompe servidor.
+- [x] payload raro no rompe servidor.
 
 
 ### Seguridad
 
-- [ ] límites de texto.
+- [x] límites de texto.
 
-- [ ] no log raw body completo.
+- [x] no log raw body completo.
 
 
 ### Prompt para Codex
@@ -3912,13 +3914,13 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Fase activa:** Fase 2 — WhatsApp Cloud API (`🟨 EN_PROGRESO`).
 **Subfase activa:** ninguna.
-**Última subfase completada:** F2.3 — Validación de firma del webhook POST.
-**Siguiente subfase:** F2.4 — Parser y normalización de eventos, pendiente de instrucción
+**Última subfase completada:** F2.4 — Parser y normalización de eventos.
+**Siguiente subfase:** F2.5 — WhatsAppClient para mensajes salientes, pendiente de instrucción
 explícita.
-**WhatsApp:** configuración, handshake GET y autenticación del POST completados; parser y cliente
-Graph API todavía no implementados.
+**WhatsApp:** configuración, handshake GET, autenticación del POST y parser completados; cliente
+Graph API todavía no implementado.
 
-No iniciar F2.4 automáticamente.
+No iniciar F2.5 automáticamente.
 
 ---
 
@@ -5026,6 +5028,88 @@ Siguiente:
 
 - F2.4 — Parser y normalización de eventos, sin iniciar hasta recibir instrucción explícita del
   usuario.
+
+---
+
+## 2026-08-26 — Parser y normalización de eventos
+
+**Fase:** Fase 2
+**Tarea:** F2.4 — Parser y normalización de eventos
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregados modelos Pydantic tolerantes a campos extra para el envelope, entries, changes,
+  values, mensajes y contenido de texto de Meta;
+- agregado el modelo interno inmutable `InboundMessage` con provider, message id, sender, tipo,
+  texto y timestamp;
+- implementado `WhatsAppWebhookService` para validar y normalizar payloads ya autenticados;
+- procesados únicamente `object=whatsapp_business_account`, `field=messages`,
+  `messaging_product=whatsapp` y mensajes `type=text`;
+- extraídos `id`, `from`, `text.body` y timestamp, con normalización de espacios;
+- ignorados webhooks de estado, objetos/cambios ajenos y tipos no soportados;
+- aplicados `CHAT_MAX_MESSAGE_CHARS` y un máximo estructural absoluto de 10000 caracteres;
+- acotadas colecciones del payload a 1000 elementos por nivel;
+- convertidos JSON malformado y estructuras inesperadas en cero mensajes sin romper la ruta;
+- conectado el parser después de la validación HMAC, conservando ACK HTTP 200;
+- agregadas pruebas de normalización, status, eventos irrelevantes, tipos no soportados, límites,
+  payloads raros y ausencia del raw body en logs;
+- actualizados README, diseño de Fase 2 y checkpoint;
+- no se implementó ni inició F2.5, Graph API, envío u orquestación.
+
+Archivos:
+
+- `backend/app/schemas/whatsapp.py`
+- `backend/app/services/whatsapp_webhook_service.py`
+- `backend/app/api/routes/whatsapp.py`
+- `backend/tests/test_whatsapp_webhook_service.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- ejemplos oficiales de payloads de WhatsApp recuperados desde `developers.facebook.com` -> HTTP
+  200; confirmaron `messages`, `statuses`, `from`, `id`, `timestamp`, `type` y `text.body`;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_whatsapp_webhook_service.py
+  backend\tests\test_whatsapp_webhook.py --basetemp=.venv\pytest-f24-target -o
+  cache_dir=.venv\pytest-cache-f24-target -q` -> 46 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f24 -o
+  cache_dir=.venv\pytest-cache-f24 -q` -> 120 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 40 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado y `.env.example`
+  sin secretos;
+- auditoría de orden -> firma HMAC validada antes de invocar el parser;
+- revisión de estados -> F2.4 completada; F2.5-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- el parser solo recibe el body después de una firma válida;
+- no se añadió acceso a `Request.json()` antes de la autenticación;
+- el texto se limita con configuración y con un techo estructural absoluto;
+- colecciones de Meta tienen límites para evitar procesamiento ilimitado;
+- raw body, texto y sender no se registran ni se reflejan en respuestas;
+- payloads desconocidos se tratan como input no confiable y producen cero mensajes;
+- no se realizaron llamadas a Meta ni se usaron credenciales reales;
+- F2.5 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- la ruta normaliza pero todavía descarta el resultado; la orquestación comienza en F2.6;
+- el body completo continúa almacenándose en memoria antes del parser y requiere un límite HTTP
+  compatible con Meta antes de producción;
+- un payload autenticado pero inválido recibe ACK 200; deberá existir observabilidad por categoría
+  sin contenido sensible para detectar cambios de schema;
+- todavía no existen envío saliente, idempotencia ni protección contra replays.
+
+Siguiente:
+
+- F2.5 — WhatsAppClient para mensajes salientes, sin iniciar hasta recibir instrucción explícita
+  del usuario.
 
 ---
 

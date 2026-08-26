@@ -3,7 +3,7 @@
 
 **Fecha:** 2026-08-25  
 **Actualizado:** 2026-08-26
-**Estado:** F2.1-F2.3 completadas; F2.4 y subfases posteriores permanecen pendientes.
+**Estado:** F2.1-F2.4 completadas; F2.5 y subfases posteriores permanecen pendientes.
 
 ---
 
@@ -183,7 +183,21 @@ malformada, calculada con otro secreto o correspondiente a otros bytes recibe HT
 cuerpo. Si `META_APP_SECRET` no está configurado, la ruta falla cerrada con HTTP 503 sin cuerpo.
 Ni body, firma ni secreto se registran o reflejan.
 
-Esta subfase no parsea ni valida el JSON autenticado. Esa responsabilidad comienza en F2.4.
+F2.4 agrega modelos Pydantic mínimos y tolerantes a campos extra para `object`, `entry`,
+`changes`, `value`, `messages` y `text`. `WhatsAppWebhookService` procesa únicamente
+`object=whatsapp_business_account`, cambios `field=messages`, `messaging_product=whatsapp` y
+mensajes `type=text`.
+
+Cada texto válido produce un `InboundMessage` interno con provider, message id, sender, texto y
+timestamp. Se eliminan espacios exteriores y se aplica `CHAT_MAX_MESSAGE_CHARS`, con un máximo
+estructural absoluto de 10000 caracteres. Texto vacío o excesivo se ignora.
+
+Eventos con `statuses`, objetos/cambios no relevantes y tipos no soportados se ignoran. JSON
+malformado, roots inesperados, campos con tipos incorrectos o estructuras futuras no producen
+HTTP 500: el parser devuelve cero mensajes y la ruta autenticada conserva ACK HTTP 200. El raw
+body, sender y texto no se registran.
+
+Esta subfase solo normaliza; no deduplica, orquesta ni envía respuestas.
 
 ---
 
