@@ -1,9 +1,9 @@
 # plan_de_trabajo.md
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
-**Última actualización:** 2026-08-25  
+**Última actualización:** 2026-08-26
 **Fase activa:** Fase 1  
-**Subfase siguiente:** F1.8 — bloqueada por respuesta HTTP 429 del proveedor
+**Subfase siguiente:** F1.9 — Cierre Fase 1 (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO  
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -514,13 +514,15 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F1.8 — Prueba manual real con OpenAI
 
-**Estado:** ⛔ BLOQUEADO
+**Estado:** ✅ COMPLETADO
 
 **Fecha de inicio:** 2026-08-25
+**Fecha de reanudación:** 2026-08-26
 
-**Bloqueo:** la credencial está presente solo en el entorno local y el backend alcanza Responses
-API, pero dos intentos controlados recibieron HTTP 429 del proveedor; no se obtuvo una respuesta
-real HTTP 200.
+**Fecha de finalización:** 2026-08-26
+
+**Resultado:** la llamada real respondió HTTP 200 con request ID y texto no vacío; las
+validaciones finales y los controles de seguridad fueron aprobados.
 
 
 ### Alcance
@@ -531,14 +533,14 @@ real HTTP 200.
 
 - [x] probar /api/v1/chat.
 
-- [ ] comprobar respuesta real.
+- [x] comprobar respuesta real.
 
 - [x] comprobar error seguro.
 
 
 ### Criterios de aceptación
 
-- [ ] una llamada real funciona.
+- [x] una llamada real funciona.
 
 - [x] credencial nunca aparece en evidencia.
 
@@ -3893,12 +3895,12 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 1.  
-**Subfase activa:** ninguna; F1.8 está bloqueada por HTTP 429 del proveedor.
-**Última subfase completada:** F1.7 — Suite de pruebas y calidad.
-**Siguiente subfase:** reanudar F1.8 cuando la cuenta/proyecto permita una llamada real.
+**Subfase activa:** ninguna.
+**Última subfase completada:** F1.8 — Prueba manual real con OpenAI.
+**Siguiente subfase:** F1.9 — Cierre Fase 1, pendiente de instrucción explícita.
 **WhatsApp:** diseñado para comenzar en Fase 2, no implementado todavía.
 
-No iniciar F1.9 ni Fase 2 mientras F1.8 permanezca bloqueada.
+No iniciar F1.9 ni Fase 2 automáticamente.
 
 ---
 
@@ -4590,6 +4592,131 @@ Bloqueo/Riesgos:
 Siguiente:
 
 - reanudar exclusivamente F1.8 cuando el proveedor permita la llamada; no iniciar F1.9.
+
+---
+
+## 2026-08-26 — Reanudación de F1.8 (bloqueada por credencial local ausente)
+
+**Fase:** Fase 1
+**Tarea:** F1.8 — Prueba manual real con OpenAI
+**Estado:** ⛔ BLOQUEADO
+
+Cambios:
+
+- reconstruido el entorno virtual local ignorado e instaladas las dependencias declaradas;
+- revisada la integración contra la referencia oficial vigente de Responses API;
+- comprobada la configuración mediante indicadores booleanos, sin leer ni imprimir secretos;
+- iniciado el backend únicamente en loopback y validado `/health`;
+- no se llamó a `/api/v1/chat` porque no existe `.env` ni una credencial en el entorno;
+- no se modificó código y no se inició F1.9 ni ninguna tarea de Fase 2.
+
+Archivos:
+
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+- `.venv` local ignorado, recreado únicamente para validación
+
+Validación:
+
+- referencia oficial de OpenAI -> `POST /responses` conserva `input`, `instructions`, `store` y
+  el campo auxiliar `output_text` recomendado por los SDK;
+- comprobación local reducida a booleanos -> `.env` ausente, `OPENAI_API_KEY` ausente y
+  `Settings` no puede cargar la configuración completa;
+- `git check-ignore -v .env` -> `.env` continúa cubierto por `.gitignore`;
+- backend iniciado en `127.0.0.1:8765` sin access log;
+- `GET /health` -> HTTP 200 y request ID presente;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f18-final -o
+  cache_dir=.venv\pytest-cache-f18-final -q` -> 58 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 34 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git ls-files .env .env.example` -> solo `.env.example` está versionado.
+
+Seguridad:
+
+- no se buscó, recuperó, creó, solicitó ni copió ninguna credencial;
+- las comprobaciones reportaron únicamente presencia/ausencia y nunca valores de configuración;
+- `.env` sigue ignorado y no aparece en `git status`;
+- no se envió una llamada con credencial inventada ni se consumieron créditos;
+- el servidor se limitó a loopback, sin access log, y se detuvo tras validar `/health`.
+
+Bloqueo/Riesgos:
+
+- falta una credencial local válida; por ello no se obtuvo HTTP 200 ni respuesta real y el
+  criterio de aceptación pendiente no puede marcarse como cumplido;
+- una credencial futura debe agregarse solo a `.env` o al entorno local del proceso, nunca al
+  repositorio, comandos compartidos, logs o documentación;
+- el endpoint interno sigue sin autenticación y no debe exponerse públicamente.
+
+Siguiente:
+
+- agregar una credencial válida únicamente en `.env` y reanudar exclusivamente F1.8; no iniciar
+  F1.9.
+
+---
+
+## 2026-08-26 — Prueba manual real con OpenAI completada
+
+**Fase:** Fase 1
+**Tarea:** F1.8 — Prueba manual real con OpenAI
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- detectada la credencial proporcionada en `.env.example` sin leer ni mostrar su valor;
+- movida la configuración proporcionada a `.env`, archivo local ignorado, y restaurado
+  `.env.example` exactamente a su versión segura rastreada;
+- validada la configuración completa mediante indicadores booleanos;
+- iniciado el backend exclusivamente en loopback sin access log y con reintentos desactivados;
+- ejecutada una única llamada real a `/api/v1/chat` mediante Responses API;
+- comprobada una respuesta HTTP 200, con request ID y texto no vacío, sin mostrar su contenido;
+- no se modificó código y no se inició F1.9 ni ninguna tarea de Fase 2.
+
+Archivos:
+
+- `README.md`
+- `docs/fase_1_diseno.md`
+- `plan_de_trabajo.md`
+- `.env` local ignorado, no versionado
+- `.env.example` restaurado, sin diferencias respecto de Git
+
+Validación:
+
+- referencia oficial vigente de OpenAI -> confirmados `POST /responses`, `input`,
+  `instructions`, `store` y `output_text`;
+- comprobación local reducida a booleanos -> `.env` existe, la credencial está presente,
+  `Settings` carga, `store=false`, modelo configurado, timeout y reintentos dentro de rango;
+- `git check-ignore -v .env` -> `.env` está cubierto por `.gitignore`;
+- backend iniciado en `127.0.0.1:8765` sin access log y detenido tras la prueba;
+- `GET /health` -> HTTP 200;
+- `scripts/manual_chat_probe.py --expect success` -> HTTP 200, request ID presente, JSON válido
+  y respuesta no vacía de 6 caracteres;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f18-success -o
+  cache_dir=.venv\pytest-cache-f18-success -q` -> 58 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 34 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes.
+
+Seguridad:
+
+- la credencial nunca apareció en comandos, salidas, logs, documentación ni evidencia;
+- `.env.example` no conserva la credencial y solo `.env.example` está rastreado por Git;
+- el probe no imprimió el mensaje, prompt ni texto de respuesta del modelo;
+- `store=false` se mantuvo y la aplicación realizó un solo intento, sin reintentos;
+- servidor limitado a loopback, sin access log y detenido inmediatamente después del probe;
+- la suite automatizada permaneció sin acceso a internet y usó dobles de OpenAI.
+
+Riesgos/Pendientes:
+
+- `/api/v1/chat` continúa siendo un endpoint interno sin autenticación y no debe exponerse
+  públicamente;
+- la disponibilidad, cuota y costo del proveedor siguen siendo dependencias externas;
+- `.env` debe mantenerse local y nunca agregarse a Git.
+
+Siguiente:
+
+- F1.9 — Cierre Fase 1, sin iniciar hasta recibir instrucción explícita del usuario.
 
 ---
 

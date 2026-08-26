@@ -7,11 +7,12 @@ promociones o pedidos.
 
 ## Estado actual
 
-F1.1-F1.7 inicializan el repositorio, implementan la configuracion central validada y crean la
+F1.1-F1.8 inicializan el repositorio, implementan la configuracion central validada y crean la
 aplicacion FastAPI con health check, errores HTTP seguros, request ID, logging minimo y CORS
 configurable. La integracion con OpenAI ya esta aislada en un servicio interno y utiliza
 Responses API. El endpoint interno de chat conecta esa frontera mediante un servicio de
-aplicacion desacoplado y la suite automatizada impide conexiones externas.
+aplicacion desacoplado, la suite automatizada impide conexiones externas y la llamada manual
+real fue validada correctamente.
 
 ## Health check
 
@@ -123,8 +124,9 @@ python scripts/manual_chat_probe.py --expect success
 El probe solo acepta el endpoint loopback, no imprime la respuesta del modelo y reporta
 únicamente estado HTTP, presencia de request ID y longitud de la respuesta.
 
-La prueba exitosa requiere que `OPENAI_API_KEY` tenga un valor válido en el `.env` local. El
-archivo está preparado e ignorado, pero Codex no crea, solicita ni copia credenciales reales.
+La prueba exitosa requiere que `OPENAI_API_KEY` tenga un valor válido en un `.env` local. Si el
+archivo no existe, créalo a partir de `.env.example`; `.env` está ignorado y Codex no crea,
+solicita ni copia credenciales reales.
 Si el proveedor responde HTTP 429, revisa la cuota, facturación y límites del proyecto antes de
 repetir la prueba; el backend devolverá únicamente su error público HTTP 503.
 

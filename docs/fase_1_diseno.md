@@ -2,9 +2,10 @@
 ## Backend base + OpenAI, preparado para WhatsApp
 
 **Fecha original:** 2026-08-25  
-**Actualizado:** 2026-08-25  
-**Estado de implementación actual:** F1.1-F1.7 completadas; F1.8 bloqueada porque el proveedor
-respondió HTTP 429 durante la prueba real.
+**Actualizado:** 2026-08-26
+**Estado de implementación actual:** F1.1-F1.8 completadas; la prueba manual real de F1.8 obtuvo
+HTTP 200 el 2026-08-26 sin exponer la credencial ni el contenido de la respuesta. F1.9 permanece
+pendiente y no se ha iniciado.
 **Objetivo:** construir un núcleo backend seguro y comprobable que después pueda ser consumido por WhatsApp sin acoplar la lógica del chatbot al canal.
 
 ---
@@ -59,7 +60,7 @@ F1.4 — Errores, request ID y CORS      ✅ COMPLETADO
 F1.5 — OpenAIService                   ✅ COMPLETADO
 F1.6 — Endpoint interno /api/v1/chat   ✅ COMPLETADO
 F1.7 — Suite de pruebas y calidad      ✅ COMPLETADO
-F1.8 — Prueba manual real con OpenAI   ⛔ BLOQUEADO
+F1.8 — Prueba manual real con OpenAI   ✅ COMPLETADO
 ```
 
 No rehacer F1.1/F1.2 salvo regresión.
@@ -233,7 +234,7 @@ F1.4 errores + logging + CORS            ✅
 F1.5 OpenAIService                       ✅
 F1.6 endpoint interno /api/v1/chat       ✅
 F1.7 pruebas/calidad                     ✅
-F1.8 integración manual OpenAI           ⛔
+F1.8 integración manual OpenAI           ✅
 F1.9 cierre                              ⬜
 ```
 
