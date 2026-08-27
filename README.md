@@ -15,7 +15,7 @@ de chat fue validado con pruebas sin red y con una llamada manual real.
 Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET, la autenticacion
 HMAC-SHA256 del webhook POST, el parser de mensajes de texto, un cliente saliente mockeable para
 Graph API, la orquestacion WhatsApp -> chatbot -> WhatsApp y una idempotencia minima en memoria.
-Todavia falta separar el procesamiento para un ACK rapido.
+El webhook ya separa el ACK del procesamiento externo mediante una tarea local controlada.
 
 ## Health check
 
@@ -113,9 +113,9 @@ JSON malformado o estructuras inesperadas tampoco generan HTTP 500.
 Cada `InboundMessage` de texto autenticado pasa a `MessageOrchestrator`, que solicita la respuesta
 al servicio de chat y pide su envio a `WhatsAppClient`. La ruta no conoce OpenAI ni Graph API y los
 adaptadores se construyen de forma perezosa, despues de verificar la firma. Un fallo operativo
-conocido devuelve HTTP 503 con un error estable que no incluye texto, destinatario ni detalles del
-proveedor. El procesamiento todavia es sincrono dentro de la solicitud; la deduplicacion minima se
-incorpora en F2.7 y la separacion del ACK corresponde a F2.8.
+conocido durante el trabajo diferido se registra con categoria estable, sin texto, destinatario ni
+detalles del proveedor. Como el ACK ya fue enviado, esos fallos no intentan reemplazar la respuesta
+HTTP ni provocan reintentos automaticos.
 
 F2.7 reclama atomica y temporalmente cada `provider:external_message_id` antes de invocar el
 chatbot. Un ID ya reclamado o completado recibe ACK HTTP 200 sin generar otra respuesta. Si el
@@ -126,7 +126,18 @@ desaloja primero el ID completado mas antiguo. Solo almacena IDs, no texto ni re
 comparte estado entre procesos o instancias, pierde su contenido al reiniciar y puede volver a
 aceptar IDs antiguos despues del desalojo. No es apta para produccion: antes de desplegar debe
 reemplazarse por almacenamiento persistente y coordinado. El procesamiento y el ACK continuan
-sincronos hasta F2.8.
+separados mediante el mecanismo local descrito a continuacion.
+
+F2.8 usa una unica tarea `BackgroundTasks` de FastAPI por lote autenticado. La ruta conserva en el
+camino del ACK solamente lectura del raw body, firma HMAC, parsing y normalizacion; el chatbot y
+Graph API se ejecutan despues de enviar HTTP 200. El procesador abre y cierra sus adaptadores dentro
+de la tarea, maneja cada mensaje de forma independiente y continua el lote si uno falla.
+
+Los fallos de background se capturan y registran solo con request ID, categoria y conteos. Las
+cancelaciones se registran y se propagan; no se crean tareas sueltas con `asyncio.create_task` ni
+se realizan reintentos. Este mecanismo es un MVP en proceso, no una cola durable: una caida despues
+del ACK puede perder trabajo. Antes de produccion debe evaluarse una cola/worker persistente con
+apagado ordenado, metricas y recuperacion verificable.
 
 ## Cliente saliente de WhatsApp
 

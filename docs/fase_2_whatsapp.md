@@ -3,7 +3,7 @@
 
 **Fecha:** 2026-08-25  
 **Actualizado:** 2026-08-27
-**Estado:** F2.1-F2.7 completadas; subfases posteriores pendientes.
+**Estado:** F2.1-F2.8 completadas; subfases posteriores pendientes.
 
 ---
 
@@ -257,6 +257,24 @@ Para MVP local puede utilizarse un mecanismo simple y probado.
 
 Antes de producción evaluar una cola/worker si el volumen, latencia o garantías de entrega lo requieren.
 
+F2.8 usa una sola `BackgroundTasks` de FastAPI por lote autenticado. De acuerdo con la
+[documentación oficial de FastAPI](https://fastapi.tiangolo.com/tutorial/background-tasks/) y
+[Starlette](https://www.starlette.io/background/), la tarea se adjunta a la respuesta y comienza
+después de enviarla. El camino del ACK queda limitado a raw body, firma, parsing, normalización y
+programación local; OpenAI y Graph API quedan fuera de la espera del cliente.
+
+`WhatsAppBackgroundProcessor` construye y cierra los adaptadores dentro de la tarea. Procesa el
+lote secuencialmente, captura los fallos por mensaje para que no impidan ejecutar los siguientes y
+no realiza reintentos. Registra exclusivamente request ID, categoría de error y conteos; nunca
+texto, sender, message ID, respuesta o detalle de proveedor. Una cancelación se registra y se
+propaga en lugar de ocultarse.
+
+No se usa `asyncio.create_task`, por lo que no quedan tareas deliberadamente desacopladas del ciclo
+de respuesta. Aun así, `BackgroundTasks` es un mecanismo local y no durable: una caída o reinicio
+después del ACK puede perder trabajo, no existe recuperación entre procesos y no hay backpressure
+persistente. Antes de producción se debe evaluar una cola/worker con entrega, apagado y
+observabilidad verificables.
+
 ---
 
 # 8. Privacidad
@@ -330,12 +348,13 @@ salida mockeable. La ruta no importa ni invoca OpenAI o Graph API directamente.
 
 La composición de adaptadores es perezosa: solo ocurre después de validar la firma y cuando el
 parser produjo al menos un mensaje soportado. Los fallos conocidos de aplicación se convierten en
-`MessageProcessingError`, con HTTP 503 y representación pública fija; mensaje, respuesta,
-destinatario y detalle del proveedor no se reflejan ni registran.
+`MessageProcessingError`; desde F2.8 el procesador los captura después del ACK y registra solo su
+categoría segura. Mensaje, respuesta, destinatario y detalle del proveedor no se reflejan ni
+registran.
 
-El procesamiento permanece dentro de la solicitud y es secuencial para lotes. F2.7 incorpora la
-deduplicación mínima en memoria; no agrega tareas de background, colas ni reintentos, que
-permanecen fuera de alcance y se revisarán en F2.8.
+F2.7 incorpora deduplicación mínima en memoria. F2.8 mueve el chatbot y el envío a un procesador
+local posterior al ACK, conserva el orden secuencial del lote y no agrega reintentos, cola externa
+o persistencia.
 
 ---
 

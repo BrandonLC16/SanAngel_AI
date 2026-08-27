@@ -1,18 +1,20 @@
-from collections.abc import AsyncIterator, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
 
 from backend.app.core.config import Settings, get_settings
 from backend.app.services.chat_service import ChatService
 from backend.app.services.idempotency_store import IdempotencyStore, InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 from backend.app.services.openai_service import OpenAIService
+from backend.app.services.whatsapp_background_processor import (
+    MessageOrchestratorFactory,
+    WhatsAppBackgroundProcessor,
+)
 from backend.app.services.whatsapp_client import WhatsAppClient
-
-MessageOrchestratorFactory = Callable[
-    [Settings],
-    AbstractAsyncContextManager[MessageOrchestrator],
-]
 
 
 @lru_cache
@@ -51,3 +53,14 @@ def get_message_orchestrator_factory() -> MessageOrchestratorFactory:
     """Expose a replaceable lazy composition root for authenticated webhook processing."""
 
     return create_message_orchestrator
+
+
+def get_whatsapp_background_processor(
+    orchestrator_factory: Annotated[
+        MessageOrchestratorFactory,
+        Depends(get_message_orchestrator_factory),
+    ],
+) -> WhatsAppBackgroundProcessor:
+    """Compose the in-process processor while keeping provider work out of the route."""
+
+    return WhatsAppBackgroundProcessor(orchestrator_factory)

@@ -3,14 +3,14 @@ import hmac
 import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 from fastapi.responses import PlainTextResponse
 
 from backend.app.api.dependencies import (
-    MessageOrchestratorFactory,
-    get_message_orchestrator_factory,
+    get_whatsapp_background_processor,
 )
 from backend.app.core.config import Settings, get_settings
+from backend.app.services.whatsapp_background_processor import WhatsAppBackgroundProcessor
 from backend.app.services.whatsapp_webhook_service import WhatsAppWebhookService
 
 router = APIRouter(prefix="/api/v1/whatsapp", tags=["whatsapp"])
@@ -91,10 +91,11 @@ def verify_whatsapp_webhook(
 )
 async def receive_whatsapp_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     settings: Annotated[Settings, Depends(get_settings)],
-    orchestrator_factory: Annotated[
-        MessageOrchestratorFactory,
-        Depends(get_message_orchestrator_factory),
+    background_processor: Annotated[
+        WhatsAppBackgroundProcessor,
+        Depends(get_whatsapp_background_processor),
     ],
 ) -> Response:
     """Authenticate Meta's signature over the untouched body before any JSON processing."""
@@ -113,8 +114,11 @@ async def receive_whatsapp_webhook(
     webhook_service = WhatsAppWebhookService(max_text_chars=settings.chat_max_message_chars)
     inbound_messages = webhook_service.parse_messages(raw_body)
     if inbound_messages:
-        async with orchestrator_factory(settings) as orchestrator:
-            for message in inbound_messages:
-                await orchestrator.process_message(message)
+        background_tasks.add_task(
+            background_processor.process_messages,
+            inbound_messages,
+            settings,
+            request.state.request_id,
+        )
 
     return Response(status_code=status.HTTP_200_OK)

@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-27
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.8 — ACK rápido y separación de procesamiento (no iniciada)
+**Subfase siguiente:** F2.9 — Prueba real en entorno de Meta (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -979,32 +979,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.8 — ACK rápido y separación de procesamiento
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-27
+
+**Fecha de finalización:** 2026-08-27
 
 
 ### Alcance
 
-- [ ] separar validación/ACK de trabajo largo.
+- [x] separar validación/ACK de trabajo largo.
 
-- [ ] mecanismo MVP seguro.
+- [x] mecanismo MVP seguro.
 
-- [ ] manejo de excepciones de background.
+- [x] manejo de excepciones de background.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] webhook responde de forma predecible.
+- [x] webhook responde de forma predecible.
 
-- [ ] trabajo externo no bloquea innecesariamente.
+- [x] trabajo externo no bloquea innecesariamente.
 
 
 ### Seguridad
 
-- [ ] sin tareas huérfanas silenciosas.
+- [x] sin tareas huérfanas silenciosas.
 
-- [ ] sin reintentos infinitos.
+- [x] sin reintentos infinitos.
 
 
 ### Prompt para Codex
@@ -5372,6 +5376,95 @@ Siguiente:
 
 - F2.8 — ACK rápido y separación de procesamiento, sin iniciar hasta recibir instrucción
   explícita del usuario.
+
+---
+
+## 2026-08-27 — ACK rápido y separación de procesamiento
+
+**Fase:** Fase 2
+**Tarea:** F2.8 — ACK rápido y separación de procesamiento
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- separada la autenticación/parsing del webhook respecto del chatbot y el envío por Graph API;
+- programada una única tarea `BackgroundTasks` de FastAPI por lote autenticado, después de
+  preparar el ACK HTTP 200;
+- agregado `WhatsAppBackgroundProcessor` para construir/cerrar los adaptadores dentro del trabajo
+  diferido y procesar el lote secuencialmente;
+- capturados los fallos por mensaje para continuar con los mensajes restantes sin reintentos;
+- capturados los fallos de construcción/cierre del lote y registradas las cancelaciones antes de
+  propagarlas;
+- limitados los logs de background a request ID, categoría segura y conteos, sin PII o contenido;
+- mantenida la ruta libre de llamadas directas a OpenAI y Graph API;
+- agregadas pruebas del ACK previo a la ejecución, procesamiento exitoso, fallo por mensaje,
+  fallo de factory, cancelación observable, ausencia de reintentos y no filtración de datos;
+- documentado que el mecanismo es local/no durable y que requiere evaluar cola/worker antes de
+  producción;
+- no se implementó ni inició F2.9 ni se realizaron pruebas reales con Meta.
+
+Archivos:
+
+- `backend/app/services/whatsapp_background_processor.py`
+- `backend/app/api/dependencies.py`
+- `backend/app/api/routes/whatsapp.py`
+- `backend/app/core/logging.py`
+- `backend/tests/test_whatsapp_background_processor.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- documentación oficial vigente de FastAPI y Starlette revisada -> `BackgroundTasks` se ejecuta
+  después de enviar la respuesta y las excepciones posteriores no pueden reemplazar el ACK;
+- colección oficial de Meta para WhatsApp Business Platform revisada -> webhook HTTPS como canal
+  de notificaciones preservado sin modificar firma o schema;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_whatsapp_background_processor.py
+  backend\tests\test_whatsapp_webhook.py backend\tests\test_message_orchestrator.py
+  backend\tests\test_idempotency_store.py --basetemp=.venv\pytest-f28-target-1 -o
+  cache_dir=.venv\pytest-cache-f28-target-1 -q` -> 43 pruebas aprobadas sin acceso externo;
+- validación dirigida de Ruff -> lint aprobado; formato detectó dos archivos y se corrigieron con
+  Ruff antes de la validación completa;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f28 -o
+  cache_dir=.venv\pytest-cache-f28 -q` -> 165 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 48 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado y `.env.example`
+  sin secretos;
+- auditoría de alcance -> ningún `asyncio.create_task`, retry loop, cola o worker en código de
+  aplicación; F2.9-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- raw body, firma y parsing siguen ocurriendo antes de programar cualquier trabajo;
+- solicitudes no autenticadas no ejecutan ni programan llamadas a proveedores;
+- cada lote usa una tarea adjunta a la respuesta, no una tarea deliberadamente huérfana;
+- fallos operativos y no esperados se capturan sin registrar excepción, texto, sender, message ID,
+  respuesta, token o detalle del proveedor;
+- las cancelaciones son observables y se propagan; no se ocultan silenciosamente;
+- no existen reintentos en el procesador de background;
+- todas las pruebas usan dobles locales y la barrera de red; no hubo llamadas reales a OpenAI o
+  Meta ni uso de credenciales reales;
+- F2.9 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- `BackgroundTasks` vive en el proceso y no es durable: una caída después del ACK puede perder el
+  lote sin que Meta lo reenvíe;
+- no existe backpressure persistente, recuperación tras reinicio ni coordinación entre procesos;
+- una cancelación queda registrada pero no se reprograma automáticamente;
+- los lotes permanecen secuenciales y pueden acumular trabajo bajo carga;
+- antes de producción debe evaluarse una cola/worker durable con apagado y métricas verificables;
+- la prueba real end-to-end corresponde exclusivamente a F2.9.
+
+Siguiente:
+
+- F2.9 — Prueba real en entorno de Meta, sin iniciar hasta recibir instrucción explícita del
+  usuario.
 
 ---
 

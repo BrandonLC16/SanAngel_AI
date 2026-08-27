@@ -8,12 +8,13 @@ from contextlib import asynccontextmanager
 
 import httpx
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 
 from backend.app.api.dependencies import get_message_orchestrator_factory
+from backend.app.api.routes.whatsapp import receive_whatsapp_webhook
 from backend.app.core.config import HttpSettings, Settings, get_settings
 from backend.app.core.exceptions import AIProviderRateLimitError
-from backend.app.core.logging import HTTP_LOGGER_NAME
+from backend.app.core.logging import HTTP_LOGGER_NAME, WHATSAPP_BACKGROUND_LOGGER_NAME
 from backend.app.main import create_app
 from backend.app.schemas.whatsapp import InboundMessage
 from backend.app.services.idempotency_store import InMemoryIdempotencyStore
@@ -26,8 +27,22 @@ class RecordingMessageOrchestrator:
     def __init__(self) -> None:
         self.messages: list[InboundMessage] = []
 
-    async def process_message(self, message: InboundMessage) -> None:
+    async def process_message(self, message: InboundMessage) -> bool:
         self.messages.append(message)
+        return True
+
+
+class RecordingBackgroundProcessor:
+    def __init__(self) -> None:
+        self.calls: list[tuple[tuple[InboundMessage, ...], Settings, str]] = []
+
+    async def process_messages(
+        self,
+        messages: tuple[InboundMessage, ...],
+        settings: Settings,
+        request_id: str,
+    ) -> None:
+        self.calls.append((messages, settings, request_id))
 
 
 class FakeChatResponder:
@@ -155,6 +170,33 @@ async def send_webhook(
         return await client.post(WEBHOOK_PATH, content=raw_body, headers=headers)
 
 
+def make_direct_request(raw_body: bytes, app_secret: str, request_id: str) -> Request:
+    signature = sign_payload(app_secret, raw_body).encode("ascii")
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": WEBHOOK_PATH,
+        "raw_path": WEBHOOK_PATH.encode("ascii"),
+        "query_string": b"",
+        "headers": [(b"x-hub-signature-256", signature)],
+        "scheme": "http",
+        "server": ("testserver", 80),
+        "client": ("127.0.0.1", 12345),
+    }
+    body_available = True
+
+    async def receive() -> dict[str, object]:
+        nonlocal body_available
+        if body_available:
+            body_available = False
+            return {"type": "http.request", "body": raw_body, "more_body": False}
+        return {"type": "http.disconnect"}
+
+    request = Request(scope, receive)
+    request.state.request_id = request_id
+    return request
+
+
 def test_valid_handshake_returns_only_challenge_and_does_not_log_token(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -278,6 +320,45 @@ def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks(
     assert whatsapp_client.calls == [(sender, answer, False)]
 
 
+def test_authenticated_route_queues_work_without_awaiting_external_processing() -> None:
+    app_secret = "test-only-meta-app-secret-marker"
+    request_id = "background-scheduling-request-id"
+    raw_body = text_message_payload("5215550000001", "mensaje diferido")
+    request = make_direct_request(raw_body, app_secret, request_id)
+    background_tasks = BackgroundTasks()
+    background_processor = RecordingBackgroundProcessor()
+    settings = Settings(
+        openai_api_key="test-only-openai-credential-placeholder",
+        meta_app_secret=app_secret,
+        _env_file=None,
+    )
+
+    async def schedule_then_run() -> tuple[object, int, int]:
+        response = await receive_whatsapp_webhook(
+            request,
+            background_tasks,
+            settings,
+            background_processor,  # type: ignore[arg-type]
+        )
+        calls_before_response = len(background_processor.calls)
+        queued_tasks = len(background_tasks.tasks)
+        await background_tasks()
+        return response, calls_before_response, queued_tasks
+
+    response, calls_before_response, queued_tasks = asyncio.run(schedule_then_run())
+
+    assert response.status_code == 200
+    assert response.body == b""
+    assert calls_before_response == 0
+    assert queued_tasks == 1
+    assert len(background_processor.calls) == 1
+    messages, received_settings, received_request_id = background_processor.calls[0]
+    assert len(messages) == 1
+    assert messages[0].text == "mensaje diferido"
+    assert received_settings is settings
+    assert received_request_id == request_id
+
+
 def test_duplicate_authenticated_message_id_is_acked_without_a_second_response() -> None:
     app_secret = "test-only-meta-app-secret-marker"
     sender = "5215550000001"
@@ -308,7 +389,7 @@ def test_duplicate_authenticated_message_id_is_acked_without_a_second_response()
     assert whatsapp_client.calls == [(sender, answer, False)]
 
 
-def test_chat_failure_returns_safe_error_without_sending_or_leaking_data(
+def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leaking_data(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     app_secret = "test-only-meta-app-secret-marker"
@@ -329,7 +410,7 @@ def test_chat_failure_returns_safe_error_without_sending_or_leaking_data(
     application = make_application(app_secret=app_secret, orchestrator=orchestrator)
     raw_body = text_message_payload(sender, inbound_text)
 
-    with caplog.at_level(logging.INFO, logger=HTTP_LOGGER_NAME):
+    with caplog.at_level(logging.INFO):
         response = asyncio.run(
             send_webhook(
                 application,
@@ -338,17 +419,17 @@ def test_chat_failure_returns_safe_error_without_sending_or_leaking_data(
             )
         )
 
-    assert response.status_code == 503
-    assert response.json()["error"] == {
-        "code": "message_processing_failed",
-        "message": "No fue posible procesar el mensaje recibido.",
-    }
+    assert response.status_code == 200
+    assert response.content == b""
     assert whatsapp_client.calls == []
     rendered = f"{response.text}\n{caplog.text}"
     assert sender not in rendered
     assert inbound_text not in rendered
     assert answer not in rendered
     assert internal_detail not in rendered
+    assert "background_message_processing_failed" in caplog.text
+    assert "error_category=message_processing_failed" in caplog.text
+    assert WHATSAPP_BACKGROUND_LOGGER_NAME in caplog.text
 
 
 def test_signature_is_checked_against_untouched_raw_body() -> None:
