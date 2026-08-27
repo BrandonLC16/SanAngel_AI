@@ -14,8 +14,8 @@ de chat fue validado con pruebas sin red y con una llamada manual real.
 
 Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET, la autenticacion
 HMAC-SHA256 del webhook POST, el parser de mensajes de texto, un cliente saliente mockeable para
-Graph API y la orquestacion WhatsApp -> chatbot -> WhatsApp. Todavia faltan idempotencia y la
-separacion del procesamiento para un ACK rapido.
+Graph API, la orquestacion WhatsApp -> chatbot -> WhatsApp y una idempotencia minima en memoria.
+Todavia falta separar el procesamiento para un ACK rapido.
 
 ## Health check
 
@@ -114,8 +114,19 @@ Cada `InboundMessage` de texto autenticado pasa a `MessageOrchestrator`, que sol
 al servicio de chat y pide su envio a `WhatsAppClient`. La ruta no conoce OpenAI ni Graph API y los
 adaptadores se construyen de forma perezosa, despues de verificar la firma. Un fallo operativo
 conocido devuelve HTTP 503 con un error estable que no incluye texto, destinatario ni detalles del
-proveedor. En F2.6 el procesamiento todavia es sincrono dentro de la solicitud y no deduplica; esas
-garantias corresponden a F2.7 y F2.8.
+proveedor. El procesamiento todavia es sincrono dentro de la solicitud; la deduplicacion minima se
+incorpora en F2.7 y la separacion del ACK corresponde a F2.8.
+
+F2.7 reclama atomica y temporalmente cada `provider:external_message_id` antes de invocar el
+chatbot. Un ID ya reclamado o completado recibe ACK HTTP 200 sin generar otra respuesta. Si el
+procesamiento falla antes de completarse, la reserva se libera para permitir un reintento.
+
+La implementacion MVP `InMemoryIdempotencyStore` conserva como maximo 10000 IDs por proceso y
+desaloja primero el ID completado mas antiguo. Solo almacena IDs, no texto ni remitentes. No
+comparte estado entre procesos o instancias, pierde su contenido al reiniciar y puede volver a
+aceptar IDs antiguos despues del desalojo. No es apta para produccion: antes de desplegar debe
+reemplazarse por almacenamiento persistente y coordinado. El procesamiento y el ACK continuan
+sincronos hasta F2.8.
 
 ## Cliente saliente de WhatsApp
 

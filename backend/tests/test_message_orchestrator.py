@@ -10,6 +10,7 @@ from backend.app.core.exceptions import (
     WhatsAppProviderTimeoutError,
 )
 from backend.app.schemas.whatsapp import InboundMessage
+from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 
 
@@ -71,11 +72,15 @@ def inbound_message(*, text: str = "Hola") -> InboundMessage:
 def test_process_message_connects_normalized_input_answer_and_sender() -> None:
     chat_service = FakeChatResponder(answer="Respuesta del chatbot")
     whatsapp_client = FakeWhatsAppSender()
-    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    orchestrator = MessageOrchestrator(
+        chat_service,
+        whatsapp_client,
+        InMemoryIdempotencyStore(),
+    )
 
     result = asyncio.run(orchestrator.process_message(inbound_message(text="Pregunta")))
 
-    assert result is None
+    assert result is True
     assert chat_service.messages == ["Pregunta"]
     assert whatsapp_client.calls == [("5215550000001", "Respuesta del chatbot", False)]
 
@@ -90,6 +95,7 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
         _env_file=None,
     )
     chat_service = FakeChatResponder(answer="Respuesta conectada")
+    idempotency_store = InMemoryIdempotencyStore()
     created_clients: list[ContextualFakeWhatsAppSender] = []
 
     def fake_whatsapp_client(candidate: Settings) -> ContextualFakeWhatsAppSender:
@@ -98,6 +104,7 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
         return client
 
     monkeypatch.setattr(dependencies, "get_chat_service", lambda: chat_service)
+    monkeypatch.setattr(dependencies, "get_idempotency_store", lambda: idempotency_store)
     monkeypatch.setattr(dependencies, "WhatsAppClient", fake_whatsapp_client)
 
     async def run_flow() -> None:
@@ -119,7 +126,8 @@ def test_chat_failure_is_mapped_and_prevents_outbound_send() -> None:
     private_detail = "test-only-private-chat-failure-marker"
     chat_service = FakeChatResponder(error=AIProviderRateLimitError(private_detail))
     whatsapp_client = FakeWhatsAppSender()
-    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    idempotency_store = InMemoryIdempotencyStore()
+    orchestrator = MessageOrchestrator(chat_service, whatsapp_client, idempotency_store)
 
     with pytest.raises(MessageProcessingError) as exc_info:
         asyncio.run(orchestrator.process_message(inbound_message(text="texto privado")))
@@ -128,13 +136,15 @@ def test_chat_failure_is_mapped_and_prevents_outbound_send() -> None:
     assert private_detail not in str(exc_info.value)
     assert "texto privado" not in str(exc_info.value)
     assert exc_info.value.__cause__ is None
+    assert asyncio.run(idempotency_store.claim("whatsapp:wamid.test-only-inbound-message-id"))
 
 
 def test_outbound_failure_is_mapped_without_message_or_recipient_detail() -> None:
     private_detail = "test-only-private-whatsapp-failure-marker"
     chat_service = FakeChatResponder(answer="respuesta privada")
     whatsapp_client = FakeWhatsAppSender(error=WhatsAppProviderTimeoutError(private_detail))
-    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    idempotency_store = InMemoryIdempotencyStore()
+    orchestrator = MessageOrchestrator(chat_service, whatsapp_client, idempotency_store)
 
     with pytest.raises(MessageProcessingError) as exc_info:
         asyncio.run(orchestrator.process_message(inbound_message(text="texto privado")))
@@ -144,3 +154,26 @@ def test_outbound_failure_is_mapped_without_message_or_recipient_detail() -> Non
     assert "texto privado" not in str(exc_info.value)
     assert "respuesta privada" not in str(exc_info.value)
     assert exc_info.value.__cause__ is None
+    assert asyncio.run(idempotency_store.claim("whatsapp:wamid.test-only-inbound-message-id"))
+
+
+def test_duplicate_message_id_does_not_generate_a_second_answer_or_send() -> None:
+    chat_service = FakeChatResponder(answer="Respuesta única")
+    whatsapp_client = FakeWhatsAppSender()
+    orchestrator = MessageOrchestrator(
+        chat_service,
+        whatsapp_client,
+        InMemoryIdempotencyStore(),
+    )
+    message = inbound_message(text="Pregunta repetida")
+
+    async def process_twice() -> tuple[bool, bool]:
+        first = await orchestrator.process_message(message)
+        second = await orchestrator.process_message(message)
+        return first, second
+
+    results = asyncio.run(process_twice())
+
+    assert results == (True, False)
+    assert chat_service.messages == ["Pregunta repetida"]
+    assert whatsapp_client.calls == [("5215550000001", "Respuesta única", False)]

@@ -3,7 +3,7 @@
 
 **Fecha:** 2026-08-25  
 **Actualizado:** 2026-08-27
-**Estado:** F2.1-F2.6 completadas; subfases posteriores pendientes.
+**Estado:** F2.1-F2.7 completadas; subfases posteriores pendientes.
 
 ---
 
@@ -217,6 +217,24 @@ con implementación temporal en memoria.
 
 Antes de producción debe usar almacenamiento persistente.
 
+F2.7 define `IdempotencyStore` con operaciones asíncronas para reclamar atómicamente un ID,
+marcarlo como procesado y liberar la reserva tras un fallo. `MessageOrchestrator` usa la clave
+`provider:external_message_id` antes de invocar el chatbot. Un ID ya reclamado o completado se
+ignora con ACK HTTP 200 y no vuelve a producir una respuesta saliente.
+
+La implementación MVP `InMemoryIdempotencyStore` está protegida frente a concurrencia dentro de
+un único event loop y limita el estado a 10000 IDs por proceso. Cuando alcanza el límite desaloja
+el ID completado más antiguo; nunca desaloja trabajo en curso y falla de forma segura si todas las
+entradas están activas. Un fallo del procesamiento libera la reserva para que Meta pueda
+reintentar.
+
+Esta implementación es explícitamente temporal: pierde el estado al reiniciar, no coordina
+procesos o instancias y el desalojo permite que un ID suficientemente antiguo vuelva a procesarse.
+Además, un cierre abrupto después del envío pero antes de marcar el ID conserva una ventana de
+duplicación. Antes de producción debe sustituirse por persistencia compartida con operaciones
+atómicas y una estrategia transaccional compatible con el envío saliente. Solo se almacenan IDs;
+no se conservan remitentes, textos ni respuestas.
+
 ---
 
 # 7. ACK rápido
@@ -315,8 +333,9 @@ parser produjo al menos un mensaje soportado. Los fallos conocidos de aplicació
 `MessageProcessingError`, con HTTP 503 y representación pública fija; mensaje, respuesta,
 destinatario y detalle del proveedor no se reflejan ni registran.
 
-El procesamiento de F2.6 permanece dentro de la solicitud y es secuencial para lotes. No incorpora
-deduplicación, tareas de background, colas ni reintentos: F2.7 y F2.8 permanecen pendientes.
+El procesamiento permanece dentro de la solicitud y es secuencial para lotes. F2.7 incorpora la
+deduplicación mínima en memoria; no agrega tareas de background, colas ni reintentos, que
+permanecen fuera de alcance y se revisarán en F2.8.
 
 ---
 

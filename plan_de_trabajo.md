@@ -3,7 +3,7 @@
 
 **Última actualización:** 2026-08-27
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.7 — Idempotencia mínima (no iniciada)
+**Subfase siguiente:** F2.8 — ACK rápido y separación de procesamiento (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -931,30 +931,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.7 — Idempotencia mínima
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-27
+
+**Fecha de finalización:** 2026-08-27
 
 
 ### Alcance
 
-- [ ] interfaz IdempotencyStore.
+- [x] interfaz IdempotencyStore.
 
-- [ ] detectar IDs duplicados.
+- [x] detectar IDs duplicados.
 
-- [ ] implementación MVP explícitamente temporal.
+- [x] implementación MVP explícitamente temporal.
 
-- [ ] tests duplicados.
+- [x] tests duplicados.
 
 
 ### Criterios de aceptación
 
-- [ ] mismo message id no genera dos respuestas.
+- [x] mismo message id no genera dos respuestas.
 
 
 ### Seguridad
 
-- [ ] documentar límite de memoria/multiproceso.
+- [x] documentar límite de memoria/multiproceso.
 
-- [ ] persistencia obligatoria antes de producción.
+- [x] persistencia obligatoria antes de producción.
 
 
 ### Prompt para Codex
@@ -5277,6 +5281,97 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F2.7 — Idempotencia mínima, sin iniciar hasta recibir instrucción explícita del usuario.
+
+---
+
+## 2026-08-27 — Idempotencia mínima
+
+**Fase:** Fase 2
+**Tarea:** F2.7 — Idempotencia mínima
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- definida la interfaz asíncrona `IdempotencyStore` con operaciones para reclamar, completar y
+  liberar IDs de mensajes;
+- implementado `InMemoryIdempotencyStore` como almacén MVP temporal, atómico dentro del proceso y
+  acotado a 10000 entradas;
+- aplicado desalojo del ID completado más antiguo al alcanzar el límite, sin expulsar mensajes en
+  curso y con fallo seguro si toda la capacidad está activa;
+- integrada una instancia compartida por proceso en la composición de dependencias;
+- actualizado `MessageOrchestrator` para reclamar `provider:external_message_id` antes del chat,
+  ignorar duplicados y marcar el ID únicamente después del envío exitoso;
+- liberada la reserva tras fallos para permitir un reintento posterior;
+- agregadas pruebas de concurrencia, duplicados completados, liberación, límite, desalojo y flujo
+  HTTP repetido con chatbot y WhatsApp mockeados;
+- documentados el límite de memoria, pérdida al reiniciar, aislamiento por proceso/instancia,
+  desalojo de IDs antiguos y obligación de persistencia antes de producción;
+- no se implementó ni inició F2.8, background processing, colas o persistencia.
+
+Archivos:
+
+- `backend/app/services/idempotency_store.py`
+- `backend/app/services/message_orchestrator.py`
+- `backend/app/api/dependencies.py`
+- `backend/app/core/exceptions.py`
+- `backend/tests/test_idempotency_store.py`
+- `backend/tests/test_message_orchestrator.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- primera ejecución dirigida -> 37 pruebas aprobadas y 1 fallida por una expectativa incorrecta
+  del test de desalojo; el caso se corrigió para no intentar expulsar entradas activas;
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_idempotency_store.py
+  backend\tests\test_message_orchestrator.py backend\tests\test_whatsapp_webhook.py
+  --basetemp=.venv\pytest-f27-target-2 -o cache_dir=.venv\pytest-cache-f27-target-2 -q` -> 39
+  pruebas aprobadas sin acceso externo;
+- validación dirigida de Ruff -> 6 archivos sin hallazgos y con formato correcto;
+- primera validación completa de formato -> detectó finales de línea inconsistentes en
+  `backend/app/core/exceptions.py`; corregidos con Ruff;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f27-final -o
+  cache_dir=.venv\pytest-cache-f27-final -q` -> 161 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 46 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado y `.env.example`
+  sin secretos;
+- auditoría de alcance -> no se añadieron `BackgroundTasks`, colas, Redis, SQLAlchemy ni trabajo
+  correspondiente a F2.8 o fases posteriores;
+- revisión de estados -> F2.7 completada; F2.8-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- la reclamación atómica evita dos respuestas para el mismo ID mientras la entrada permanece en
+  el almacén local;
+- se conservan únicamente IDs con namespace de proveedor; no se almacenan texto, respuesta,
+  remitente, token o body del webhook;
+- la capacidad está acotada y el almacén nunca expulsa trabajo en curso;
+- una reserva fallida se libera y los errores del almacén se mapean a respuestas seguras;
+- todas las pruebas usan dobles locales y la barrera de red; no hubo llamadas reales a OpenAI o
+  Meta ni uso de credenciales reales;
+- la implementación está marcada como no apta para múltiples procesos/instancias y la
+  persistencia compartida es obligatoria antes de producción;
+- F2.8 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- el estado se pierde en cada reinicio y no se comparte entre procesos o instancias;
+- al superar 10000 entradas, un ID completado antiguo puede desalojarse y volver a aceptarse;
+- existe una ventana de duplicación si el proceso termina después de enviar a Meta pero antes de
+  marcar el ID como completado;
+- la idempotencia persistente y coordinada se implementará antes de producción en la fase de
+  persistencia correspondiente;
+- el procesamiento sigue bloqueando el ACK; su separación corresponde a F2.8.
+
+Siguiente:
+
+- F2.8 — ACK rápido y separación de procesamiento, sin iniciar hasta recibir instrucción
+  explícita del usuario.
 
 ---
 

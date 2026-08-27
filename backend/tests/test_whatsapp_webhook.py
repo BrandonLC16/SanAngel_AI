@@ -16,6 +16,7 @@ from backend.app.core.exceptions import AIProviderRateLimitError
 from backend.app.core.logging import HTTP_LOGGER_NAME
 from backend.app.main import create_app
 from backend.app.schemas.whatsapp import InboundMessage
+from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 
 WEBHOOK_PATH = "/api/v1/whatsapp/webhook"
@@ -108,7 +109,12 @@ def sign_payload(app_secret: str, raw_body: bytes) -> str:
     return f"sha256={digest}"
 
 
-def text_message_payload(sender: str, text: str) -> bytes:
+def text_message_payload(
+    sender: str,
+    text: str,
+    *,
+    message_id: str = "wamid.test-only-inbound-message-id",
+) -> bytes:
     payload = {
         "object": "whatsapp_business_account",
         "entry": [
@@ -121,7 +127,7 @@ def text_message_payload(sender: str, text: str) -> bytes:
                             "messages": [
                                 {
                                     "from": sender,
-                                    "id": "wamid.test-only-inbound-message-id",
+                                    "id": message_id,
                                     "timestamp": "1720000000",
                                     "type": "text",
                                     "text": {"body": text},
@@ -250,7 +256,11 @@ def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks(
     answer = "test-only-private-answer-marker"
     chat_service = FakeChatResponder(answer=answer)
     whatsapp_client = FakeWhatsAppSender()
-    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    orchestrator = MessageOrchestrator(
+        chat_service,
+        whatsapp_client,
+        InMemoryIdempotencyStore(),
+    )
     application = make_application(app_secret=app_secret, orchestrator=orchestrator)
     raw_body = text_message_payload(sender, f"  {inbound_text}  ")
 
@@ -268,6 +278,36 @@ def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks(
     assert whatsapp_client.calls == [(sender, answer, False)]
 
 
+def test_duplicate_authenticated_message_id_is_acked_without_a_second_response() -> None:
+    app_secret = "test-only-meta-app-secret-marker"
+    sender = "5215550000001"
+    inbound_text = "test-only-duplicate-inbound-text-marker"
+    answer = "test-only-single-answer-marker"
+    chat_service = FakeChatResponder(answer=answer)
+    whatsapp_client = FakeWhatsAppSender()
+    orchestrator = MessageOrchestrator(
+        chat_service,
+        whatsapp_client,
+        InMemoryIdempotencyStore(),
+    )
+    application = make_application(app_secret=app_secret, orchestrator=orchestrator)
+    raw_body = text_message_payload(sender, inbound_text)
+    headers = [("X-Hub-Signature-256", sign_payload(app_secret, raw_body))]
+
+    async def send_twice() -> tuple[httpx.Response, httpx.Response]:
+        first = await send_webhook(application, raw_body, headers)
+        second = await send_webhook(application, raw_body, headers)
+        return first, second
+
+    first_response, duplicate_response = asyncio.run(send_twice())
+
+    assert first_response.status_code == 200
+    assert duplicate_response.status_code == 200
+    assert first_response.content == duplicate_response.content == b""
+    assert chat_service.messages == [inbound_text]
+    assert whatsapp_client.calls == [(sender, answer, False)]
+
+
 def test_chat_failure_returns_safe_error_without_sending_or_leaking_data(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -281,7 +321,11 @@ def test_chat_failure_returns_safe_error_without_sending_or_leaking_data(
         error=AIProviderRateLimitError(internal_detail),
     )
     whatsapp_client = FakeWhatsAppSender()
-    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    orchestrator = MessageOrchestrator(
+        chat_service,
+        whatsapp_client,
+        InMemoryIdempotencyStore(),
+    )
     application = make_application(app_secret=app_secret, orchestrator=orchestrator)
     raw_body = text_message_payload(sender, inbound_text)
 

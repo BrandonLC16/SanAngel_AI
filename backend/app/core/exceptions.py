@@ -92,3 +92,10 @@ class MessageProcessingError(ServiceUnavailableError):
 
     error_code = "message_processing_failed"
     public_message = "No fue posible procesar el mensaje recibido."
+
+
+class IdempotencyStoreError(ServiceUnavailableError):
+    """Raised when the idempotency boundary cannot safely claim or retain an ID."""
+
+    error_code = "idempotency_store_unavailable"
+    public_message = "No fue posible verificar el estado del mensaje."

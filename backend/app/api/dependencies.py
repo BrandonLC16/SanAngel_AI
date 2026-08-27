@@ -4,6 +4,7 @@ from functools import lru_cache
 
 from backend.app.core.config import Settings, get_settings
 from backend.app.services.chat_service import ChatService
+from backend.app.services.idempotency_store import IdempotencyStore, InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 from backend.app.services.openai_service import OpenAIService
 from backend.app.services.whatsapp_client import WhatsAppClient
@@ -25,6 +26,13 @@ def get_chat_service() -> ChatService:
     )
 
 
+@lru_cache
+def get_idempotency_store() -> IdempotencyStore:
+    """Return the bounded process-local MVP store; production requires persistence."""
+
+    return InMemoryIdempotencyStore()
+
+
 @asynccontextmanager
 async def create_message_orchestrator(
     settings: Settings,
@@ -32,7 +40,11 @@ async def create_message_orchestrator(
     """Build provider adapters only after the webhook has authenticated its request."""
 
     async with WhatsAppClient(settings) as whatsapp_client:
-        yield MessageOrchestrator(get_chat_service(), whatsapp_client)
+        yield MessageOrchestrator(
+            get_chat_service(),
+            whatsapp_client,
+            get_idempotency_store(),
+        )
 
 
 def get_message_orchestrator_factory() -> MessageOrchestratorFactory:
