@@ -85,3 +85,10 @@ class WhatsAppProviderStatusError(WhatsAppProviderError):
 
 class WhatsAppProviderResponseError(WhatsAppProviderError):
     """Raised when a successful Graph API response has no usable message ID."""
+
+
+class MessageProcessingError(ServiceUnavailableError):
+    """Raised when an inbound message cannot complete the application flow."""
+
+    error_code = "message_processing_failed"
+    public_message = "No fue posible procesar el mensaje recibido."

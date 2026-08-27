@@ -1,9 +1,9 @@
 # plan_de_trabajo.md
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
-**Última actualización:** 2026-08-26
+**Última actualización:** 2026-08-27
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp (no iniciada)
+**Subfase siguiente:** F2.7 — Idempotencia mínima (no iniciada)
 **Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
 **Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
 **Panel web:** administración y atención humana, no chat público del cliente.
@@ -883,30 +883,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-26
+
+**Fecha de finalización:** 2026-08-27
 
 
 ### Alcance
 
-- [ ] conectar inbound normalizado al servicio de chat.
+- [x] conectar inbound normalizado al servicio de chat.
 
-- [ ] obtener answer.
+- [x] obtener answer.
 
-- [ ] enviar answer.
+- [x] enviar answer.
 
-- [ ] manejar fallos.
+- [x] manejar fallos.
 
 
 ### Criterios de aceptación
 
-- [ ] mensaje de texto puede recorrer flujo completo con mocks.
+- [x] mensaje de texto puede recorrer flujo completo con mocks.
 
 
 ### Seguridad
 
-- [ ] webhook no contiene lógica OpenAI directa.
+- [x] webhook no contiene lógica OpenAI directa.
 
-- [ ] fallo no filtra datos.
+- [x] fallo no filtra datos.
 
 
 ### Prompt para Codex
@@ -5197,6 +5201,82 @@ Siguiente:
 
 - F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp, sin iniciar hasta recibir instrucción
   explícita del usuario.
+
+---
+
+## 2026-08-27 — Orquestación WhatsApp -> chatbot -> WhatsApp
+
+**Fase:** Fase 2
+**Tarea:** F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregado `MessageOrchestrator` como frontera de aplicación entre `InboundMessage`, el servicio
+  de chat y el cliente saliente de WhatsApp;
+- definida la composición perezosa de `ChatService` y `WhatsAppClient`, con cierre seguro del
+  cliente HTTP al terminar el procesamiento;
+- conectado el webhook autenticado y normalizado al orquestador sin introducir lógica directa de
+  OpenAI o Graph API en la ruta;
+- procesados secuencialmente los mensajes de texto soportados y enviado cada resultado al mismo
+  `sender_id` validado;
+- mapeados los fallos conocidos del chat o del envío a `MessageProcessingError`, con respuesta
+  HTTP 503 estable y sin detalles privados o del proveedor;
+- agregadas pruebas unitarias y de integración HTTP completamente mockeadas para el recorrido
+  inbound -> chatbot -> outbound y sus errores;
+- actualizados README, diseño de Fase 2 y checkpoint;
+- no se implementó ni inició F2.7, idempotencia, procesamiento en background o reintentos.
+
+Archivos:
+
+- `backend/app/services/message_orchestrator.py`
+- `backend/app/api/dependencies.py`
+- `backend/app/api/routes/whatsapp.py`
+- `backend/app/core/exceptions.py`
+- `backend/tests/test_message_orchestrator.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest backend\tests\test_message_orchestrator.py
+  backend\tests\test_whatsapp_webhook.py --basetemp=.venv\pytest-f26-resume-target -o
+  cache_dir=.venv\pytest-cache-f26-resume-target -q` -> 28 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\python.exe -m pytest --basetemp=.venv\pytest-f26-resume -o
+  cache_dir=.venv\pytest-cache-f26-resume -q` -> 150 pruebas aprobadas sin acceso externo;
+- `.venv\Scripts\ruff.exe check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check --no-cache .` -> 44 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores;
+- prueba de seguridad del repositorio incluida en la suite -> `.env` ignorado y `.env.example`
+  sin secretos;
+- auditoría de capas -> la ruta de WhatsApp no importa ni invoca OpenAI, `answer` o `send_text`;
+- revisión de estados -> F2.6 completada; F2.7-F2.10 permanecen pendientes.
+
+Seguridad:
+
+- la firma HMAC y el parsing seguro permanecen antes de la construcción de adaptadores;
+- solicitudes no autenticadas no construyen clientes de OpenAI o WhatsApp;
+- texto, respuesta, sender y detalles internos no aparecen en la respuesta HTTP, excepciones ni
+  logs probados;
+- el access token continúa encapsulado en `WhatsAppClient` y no se mueve a la ruta o al
+  orquestador;
+- no se realizaron llamadas reales a OpenAI o Meta ni se usaron credenciales reales;
+- F2.7 y todas las subfases posteriores permanecen `⬜ PENDIENTE`.
+
+Riesgos/Pendientes:
+
+- F2.6 procesa dentro de la solicitud HTTP; el ACK rápido se separará en F2.8;
+- todavía no existe idempotencia, por lo que Meta podría provocar respuestas duplicadas al
+  reenviar un mismo message ID; corresponde a F2.7;
+- los lotes se procesan secuencialmente y un fallo detiene los mensajes restantes;
+- no se realizó una prueba real con Meta; corresponde a F2.9.
+
+Siguiente:
+
+- F2.7 — Idempotencia mínima, sin iniciar hasta recibir instrucción explícita del usuario.
 
 ---
 

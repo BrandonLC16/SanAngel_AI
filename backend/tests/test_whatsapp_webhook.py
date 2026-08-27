@@ -1,22 +1,66 @@
 import asyncio
 import hashlib
 import hmac
+import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
 from fastapi import FastAPI, Request
 
+from backend.app.api.dependencies import get_message_orchestrator_factory
 from backend.app.core.config import HttpSettings, Settings, get_settings
+from backend.app.core.exceptions import AIProviderRateLimitError
 from backend.app.core.logging import HTTP_LOGGER_NAME
 from backend.app.main import create_app
+from backend.app.schemas.whatsapp import InboundMessage
+from backend.app.services.message_orchestrator import MessageOrchestrator
 
 WEBHOOK_PATH = "/api/v1/whatsapp/webhook"
+
+
+class RecordingMessageOrchestrator:
+    def __init__(self) -> None:
+        self.messages: list[InboundMessage] = []
+
+    async def process_message(self, message: InboundMessage) -> None:
+        self.messages.append(message)
+
+
+class FakeChatResponder:
+    def __init__(self, *, answer: str, error: Exception | None = None) -> None:
+        self._answer = answer
+        self.error = error
+        self.messages: list[str] = []
+
+    async def answer(self, message: str) -> str:
+        self.messages.append(message)
+        if self.error is not None:
+            raise self.error
+        return self._answer
+
+
+class FakeWhatsAppSender:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, bool]] = []
+
+    async def send_text(
+        self,
+        recipient: str,
+        text: str,
+        *,
+        preview_url: bool = False,
+    ) -> str:
+        self.calls.append((recipient, text, preview_url))
+        return "wamid.test-only-outbound-message-id"
 
 
 def make_application(
     verify_token: str | None = "test-only-verify-token-marker",
     app_secret: str | None = "test-only-meta-app-secret-marker",
+    orchestrator: MessageOrchestrator | RecordingMessageOrchestrator | None = None,
 ) -> FastAPI:
     application = create_app(HttpSettings(app_env="testing", log_level="INFO", _env_file=None))
     settings = Settings(
@@ -26,6 +70,16 @@ def make_application(
         _env_file=None,
     )
     application.dependency_overrides[get_settings] = lambda: settings
+
+    selected_orchestrator = orchestrator or RecordingMessageOrchestrator()
+
+    @asynccontextmanager
+    async def use_test_orchestrator(_settings: Settings) -> AsyncIterator[object]:
+        yield selected_orchestrator
+
+    application.dependency_overrides[get_message_orchestrator_factory] = lambda: (
+        use_test_orchestrator
+    )
     return application
 
 
@@ -52,6 +106,34 @@ def valid_params(verify_token: str, challenge: str = "1158201444") -> list[tuple
 def sign_payload(app_secret: str, raw_body: bytes) -> str:
     digest = hmac.new(app_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
+
+
+def text_message_payload(sender: str, text: str) -> bytes:
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [
+                                {
+                                    "from": sender,
+                                    "id": "wamid.test-only-inbound-message-id",
+                                    "timestamp": "1720000000",
+                                    "type": "text",
+                                    "text": {"body": text},
+                                }
+                            ],
+                        },
+                    }
+                ]
+            }
+        ],
+    }
+    return json.dumps(payload, separators=(",", ":")).encode()
 
 
 async def send_webhook(
@@ -161,6 +243,70 @@ def test_valid_post_signature_over_exact_raw_body_is_accepted() -> None:
     assert response.content == b""
 
 
+def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks() -> None:
+    app_secret = "test-only-meta-app-secret-marker"
+    sender = "5215550000001"
+    inbound_text = "test-only-private-inbound-text-marker"
+    answer = "test-only-private-answer-marker"
+    chat_service = FakeChatResponder(answer=answer)
+    whatsapp_client = FakeWhatsAppSender()
+    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    application = make_application(app_secret=app_secret, orchestrator=orchestrator)
+    raw_body = text_message_payload(sender, f"  {inbound_text}  ")
+
+    response = asyncio.run(
+        send_webhook(
+            application,
+            raw_body,
+            [("X-Hub-Signature-256", sign_payload(app_secret, raw_body))],
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content == b""
+    assert chat_service.messages == [inbound_text]
+    assert whatsapp_client.calls == [(sender, answer, False)]
+
+
+def test_chat_failure_returns_safe_error_without_sending_or_leaking_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app_secret = "test-only-meta-app-secret-marker"
+    sender = "5215550000001"
+    inbound_text = "test-only-private-inbound-text-marker"
+    answer = "test-only-private-answer-marker"
+    internal_detail = "test-only-private-provider-failure-marker"
+    chat_service = FakeChatResponder(
+        answer=answer,
+        error=AIProviderRateLimitError(internal_detail),
+    )
+    whatsapp_client = FakeWhatsAppSender()
+    orchestrator = MessageOrchestrator(chat_service, whatsapp_client)
+    application = make_application(app_secret=app_secret, orchestrator=orchestrator)
+    raw_body = text_message_payload(sender, inbound_text)
+
+    with caplog.at_level(logging.INFO, logger=HTTP_LOGGER_NAME):
+        response = asyncio.run(
+            send_webhook(
+                application,
+                raw_body,
+                [("X-Hub-Signature-256", sign_payload(app_secret, raw_body))],
+            )
+        )
+
+    assert response.status_code == 503
+    assert response.json()["error"] == {
+        "code": "message_processing_failed",
+        "message": "No fue posible procesar el mensaje recibido.",
+    }
+    assert whatsapp_client.calls == []
+    rendered = f"{response.text}\n{caplog.text}"
+    assert sender not in rendered
+    assert inbound_text not in rendered
+    assert answer not in rendered
+    assert internal_detail not in rendered
+
+
 def test_signature_is_checked_against_untouched_raw_body() -> None:
     app_secret = "test-only-meta-app-secret-marker"
     signed_body = b'{"object":"whatsapp_business_account","entry":[]}'
@@ -200,6 +346,23 @@ def test_unauthenticated_payload_is_rejected_before_json_is_accessed(
     assert response.status_code == 403
     assert response.content == b""
     assert json_was_accessed is False
+
+
+def test_unauthenticated_text_does_not_build_provider_adapters() -> None:
+    application = make_application()
+    application.dependency_overrides.pop(get_message_orchestrator_factory)
+    raw_body = text_message_payload("5215550000001", "texto no autenticado")
+
+    response = asyncio.run(
+        send_webhook(
+            application,
+            raw_body,
+            [("X-Hub-Signature-256", "sha256=" + "0" * 64)],
+        )
+    )
+
+    assert response.status_code == 403
+    assert response.content == b""
 
 
 @pytest.mark.parametrize(

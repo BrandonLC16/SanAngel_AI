@@ -2,8 +2,8 @@
 ## WhatsApp como interfaz principal del cliente
 
 **Fecha:** 2026-08-25  
-**Actualizado:** 2026-08-26
-**Estado:** F2.1-F2.5 completadas; F2.6 y subfases posteriores permanecen pendientes.
+**Actualizado:** 2026-08-27
+**Estado:** F2.1-F2.6 completadas; subfases posteriores pendientes.
 
 ---
 
@@ -304,6 +304,19 @@ proveedor no se registran ni se incorporan a errores. El cliente propio puede ce
 `aclose()` o context manager; uno inyectado permanece bajo control del caller.
 
 F2.5 no conecta todavía el cliente con el webhook o el chatbot.
+
+F2.6 agrega `MessageOrchestrator` como frontera de aplicación entre el mensaje normalizado,
+`ChatService` y `WhatsAppClient`. El orquestador recibe un `InboundMessage`, obtiene la respuesta
+mediante la interfaz de chat y solicita el envío al mismo `sender_id` mediante una interfaz de
+salida mockeable. La ruta no importa ni invoca OpenAI o Graph API directamente.
+
+La composición de adaptadores es perezosa: solo ocurre después de validar la firma y cuando el
+parser produjo al menos un mensaje soportado. Los fallos conocidos de aplicación se convierten en
+`MessageProcessingError`, con HTTP 503 y representación pública fija; mensaje, respuesta,
+destinatario y detalle del proveedor no se reflejan ni registran.
+
+El procesamiento de F2.6 permanece dentro de la solicitud y es secuencial para lotes. No incorpora
+deduplicación, tareas de background, colas ni reintentos: F2.7 y F2.8 permanecen pendientes.
 
 ---
 

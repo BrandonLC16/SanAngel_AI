@@ -6,6 +6,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import PlainTextResponse
 
+from backend.app.api.dependencies import (
+    MessageOrchestratorFactory,
+    get_message_orchestrator_factory,
+)
 from backend.app.core.config import Settings, get_settings
 from backend.app.services.whatsapp_webhook_service import WhatsAppWebhookService
 
@@ -88,6 +92,10 @@ def verify_whatsapp_webhook(
 async def receive_whatsapp_webhook(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
+    orchestrator_factory: Annotated[
+        MessageOrchestratorFactory,
+        Depends(get_message_orchestrator_factory),
+    ],
 ) -> Response:
     """Authenticate Meta's signature over the untouched body before any JSON processing."""
 
@@ -103,5 +111,10 @@ async def receive_whatsapp_webhook(
         return Response(status_code=status.HTTP_403_FORBIDDEN)
 
     webhook_service = WhatsAppWebhookService(max_text_chars=settings.chat_max_message_chars)
-    webhook_service.parse_messages(raw_body)
+    inbound_messages = webhook_service.parse_messages(raw_body)
+    if inbound_messages:
+        async with orchestrator_factory(settings) as orchestrator:
+            for message in inbound_messages:
+                await orchestrator.process_message(message)
+
     return Response(status_code=status.HTTP_200_OK)

@@ -13,9 +13,9 @@ CORS configurable y una integracion desacoplada con OpenAI Responses API. El end
 de chat fue validado con pruebas sin red y con una llamada manual real.
 
 Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET, la autenticacion
-HMAC-SHA256 del webhook POST, el parser de mensajes de texto y un cliente saliente mockeable para
-Graph API. WhatsApp sera el canal principal del cliente, pero la orquestacion completa todavia no
-esta implementada.
+HMAC-SHA256 del webhook POST, el parser de mensajes de texto, un cliente saliente mockeable para
+Graph API y la orquestacion WhatsApp -> chatbot -> WhatsApp. Todavia faltan idempotencia y la
+separacion del procesamiento para un ACK rapido.
 
 ## Health check
 
@@ -96,9 +96,10 @@ query string.
 
 El mismo path acepta POST y, antes de acceder a JSON, conserva los bytes exactos del body y valida
 `X-Hub-Signature-256` mediante HMAC-SHA256 con `META_APP_SECRET`. La firma debe usar el formato
-`sha256=<64 caracteres hexadecimales>` y se compara en tiempo constante. Una firma valida recibe
-HTTP 200 sin cuerpo; firmas ausentes, duplicadas, malformadas o incorrectas reciben HTTP 403 sin
-cuerpo. Si falta el App Secret, responde HTTP 503 sin cuerpo.
+`sha256=<64 caracteres hexadecimales>` y se compara en tiempo constante. Una firma valida sin
+mensajes relevantes, o cuyo procesamiento termina correctamente, recibe HTTP 200 sin cuerpo;
+firmas ausentes, duplicadas, malformadas o incorrectas reciben HTTP 403 sin cuerpo. Si falta el
+App Secret, responde HTTP 503 sin cuerpo.
 
 Tras autenticarlo, el backend valida la estructura relevante mediante modelos Pydantic tolerantes
 a campos futuros. Los mensajes `type=text` se normalizan como `InboundMessage` interno con
@@ -107,8 +108,14 @@ provider, message id, sender, texto y timestamp. El texto se recorta y se limita
 
 Webhooks de estado, objetos/cambios ajenos, productos distintos de WhatsApp y tipos no soportados
 como imagen, audio, documento, ubicacion, contactos e interactivos se ignoran con ACK HTTP 200.
-JSON malformado o estructuras inesperadas tampoco generan HTTP 500. Todavia no se responde al
-cliente ni se deduplican mensajes; esas responsabilidades pertenecen a subfases posteriores.
+JSON malformado o estructuras inesperadas tampoco generan HTTP 500.
+
+Cada `InboundMessage` de texto autenticado pasa a `MessageOrchestrator`, que solicita la respuesta
+al servicio de chat y pide su envio a `WhatsAppClient`. La ruta no conoce OpenAI ni Graph API y los
+adaptadores se construyen de forma perezosa, despues de verificar la firma. Un fallo operativo
+conocido devuelve HTTP 503 con un error estable que no incluye texto, destinatario ni detalles del
+proveedor. En F2.6 el procesamiento todavia es sincrono dentro de la solicitud y no deduplica; esas
+garantias corresponden a F2.7 y F2.8.
 
 ## Cliente saliente de WhatsApp
 
