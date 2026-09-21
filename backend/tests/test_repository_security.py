@@ -28,6 +28,7 @@ def test_environment_example_keeps_all_secrets_empty() -> None:
 
     assert SENSITIVE_ENV_NAMES <= values.keys()
     assert all(values[name] == "" for name in SENSITIVE_ENV_NAMES)
+    assert values["DATABASE_URL"] == "sqlite+pysqlite:///./carniceria.db"
     assert values["GREEN_API_INSTANCE_ID"] == ""
     assert values["GREEN_API_API_URL"] == "https://api.green-api.com"
 
@@ -44,6 +45,18 @@ def test_gitignore_protects_local_environment_without_hiding_example() -> None:
     assert "!.env.example" in ignore_rules
 
 
+def test_gitignore_protects_local_sqlite_files() -> None:
+    ignore_rules = {
+        line.strip()
+        for line in (REPOSITORY_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    assert {"*.db", "*.db-journal", "*.db-shm", "*.db-wal", "*.sqlite", "*.sqlite3"} <= (
+        ignore_rules
+    )
+
+
 def test_green_api_host_default_is_centralized_in_application_config() -> None:
     host_pattern = re.compile(r"https://api\.green-api\.com")
     files_with_hosts = {
@@ -53,3 +66,19 @@ def test_green_api_host_default_is_centralized_in_application_config() -> None:
     }
 
     assert files_with_hosts == {"backend/app/core/config.py"}
+
+
+def test_alembic_config_does_not_embed_a_database_url() -> None:
+    alembic_config = (REPOSITORY_ROOT / "alembic.ini").read_text(encoding="utf-8")
+
+    assert "sqlalchemy.url" not in alembic_config
+    assert "DATABASE_URL" not in alembic_config
+
+
+def test_application_does_not_bypass_migrations_with_create_all() -> None:
+    application_sources = (
+        path.read_text(encoding="utf-8")
+        for path in (REPOSITORY_ROOT / "backend" / "app").rglob("*.py")
+    )
+
+    assert all(".create_all(" not in source for source in application_sources)

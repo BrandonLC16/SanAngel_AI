@@ -2,9 +2,9 @@
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
 **Última actualización:** 2026-09-21
-**Fase activa:** ninguna; Fase 2 completada
-**Subfase activa:** ninguna; F3.1 permanece ⬜ PENDIENTE
-**Estado global:** 🟨 EN DESARROLLO — Fase 2 completada; Fase 3 pendiente
+**Fase activa:** Fase 3 — Persistencia comercial
+**Subfase activa:** ninguna; F3.2 permanece ⬜ PENDIENTE
+**Estado global:** 🟨 EN DESARROLLO — F3.1 completada; F3.2 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1293,41 +1293,47 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Crear SQLite como primera fuente de verdad para datos comerciales.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+
+**Fecha de inicio:** 2026-09-21
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F3.1 — SQLAlchemy + Alembic + SQLite
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-21
+
+**Fecha de finalización:** 2026-09-21
 
 
 ### Alcance
 
-- [ ] configuración DB.
+- [x] configuración DB.
 
-- [ ] engine/session.
+- [x] engine/session.
 
-- [ ] Alembic.
+- [x] Alembic.
 
-- [ ] primera migración base.
+- [x] primera migración base.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] DB reproducible desde migraciones.
+- [x] DB reproducible desde migraciones.
 
-- [ ] tests aislados.
+- [x] tests aislados.
 
 
 ### Seguridad
 
-- [ ] URL DB configurable.
+- [x] URL DB configurable.
 
-- [ ] no SQL concatenado.
+- [x] no SQL concatenado.
 
 
 ### Prompt para Codex
@@ -4023,8 +4029,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | GreenAPI timeout/retries acotados | F2 | Sí | ✅ F2.9 |
 | PII WhatsApp redactada en logs | F2 | Sí | ✅ F2.9 |
 | token webhook fuerte y acotado | F2 | Sí | ✅ F2.10 |
-| SQLAlchemy/queries parametrizadas | F3 | Sí | ⬜ |
-| migraciones | F3 | Sí | ⬜ |
+| SQLAlchemy/queries parametrizadas | F3 | Sí | ✅ F3.1 |
+| URL DB configurable/protegida | F3 | Sí | ✅ F3.1 |
+| migraciones | F3 | Sí | ✅ F3.1 |
 | Decimal para dinero | F3 | Sí | ⬜ |
 | integridad/constraints | F3 | Sí | ⬜ |
 | documentos tratados como no confiables | F4 | Sí | ⬜ |
@@ -4101,14 +4108,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 # 18. Checkpoint actual
 
-**Fase activa:** ninguna; Fase 2 — WhatsApp mediante GreenAPI está `✅ COMPLETADO`.
-**Subfase activa:** ninguna; F3.1 permanece `⬜ PENDIENTE`.
-**Última subfase completada:** F2.10 — Cierre Fase 2.
-**Siguiente subfase:** F3.1 — SQLAlchemy + Alembic + SQLite, pendiente y sin iniciar.
+**Fase activa:** Fase 3 — Persistencia comercial (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F3.2 permanece `⬜ PENDIENTE`.
+**Última subfase completada:** F3.1 — SQLAlchemy + Alembic + SQLite.
+**Siguiente subfase:** F3.2 — Entidad sucursales, pendiente y sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
-No iniciar Fase 3 automáticamente.
+No iniciar F3.2 automáticamente.
 
 ---
 
@@ -5952,6 +5959,91 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F3.1 — SQLAlchemy + Alembic + SQLite, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
+
+---
+
+## 2026-09-21 — Base de persistencia con SQLAlchemy, Alembic y SQLite
+
+**Fase:** Fase 3 — Persistencia comercial
+**Tarea:** F3.1 — SQLAlchemy + Alembic + SQLite
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregados SQLAlchemy 2.0.54 y Alembic 1.20.0 como dependencias runtime con rangos acotados;
+- incorporado `DatabaseSettings` independiente de OpenAI y GreenAPI, con `DATABASE_URL`
+  protegido por `SecretStr` y limitado a SQLite;
+- creados base declarativa con convenciones de nombres, engine lazy, `sessionmaker` y dependencia
+  de sesión sin commits implícitos;
+- agregado entorno Alembic sin URL embebida ni configuración de logging que pueda mostrarla;
+- creada revisión inicial vacía que establece `alembic_version` sin anticipar entidades de
+  F3.2;
+- ignorados archivos SQLite y sidecars locales;
+- documentados configuración, migraciones, límites transaccionales y comandos reproducibles;
+- F3.2 no fue iniciada.
+
+Archivos:
+
+- `.env.example`
+- `.gitignore`
+- `pyproject.toml`
+- `alembic.ini`
+- `backend/app/core/config.py`
+- `backend/app/db/__init__.py`
+- `backend/app/db/base.py`
+- `backend/app/db/session.py`
+- `migrations/README.md`
+- `migrations/env.py`
+- `migrations/script.py.mako`
+- `migrations/versions/20260921_0001_initial_schema.py`
+- `backend/tests/test_database_config.py`
+- `backend/tests/test_database_session.py`
+- `backend/tests/test_migrations.py`
+- `backend/tests/test_repository_security.py`
+- `README.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pip install -e ".[dev]"` -> instalación correcta de SQLAlchemy
+  2.0.54, Alembic 1.20.0 y dependencias transitivas;
+- primera validación dirigida -> 17 pruebas aprobadas y 2 fallidas por expectativas incorrectas
+  de representación oculta y cadena vacía; las pruebas se corrigieron sin relajar validación;
+- segunda validación dirigida -> 19 pruebas aprobadas;
+- validación dirigida ampliada -> 22 pruebas aprobadas, lint y formato aprobados;
+- CLI Alembic sobre SQLite temporal -> `upgrade head`, `current`, `check` y `downgrade base`
+  correctos; head `20260921_0001` y cero operaciones nuevas detectadas;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f31-full-1 -o
+  cache_dir=.venv\pytest-cache-f31-full-1` -> 194 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 57 archivos con formato
+  correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas de conversión LF/CRLF;
+- auditoría de alcance -> una sola revisión y solo tabla `alembic_version`; ninguna entidad de
+  F3.2 creada.
+
+Seguridad:
+
+- `DATABASE_URL` es configurable, se oculta de `repr` y errores, y no se almacena en
+  `alembic.ini`;
+- F3.1 acepta solo `sqlite`/`sqlite+pysqlite`, sin host, usuario o password;
+- migraciones cargan exclusivamente la configuración DB y no requieren secretos de proveedores;
+- no existe SQL manual, SQL concatenado ni `Base.metadata.create_all()` en la aplicación;
+- las pruebas usan rutas `tmp_path`, no comparten DB y no acceden a red externa;
+- archivos `.db`, `.sqlite`, `.sqlite3` y sidecars están ignorados por Git.
+
+Riesgos/Pendientes:
+
+- el path SQLite relativo depende de ejecutar comandos desde la raíz del repositorio;
+- SQLite y el engine síncrono son adecuados para el MVP, no una decisión final de escalamiento;
+- la revisión inicial no contiene tablas de negocio por diseño;
+- entidades, constraints, repositories y servicios comienzan en F3.2 y subfases posteriores;
+- antes de múltiples instancias se debe evaluar PostgreSQL, concurrencia, backups y restore.
+
+Siguiente:
+
+- F3.2 — Entidad sucursales, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
 
 ---
 

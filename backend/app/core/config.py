@@ -5,9 +5,12 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
 CorsOrigins = Annotated[tuple[str, ...], NoDecode]
 DEFAULT_GREEN_API_URL = "https://api.green-api.com"
+DEFAULT_DATABASE_URL = "sqlite+pysqlite:///./carniceria.db"
 
 
 class HttpSettings(BaseSettings):
@@ -78,6 +81,47 @@ class HttpSettings(BaseSettings):
             normalized_origins.append(normalized_origin)
 
         return tuple(normalized_origins)
+
+
+class DatabaseSettings(BaseSettings):
+    """Database-only configuration usable without provider credentials."""
+
+    database_url: SecretStr = Field(default=DEFAULT_DATABASE_URL, repr=False)
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+        case_sensitive=False,
+        frozen=True,
+        hide_input_in_errors=True,
+        validate_default=True,
+    )
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value: SecretStr) -> SecretStr:
+        raw_url = value.get_secret_value()
+        if raw_url != raw_url.strip() or "\x00" in raw_url:
+            raise ValueError("DATABASE_URL has an invalid format")
+
+        try:
+            parsed_url = make_url(raw_url)
+        except ArgumentError as exc:
+            raise ValueError("DATABASE_URL has an invalid format") from exc
+
+        if (
+            parsed_url.drivername not in {"sqlite", "sqlite+pysqlite"}
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.host is not None
+            or parsed_url.port is not None
+            or not parsed_url.database
+        ):
+            raise ValueError("DATABASE_URL must be a SQLite URL")
+
+        return value
 
 
 class Settings(HttpSettings):
@@ -192,6 +236,13 @@ def get_http_settings() -> HttpSettings:
     """Return HTTP settings without requiring provider credentials."""
 
     return HttpSettings()
+
+
+@lru_cache
+def get_database_settings() -> DatabaseSettings:
+    """Return validated database configuration without loading provider secrets."""
+
+    return DatabaseSettings()
 
 
 @lru_cache

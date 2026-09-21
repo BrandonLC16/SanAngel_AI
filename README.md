@@ -22,7 +22,8 @@ Meta Cloud API a GreenAPI dentro de F2.9. Ya están implementados y probados sin
 
 F2.9 está `✅ COMPLETADO`: la instancia real quedó autorizada, el webhook registrado y el
 recorrido WhatsApp -> GreenAPI -> backend -> OpenAI -> GreenAPI -> WhatsApp fue confirmado con un
-mensaje real. F2.10 y la Fase 2 están `✅ COMPLETADO`; Fase 3 no ha sido iniciada.
+mensaje real. F2.10 y la Fase 2 están `✅ COMPLETADO`. F3.1 está `✅ COMPLETADO`:
+SQLAlchemy, SQLite y Alembic tienen una base reproducible. F3.2 no ha sido iniciada.
 
 ## Requisitos y preparación local
 
@@ -65,6 +66,8 @@ Variables relevantes:
 - `OPENAI_STORE_RESPONSES`: `false` por defecto;
 - `OPENAI_TIMEOUT_SECONDS`: mayor que 0 y hasta 120 segundos;
 - `OPENAI_MAX_RETRIES`: de 0 a 5, con 2 por defecto;
+- `DATABASE_URL`: URL SQLite configurable, oculta en representaciones y con
+  `sqlite+pysqlite:///./carniceria.db` como valor por defecto;
 - `GREEN_API_INSTANCE_ID`: identificador numérico de la instancia GreenAPI;
 - `GREEN_API_TOKEN_INSTANCE`: token secreto usado para enviar mensajes;
 - `GREEN_API_API_URL`: host HTTPS asignado a la instancia o
@@ -89,6 +92,29 @@ GET /health
   "service": "carniceria-ai-chatbot"
 }
 ```
+
+## Persistencia SQLite y migraciones
+
+F3.1 incorpora SQLAlchemy 2.0 y Alembic. `DatabaseSettings` carga exclusivamente `DATABASE_URL`,
+por lo que las migraciones no requieren claves de OpenAI o GreenAPI. La aplicación acepta en esta
+fase solo `sqlite` o `sqlite+pysqlite`, sin host, usuario o password en la URL.
+
+Desde la raíz del repositorio:
+
+```powershell
+python -m alembic upgrade head
+python -m alembic current
+python -m alembic check
+```
+
+La primera revisión es una base vacía y reproducible: crea `alembic_version`, pero no anticipa
+tablas de sucursales, productos o precios. Esas entidades comienzan en F3.2. Los cambios de
+schema deben realizarse mediante migraciones; el código de aplicación no ejecuta
+`Base.metadata.create_all()`.
+
+El engine y el `sessionmaker` se construyen de forma lazy. Las sesiones no hacen commit
+implícito: cada servicio o repositorio futuro debe definir sus límites transaccionales. Los
+archivos SQLite locales y sus sidecars están ignorados por Git.
 
 ## Webhook de GreenAPI
 

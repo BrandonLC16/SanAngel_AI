@@ -32,6 +32,14 @@ dist/
 # Logs
 *.log
 
+# Local SQLite databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
 # Editors and operating systems
 .idea/
 .vscode/
