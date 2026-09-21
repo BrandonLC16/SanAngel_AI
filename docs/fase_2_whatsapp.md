@@ -1,407 +1,305 @@
 # Diseño técnico — Fase 2
-## WhatsApp como interfaz principal del cliente
+## WhatsApp mediante GreenAPI
 
-**Fecha:** 2026-08-25  
-**Actualizado:** 2026-08-27
-**Estado:** F2.1-F2.8 completadas; subfases posteriores pendientes.
+## 1. Estado y alcance
 
----
+F2.1-F2.8 permanecen registradas como completadas porque establecieron configuración, webhook,
+normalización, cliente saliente, orquestación, idempotencia y separación del ACK. La migración
+solicitada de Meta Cloud API a GreenAPI se registra dentro de F2.9 y reemplaza únicamente los
+adaptadores de frontera.
 
-# 1. Objetivo
-
-Conectar el núcleo construido en Fase 1 con WhatsApp Business Platform / Cloud API para que:
-
-1. un cliente envíe un mensaje por WhatsApp;
-2. Meta notifique al backend mediante webhook;
-3. el backend valide y normalice el evento;
-4. el chatbot genere una respuesta;
-5. el backend envíe la respuesta mediante Graph API;
-6. el cliente la reciba en WhatsApp.
-
----
-
-# 2. Arquitectura
-
-```text
-Cliente
-   |
-   v
-WhatsApp
-   |
-   v
-Meta
-   |
-   | HTTPS webhook
-   v
-FastAPI
-   |
-   v
-WhatsAppWebhookService
-   |
-   v
-MessageOrchestrator
-   |
-   +--------------------------+
-   |                          |
-   v                          v
-Chatbot/OpenAI            Business services
-   |                          |
-   +------------+-------------+
-                |
-                v
-        WhatsAppClient
-                |
-                v
-        Meta Graph API
-                |
-                v
-             Cliente
-```
-
----
-
-# 3. Fronteras y responsabilidades
-
-## WhatsApp route
-
-Responsable de:
-
-- handshake GET;
-- recibir POST;
-- obtener raw body;
-- validar autenticidad;
-- responder HTTP apropiadamente.
-
-NO responsable de:
-
-- prompts;
-- lógica comercial;
-- consultar precios;
-- construir conversaciones directamente.
-
-## WhatsAppWebhookService
-
-- validar evento;
-- parsear únicamente estructuras soportadas;
-- normalizar evento.
-
-Ejemplo interno:
+Se mantienen sin cambios los contratos internos:
 
 ```text
 InboundMessage
-- provider = whatsapp
-- external_message_id
-- sender_id
-- message_type
-- text
-- timestamp
+    -> MessageOrchestrator
+        -> ChatService
+        -> WhatsAppClient.send_text(recipient, text)
 ```
 
-## MessageOrchestrator
+F2.9 está `✅ COMPLETADO` después de completar una prueba real:
 
-- determinar si el evento requiere respuesta;
-- invocar chatbot;
-- invocar servicios comerciales cuando se incorporen;
-- pedir envío.
+```text
+WhatsApp -> GreenAPI -> webhook -> OpenAI -> GreenAPI -> WhatsApp
+```
 
-## WhatsAppClient
+## 2. Arquitectura
 
-- enviar mensajes;
-- timeout;
-- errores de Graph API;
-- tokens en headers;
-- nunca exponerlos al dominio.
+```text
+Cliente de WhatsApp
+        |
+        v
+     GreenAPI
+        |
+        | POST HTTPS + Authorization: Bearer <webhook token>
+        v
+/api/v1/whatsapp/webhook
+        |
+        v
+WhatsAppWebhookService
+        |
+        | InboundMessage
+        v
+BackgroundTasks -> MessageOrchestrator
+                       |              |
+                       v              v
+                 OpenAIService   WhatsAppClient
+                                      |
+                                      v
+                            GreenAPI sendMessage
+```
 
----
+La ruta autentica y normaliza. El orquestador coordina. Los adaptadores externos están aislados
+en servicios. La ruta no contiene llamadas directas a OpenAI ni construye endpoints de GreenAPI.
 
-# 4. Variables previstas
+## 3. Configuración
 
-Agregar únicamente cuando empiece F2.1:
-
-```env
-WHATSAPP_ACCESS_TOKEN=
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_VERIFY_TOKEN=
-META_APP_SECRET=
-META_GRAPH_API_VERSION=v26.0
+```dotenv
+GREEN_API_INSTANCE_ID=
+GREEN_API_TOKEN_INSTANCE=
+GREEN_API_API_URL=https://api.green-api.com
+GREEN_API_WEBHOOK_TOKEN=
 WHATSAPP_REQUEST_TIMEOUT_SECONDS=15
 ```
 
-No inventar valores sensibles. Los secretos permanecen opcionales en `Settings` hasta que se
-habilite el adaptador que los consume; cuando se configuran se validan y se protegen con
-`SecretStr`. `WHATSAPP_PHONE_NUMBER_ID` acepta un identificador numérico y el timeout está
-acotado a un máximo de 120 segundos.
+Reglas:
 
-`META_GRAPH_API_VERSION` se centraliza en `Settings`. El default `v26.0` corresponde a la versión
-más reciente declarada por el
-[changelog oficial de Graph API](https://developers.facebook.com/docs/graph-api/changelog/) al
-implementar F2.1 (introducida el 2026-07-29). Debe confirmarse nuevamente antes de una prueba real
-o despliegue porque el ciclo de versiones de Meta es externo al repositorio.
+- `GREEN_API_INSTANCE_ID` contiene de 1 a 20 dígitos y no empieza con cero;
+- `GREEN_API_TOKEN_INSTANCE` es `SecretStr` y acepta únicamente caracteres seguros para path;
+- `GREEN_API_WEBHOOK_TOKEN` es `SecretStr`, se compara de forma exacta y nunca se registra;
+- `GREEN_API_API_URL` exige HTTPS, sin credenciales, path, query o fragment;
+- el host debe ser `green-api.com`, `greenapi.com` o uno de sus subdominios, incluido el host
+  asignado a la instancia;
+- el timeout es mayor que cero y no supera 120 segundos.
 
----
+No hay fallback a variables de Meta. La ausencia de configuración requerida produce un fallo
+cerrado y seguro. `.env` no se versiona y `.env.example` solo contiene valores vacíos o públicos.
 
-# 5. Seguridad del webhook
+## 4. Configuración de la instancia GreenAPI
 
-## Handshake GET
+En `SetSettings` o en la consola de GreenAPI se debe establecer:
 
-Validar los parámetros requeridos por Meta y comparar el verify token configurado.
-
-No loguearlo.
-
-F2.2 expone `GET /api/v1/whatsapp/webhook`. Exige una sola instancia de `hub.mode`,
-`hub.verify_token` y `hub.challenge`; el modo debe ser `subscribe` y el challenge un entero
-decimal acotado. El token se compara en tiempo constante contra `WHATSAPP_VERIFY_TOKEN`.
-
-Una solicitud válida devuelve únicamente el challenge como texto plano. Mode, token o challenge
-inválidos reciben HTTP 403 sin cuerpo; la ausencia de configuración del verify token recibe HTTP
-503 sin cuerpo. La ruta y el middleware no registran el query string ni el token. Esta subfase no
-implementa el método POST.
-
-## POST
-
-Tratar el webhook como endpoint público hostil.
-
-Antes de procesar:
-
-1. obtener raw body;
-2. validar firma oficial vigente;
-3. cuando corresponda `X-Hub-Signature-256`, comprobar HMAC-SHA256 con `META_APP_SECRET`;
-4. comparación segura;
-5. parsear JSON;
-6. validar schema;
-7. ignorar eventos no soportados.
-
-No confiar en que un payload tiene forma correcta solo porque es JSON.
-
-F2.3 implementa `POST /api/v1/whatsapp/webhook`. La ruta obtiene el body crudo mediante
-`Request.body()` y no accede a JSON antes de autenticarlo. Exige exactamente un header
-`X-Hub-Signature-256` con formato `sha256=<64 hex minúsculas>`, calcula HMAC-SHA256 sobre esos
-bytes con `META_APP_SECRET` y compara los digests mediante `hmac.compare_digest`.
-
-Una firma válida permite continuar hasta un ACK HTTP 200 sin cuerpo. Firma ausente, duplicada,
-malformada, calculada con otro secreto o correspondiente a otros bytes recibe HTTP 403 sin
-cuerpo. Si `META_APP_SECRET` no está configurado, la ruta falla cerrada con HTTP 503 sin cuerpo.
-Ni body, firma ni secreto se registran o reflejan.
-
-F2.4 agrega modelos Pydantic mínimos y tolerantes a campos extra para `object`, `entry`,
-`changes`, `value`, `messages` y `text`. `WhatsAppWebhookService` procesa únicamente
-`object=whatsapp_business_account`, cambios `field=messages`, `messaging_product=whatsapp` y
-mensajes `type=text`.
-
-Cada texto válido produce un `InboundMessage` interno con provider, message id, sender, texto y
-timestamp. Se eliminan espacios exteriores y se aplica `CHAT_MAX_MESSAGE_CHARS`, con un máximo
-estructural absoluto de 10000 caracteres. Texto vacío o excesivo se ignora.
-
-Eventos con `statuses`, objetos/cambios no relevantes y tipos no soportados se ignoran. JSON
-malformado, roots inesperados, campos con tipos incorrectos o estructuras futuras no producen
-HTTP 500: el parser devuelve cero mensajes y la ruta autenticada conserva ACK HTTP 200. El raw
-body, sender y texto no se registran.
-
-Esta subfase solo normaliza; no deduplica, orquesta ni envía respuestas.
-
----
-
-# 6. Idempotencia
-
-Los webhooks pueden repetirse.
-
-Usar el ID externo del mensaje/evento.
-
-Durante desarrollo puede existir una interfaz:
-
-```text
-IdempotencyStore
+```json
+{
+  "webhookUrl": "https://<host-publico>/api/v1/whatsapp/webhook",
+  "webhookUrlToken": "<mismo valor que GREEN_API_WEBHOOK_TOKEN>",
+  "incomingWebhook": "yes"
+}
 ```
 
-con implementación temporal en memoria.
+El token del webhook debe ser distinto del token de instancia. Si `webhookUrlToken` está
+configurado, GreenAPI agrega el encabezado `Authorization` a las notificaciones. Este proyecto usa
+el esquema documentado `Bearer AuthToken`.
 
-Antes de producción debe usar almacenamiento persistente.
+GreenAPI no requiere el handshake GET de Meta. Por lo tanto, el endpoint expone únicamente POST;
+un GET responde 405.
 
-F2.7 define `IdempotencyStore` con operaciones asíncronas para reclamar atómicamente un ID,
-marcarlo como procesado y liberar la reserva tras un fallo. `MessageOrchestrator` usa la clave
-`provider:external_message_id` antes de invocar el chatbot. Un ID ya reclamado o completado se
-ignora con ACK HTTP 200 y no vuelve a producir una respuesta saliente.
+Referencias oficiales:
 
-La implementación MVP `InMemoryIdempotencyStore` está protegida frente a concurrencia dentro de
-un único event loop y limita el estado a 10000 IDs por proceso. Cuando alcanza el límite desaloja
-el ID completado más antiguo; nunca desaloja trabajo en curso y falla de forma segura si todas las
-entradas están activas. Un fallo del procesamiento libera la reserva para que Meta pueda
-reintentar.
+- [configuración SetSettings](https://green-api.com/en/docs/api/account/SetSettings/);
+- [webhook endpoint](https://green-api.com/en/docs/api/receiving/technology-webhook-endpoint/);
+- [formato de mensajes entrantes](https://green-api.com/en/docs/api/receiving/notifications-format/incoming-message/Webhook-IncomingMessageReceived/).
 
-Esta implementación es explícitamente temporal: pierde el estado al reiniciar, no coordina
-procesos o instancias y el desalojo permite que un ID suficientemente antiguo vuelva a procesarse.
-Además, un cierre abrupto después del envío pero antes de marcar el ID conserva una ventana de
-duplicación. Antes de producción debe sustituirse por persistencia compartida con operaciones
-atómicas y una estrategia transaccional compatible con el envío saliente. Solo se almacenan IDs;
-no se conservan remitentes, textos ni respuestas.
+## 5. Autenticación del webhook
 
----
+El endpoint es público y todo input es no confiable. El orden obligatorio es:
 
-# 7. ACK rápido
+1. comprobar que `GREEN_API_WEBHOOK_TOKEN` y `GREEN_API_INSTANCE_ID` estén configurados;
+2. exigir exactamente un valor de `Authorization` y limitar su tamaño;
+3. comparar en tiempo constante `Bearer <GREEN_API_WEBHOOK_TOKEN>`;
+4. rechazar con HTTP 403 antes de leer el body cuando la autenticación es inválida;
+5. leer y parsear JSON solo después de autenticar;
+6. validar el esquema e instancia;
+7. programar trabajo únicamente para mensajes admitidos.
 
-El endpoint webhook no debe realizar trabajo arbitrariamente largo antes de responder.
+Si la configuración local falta, se responde HTTP 503 sin detalle. Los errores de autenticación
+no reflejan tokens ni contenido.
 
-Diseñar separación entre:
+## 6. Parsing y normalización
 
-```text
-recepción/verificación
-```
+Solo se acepta:
 
-y:
+- `typeWebhook=incomingMessageReceived`;
+- `instanceData.typeInstance=whatsapp`;
+- `instanceData.idInstance` igual a `GREEN_API_INSTANCE_ID`;
+- un `idMessage` no vacío;
+- un `senderData.chatId` válido con sufijo `@c.us` o `@g.us`;
+- un timestamp entero no negativo.
 
-```text
-procesamiento
-```
+Tipos admitidos:
 
-Para MVP local puede utilizarse un mecanismo simple y probado.
+| `typeMessage` | Campo de texto |
+|---|---|
+| `textMessage` | `textMessageData.textMessage` |
+| `extendedTextMessage` | `extendedTextMessageData.text` |
+| `quotedMessage` | `quotedMessage.extendedTextMessageData.text` |
 
-Antes de producción evaluar una cola/worker si el volumen, latencia o garantías de entrega lo requieren.
+El texto se recorta y debe respetar `CHAT_MAX_MESSAGE_CHARS`. Un texto vacío, excesivo o con
+estructura inválida se ignora con ACK HTTP 200. También se ignoran estados, mensajes salientes,
+media, ubicaciones, contactos y futuros tipos no soportados.
 
-F2.8 usa una sola `BackgroundTasks` de FastAPI por lote autenticado. De acuerdo con la
-[documentación oficial de FastAPI](https://fastapi.tiangolo.com/tutorial/background-tasks/) y
-[Starlette](https://www.starlette.io/background/), la tarea se adjunta a la respuesta y comienza
-después de enviarla. El camino del ACK queda limitado a raw body, firma, parsing, normalización y
-programación local; OpenAI y Graph API quedan fuera de la espera del cliente.
-
-`WhatsAppBackgroundProcessor` construye y cierra los adaptadores dentro de la tarea. Procesa el
-lote secuencialmente, captura los fallos por mensaje para que no impidan ejecutar los siguientes y
-no realiza reintentos. Registra exclusivamente request ID, categoría de error y conteos; nunca
-texto, sender, message ID, respuesta o detalle de proveedor. Una cancelación se registra y se
-propaga en lugar de ocultarse.
-
-No se usa `asyncio.create_task`, por lo que no quedan tareas deliberadamente desacopladas del ciclo
-de respuesta. Aun así, `BackgroundTasks` es un mecanismo local y no durable: una caída o reinicio
-después del ACK puede perder trabajo, no existe recuperación entre procesos y no hay backpressure
-persistente. Antes de producción se debe evaluar una cola/worker con entrega, apagado y
-observabilidad verificables.
-
----
-
-# 8. Privacidad
-
-El número/identificador de WhatsApp se trata como dato personal.
-
-Logs:
+El resultado interno es:
 
 ```text
-permitido: ******1234
-evitar:    +5218112345678
+InboundMessage(
+  provider="whatsapp",
+  external_message_id=idMessage,
+  sender_id=senderData.chatId,
+  text=<texto normalizado>,
+  timestamp=<timestamp UTC>
+)
 ```
 
-No persistir conversaciones completas hasta que exista política de retención definida en la fase correspondiente.
+Mantener `provider="whatsapp"` evita acoplar idempotencia y orquestación al proveedor de
+transporte.
 
----
+## 7. ACK y procesamiento
 
-# 9. Tipos de mensajes
+Una notificación autenticada y parseada responde HTTP 200 sin esperar OpenAI o GreenAPI. El lote
+se entrega a una única tarea `BackgroundTasks`, donde se construyen y cierran los adaptadores.
 
-Primero soportar únicamente texto.
+Cada mensaje se procesa de forma independiente. Un fallo no detiene los restantes. No existen
+reintentos automáticos en esta capa, porque un resultado ambiguo del envío podría duplicar la
+respuesta.
 
-Para otros tipos:
+Limitación: `BackgroundTasks` vive en el proceso. Una caída después del ACK puede perder trabajo.
+Antes de producción se debe evaluar una cola durable con backpressure, apagado ordenado,
+recuperación y métricas.
 
-- imagen;
-- audio;
-- ubicación;
-- documento;
-- contacto;
+## 8. Idempotencia
 
-responder de forma controlada o ignorarlos según regla explícita.
+La clave es `provider:external_message_id`. El orquestador reclama antes de llamar a OpenAI,
+marca como completado después del envío y libera la reserva si el procesamiento falla.
 
-No intentar procesarlos como texto accidentalmente.
+`InMemoryIdempotencyStore`:
 
----
+- es atómico dentro de un proceso;
+- almacena solo IDs, no texto ni remitentes;
+- limita su capacidad a 10000 entradas;
+- desaloja primero la entrada completada más antigua;
+- nunca desaloja una entrada activa.
 
-# 10. Envío
+No es una solución de producción: no se comparte entre procesos, se pierde al reiniciar y deja
+una ventana entre envío y marcado. Debe reemplazarse por persistencia coordinada.
 
-`WhatsAppClient` debe:
+## 9. Cliente saliente
 
-- construir endpoint con base/version/phone-number-id de configuración;
-- enviar token en header;
-- validar destinatario;
-- enviar payload estructurado;
-- aplicar timeout;
-- mapear errores;
-- ser mockeable;
-- evitar logs con token o cuerpo sensible.
+GreenAPI define `SendMessage` como:
 
-F2.5 implementa `WhatsAppClient.send_text` con `httpx` asíncrono y cliente HTTP inyectable. El
-endpoint se construye únicamente como
-`https://graph.facebook.com/{META_GRAPH_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages`; la base
-no es configurable por input externo. El access token permanece backend-only y se envía solo en
-`Authorization: Bearer`.
+```text
+POST {apiUrl}/waInstance{idInstance}/sendMessage/{apiTokenInstance}
+```
 
-El payload usa `messaging_product=whatsapp`, `recipient_type=individual`, `type=text`, destinatario
-validado y objeto `text` con `preview_url` explícito. El texto se normaliza, no admite blancos y se
-limita a 4096 caracteres. Una respuesta exitosa se valida y devuelve el message ID de Meta.
+Body:
 
-El timeout procede de `WHATSAPP_REQUEST_TIMEOUT_SECONDS`. El cliente no sigue redirecciones ni
-reintenta automáticamente; timeout, conexión, HTTP 429, otros estados no exitosos y respuestas
-inválidas se mapean a excepciones internas seguras. Token, destinatario, texto y respuesta del
-proveedor no se registran ni se incorporan a errores. El cliente propio puede cerrarse mediante
-`aclose()` o context manager; uno inyectado permanece bajo control del caller.
+```json
+{
+  "chatId": "5210000000000@c.us",
+  "message": "Respuesta",
+  "linkPreview": false
+}
+```
 
-F2.5 no conecta todavía el cliente con el webhook o el chatbot.
+La respuesta válida es:
 
-F2.6 agrega `MessageOrchestrator` como frontera de aplicación entre el mensaje normalizado,
-`ChatService` y `WhatsAppClient`. El orquestador recibe un `InboundMessage`, obtiene la respuesta
-mediante la interfaz de chat y solicita el envío al mismo `sender_id` mediante una interfaz de
-salida mockeable. La ruta no importa ni invoca OpenAI o Graph API directamente.
+```json
+{
+  "idMessage": "..."
+}
+```
 
-La composición de adaptadores es perezosa: solo ocurre después de validar la firma y cuando el
-parser produjo al menos un mensaje soportado. Los fallos conocidos de aplicación se convierten en
-`MessageProcessingError`; desde F2.8 el procesador los captura después del ACK y registra solo su
-categoría segura. Mensaje, respuesta, destinatario y detalle del proveedor no se reflejan ni
-registran.
+El texto saliente admite hasta 20000 caracteres conforme al endpoint actual. `chatId` se valida
+antes de usarlo. La URL base se toma únicamente de configuración validada.
 
-F2.7 incorpora deduplicación mínima en memoria. F2.8 mueve el chatbot y el envío a un procesador
-local posterior al ACK, conserva el orden secuencial del lote y no agrega reintentos, cola externa
-o persistencia.
+GreenAPI exige `apiTokenInstance` en el path. Este riesgo se controla así:
 
----
+- el token solo se revela dentro del método que construye la solicitud;
+- `httpx` y `httpcore` se configuran en nivel `WARNING` para impedir el log informativo de URL;
+- no se sigue ninguna redirección;
+- la URL final nunca se devuelve en excepciones;
+- no se registran request/response bodies;
+- los tests comprueban que el token no aparece en logs ni errores.
 
-# 11. Mensajes fuera de conversación de servicio / plantillas
+Timeouts, conexión, rate limit, estados HTTP y respuestas inválidas se traducen a excepciones
+internas seguras. Solo se conserva un código numérico del proveedor cuando está disponible; no se
+conservan mensajes ni cuerpos.
 
-Antes de implementar mensajes iniciados por el negocio, promociones o seguimientos:
+Referencias oficiales:
 
-- revisar reglas y ventanas vigentes de WhatsApp;
-- utilizar plantillas aprobadas cuando corresponda;
-- no asumir que una respuesta libre es válida indefinidamente;
-- documentar categoría/consentimiento cuando aplique.
+- [SendMessage](https://green-api.com/en/docs/api/sending/SendMessage/);
+- [formato de solicitudes](https://green-api.com/en/docs/request-format/);
+- [hosts de GreenAPI](https://green-api.com/en/docs/api/recommendations/using-green-api-hosts/);
+- [errores comunes](https://green-api.com/en/docs/api/common-errors/).
 
-Fase 2 se concentra inicialmente en responder mensajes iniciados por el cliente.
+## 10. Logging y privacidad
 
----
+Se puede registrar:
 
-# 12. Pruebas obligatorias
+- request ID;
+- plantilla de endpoint;
+- status HTTP;
+- duración;
+- categoría estable del fallo;
+- conteos de mensajes.
 
-- handshake válido;
-- handshake inválido;
-- firma POST válida;
-- firma POST inválida;
-- JSON inválido;
-- evento sin mensaje;
-- mensaje de texto;
-- mensaje duplicado;
-- tipo no soportado;
-- envío correcto mockeado;
-- error Graph API;
-- timeout;
-- ningún token en logs/excepciones.
+No se registra:
 
-Las pruebas automáticas no llaman a Meta.
+- tokens;
+- encabezado `Authorization`;
+- URL final de `sendMessage`;
+- body del webhook;
+- `chatId` o número completo;
+- texto de entrada o salida;
+- respuesta completa de GreenAPI u OpenAI.
 
----
+Los identificadores y números de WhatsApp son datos personales.
 
-# 13. Definition of Done
+## 11. Pruebas
 
-Fase 2 solo termina cuando:
+Las pruebas comunes no usan internet. Deben cubrir:
 
-- webhook está verificado;
-- POST valida autenticidad;
-- texto entrante se normaliza;
-- mensaje de respuesta puede enviarse;
-- flujo WhatsApp -> chatbot -> WhatsApp funciona en entorno de prueba;
-- idempotencia mínima existe;
-- errores son seguros;
-- tokens no aparecen en Git/logs;
-- tests pasan;
-- README/plan actualizados.
+- configuración válida e inválida, secretos y allowlist del host;
+- token Bearer correcto, ausente, duplicado e incorrecto;
+- autenticación antes de leer el body;
+- instancia correcta e incorrecta;
+- texto simple, extendido, citado y grupo;
+- tipos/eventos ignorados y JSON inválido;
+- flujo completo con dobles;
+- deduplicación y liberación tras fallo;
+- ACK antes del procesamiento;
+- endpoint/payload/respuesta de `SendMessage`;
+- timeout, conexión, 401/403/429/5xx y respuesta inválida;
+- ausencia de tokens, texto, destinatario y URL final en logs o errores.
+
+Comandos de cierre:
+
+```powershell
+pytest
+ruff check .
+ruff format --check .
+python -m pip check
+git diff --check
+```
+
+## 12. Prueba real F2.9
+
+La prueba real requiere que el usuario configure localmente la instancia y ambos tokens, sin
+compartir sus valores. Luego:
+
+1. reiniciar el backend para cargar la nueva configuración;
+2. publicar el endpoint por HTTPS;
+3. configurar `webhookUrl`, `webhookUrlToken` e `incomingWebhook=yes` en GreenAPI;
+4. confirmar que el estado de la instancia permite enviar/recibir;
+5. enviar un mensaje real al WhatsApp conectado;
+6. comprobar POST autenticado y ACK 200;
+7. comprobar procesamiento OpenAI;
+8. comprobar `SendMessage` y recepción de la respuesta en WhatsApp;
+9. ejecutar todos los validadores;
+10. pasar F2.9 por `🧪 VALIDACION` y solo después a `✅ COMPLETADO`.
+
+No se deben guardar payloads reales ni evidencias con números o tokens.
+
+El 2026-09-21 se verificó el health público, la autenticación del webhook, el ACK HTTP 200, el
+procesamiento de un mensaje sin fallos, la aceptación de `SendMessage` y la recepción final de la
+respuesta confirmada por el usuario. La evidencia conservada contiene solo estados y conteos
+seguros; no incluye texto, números, IDs externos, tokens o payloads.

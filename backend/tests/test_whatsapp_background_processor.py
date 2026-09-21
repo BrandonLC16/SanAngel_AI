@@ -42,7 +42,7 @@ def make_settings() -> Settings:
 def make_message(message_id: str, text: str) -> InboundMessage:
     return InboundMessage(
         external_message_id=message_id,
-        sender_id="5215550000001",
+        sender_id="5215550000001@c.us",
         text=text,
         timestamp=1720000000,
     )
@@ -80,12 +80,48 @@ def test_background_processor_continues_batch_after_failure_without_retrying(
     assert orchestrator.calls == [failing_id, successful_id]
     assert caplog.text.count("background_message_processing_failed") == 1
     assert "error_category=message_processing_failed" in caplog.text
+    assert "source_error_category=none" in caplog.text
+    assert "provider_code=none provider_subcode=none" in caplog.text
     assert "message_count=2 failed_count=1" in caplog.text
     assert "safe-background-request-id" in caplog.text
     assert failing_id not in caplog.text
     assert successful_id not in caplog.text
     assert private_text not in caplog.text
     assert "test-only-private-background-failure-marker" not in caplog.text
+
+
+def test_background_processor_logs_only_safe_provider_diagnostics(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    private_detail = "test-only-private-provider-failure-marker"
+
+    class DiagnosticOrchestrator(RecordingOrchestrator):
+        async def process_message(self, message: InboundMessage) -> bool:
+            self.calls.append(message.external_message_id)
+            raise MessageProcessingError(
+                private_detail,
+                source_error_code="whatsapp_service_unavailable",
+                provider_code=131000,
+                provider_subcode=2494013,
+            )
+
+    orchestrator = DiagnosticOrchestrator()
+    processor = processor_for(orchestrator)
+
+    with caplog.at_level(logging.INFO, logger=WHATSAPP_BACKGROUND_LOGGER_NAME):
+        asyncio.run(
+            processor.process_messages(
+                (make_message("wamid.test-only-id", "texto privado"),),
+                make_settings(),
+                "safe-diagnostics-request-id",
+            )
+        )
+
+    assert "source_error_category=whatsapp_service_unavailable" in caplog.text
+    assert "provider_code=131000 provider_subcode=2494013" in caplog.text
+    assert private_detail not in caplog.text
+    assert "wamid.test-only-id" not in caplog.text
+    assert "texto privado" not in caplog.text
 
 
 def test_background_factory_failure_is_swallowed_and_logged_without_private_detail(

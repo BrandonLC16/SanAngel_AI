@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Mapping
 from typing import Protocol, Self
@@ -15,11 +16,30 @@ from backend.app.core.exceptions import (
     WhatsAppProviderStatusError,
     WhatsAppProviderTimeoutError,
 )
-from backend.app.schemas.whatsapp import WhatsAppSendResponse
+from backend.app.schemas.whatsapp import GREEN_API_CHAT_ID_PATTERN, WhatsAppSendResponse
 
-GRAPH_API_BASE_URL = "https://graph.facebook.com"
-MAX_OUTBOUND_TEXT_CHARS = 4096
-_RECIPIENT_PATTERN = re.compile(r"\+?[1-9][0-9]{5,14}")
+MAX_OUTBOUND_TEXT_CHARS = 20_000
+_RECIPIENT_PATTERN = re.compile(GREEN_API_CHAT_ID_PATTERN)
+
+
+def _disable_http_url_logging() -> None:
+    """Prevent dependencies from logging GREEN-API URLs that contain the instance token."""
+
+    for logger_name in ("httpx", "httpcore"):
+        provider_logger = logging.getLogger(logger_name)
+        if provider_logger.level < logging.WARNING:
+            provider_logger.setLevel(logging.WARNING)
+
+
+def _green_api_error_code(response: httpx.Response) -> int | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    code = payload.get("code")
+    return code if isinstance(code, int) and not isinstance(code, bool) else None
 
 
 class AsyncHTTPClient(Protocol):
@@ -35,7 +55,7 @@ class AsyncHTTPClient(Protocol):
 
 
 class WhatsAppClient:
-    """Send WhatsApp messages through a fixed Graph API boundary without content logging."""
+    """Send WhatsApp text messages through GREEN-API without content logging."""
 
     def __init__(
         self,
@@ -43,14 +63,15 @@ class WhatsAppClient:
         *,
         http_client: AsyncHTTPClient | None = None,
     ) -> None:
-        access_token = settings.whatsapp_access_token
-        phone_number_id = settings.whatsapp_phone_number_id
-        if access_token is None or phone_number_id is None:
+        _disable_http_url_logging()
+        instance_id = settings.green_api_instance_id
+        token_instance = settings.green_api_token_instance
+        if instance_id is None or token_instance is None:
             raise WhatsAppClientConfigurationError("WhatsApp client configuration is incomplete")
 
-        self._access_token = access_token
         self._endpoint = (
-            f"{GRAPH_API_BASE_URL}/{settings.meta_graph_api_version}/{phone_number_id}/messages"
+            f"{settings.green_api_api_url}/waInstance{instance_id}/sendMessage/"
+            f"{token_instance.get_secret_value()}"
         )
         self._timeout = settings.whatsapp_request_timeout_seconds
 
@@ -94,19 +115,11 @@ class WhatsAppClient:
         if not normalized_text:
             raise WhatsAppClientInputError("WhatsApp text must not be blank")
 
-        headers = {
-            "Authorization": f"Bearer {self._access_token.get_secret_value()}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
         payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": recipient,
-            "type": "text",
-            "text": {
-                "preview_url": preview_url,
-                "body": normalized_text,
-            },
+            "chatId": recipient,
+            "message": normalized_text,
+            "linkPreview": preview_url,
         }
 
         try:
@@ -118,18 +131,29 @@ class WhatsAppClient:
                 follow_redirects=False,
             )
         except httpx.TimeoutException:
-            raise WhatsAppProviderTimeoutError("Graph API timeout") from None
+            raise WhatsAppProviderTimeoutError("GREEN-API timeout") from None
         except httpx.RequestError:
-            raise WhatsAppProviderConnectionError("Graph API connection failure") from None
+            raise WhatsAppProviderConnectionError("GREEN-API connection failure") from None
 
         if response.status_code == 429:
-            raise WhatsAppProviderRateLimitError("Graph API rate limit")
+            raise WhatsAppProviderRateLimitError("GREEN-API rate limit")
         if not 200 <= response.status_code < 300:
-            raise WhatsAppProviderStatusError("Graph API HTTP failure")
+            provider_code = _green_api_error_code(response) or response.status_code
+            raise WhatsAppProviderStatusError(
+                "GREEN-API HTTP failure",
+                provider_code=provider_code,
+            )
+
+        provider_code = _green_api_error_code(response)
+        if provider_code is not None:
+            raise WhatsAppProviderStatusError(
+                "GREEN-API returned an error response",
+                provider_code=provider_code,
+            )
 
         try:
             parsed_response = WhatsAppSendResponse.model_validate_json(response.content)
         except ValidationError:
-            raise WhatsAppProviderResponseError("Graph API returned an invalid response") from None
+            raise WhatsAppProviderResponseError("GREEN-API returned an invalid response") from None
 
-        return parsed_response.messages[0].id
+        return parsed_response.id_message

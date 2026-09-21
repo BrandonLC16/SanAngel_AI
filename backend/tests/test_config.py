@@ -22,11 +22,10 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.openai_timeout_seconds == 30
     assert settings.openai_max_retries == 2
     assert settings.chat_max_message_chars == 2000
-    assert settings.whatsapp_access_token is None
-    assert settings.whatsapp_phone_number_id is None
-    assert settings.whatsapp_verify_token is None
-    assert settings.meta_app_secret is None
-    assert settings.meta_graph_api_version == "v26.0"
+    assert settings.green_api_instance_id is None
+    assert settings.green_api_token_instance is None
+    assert settings.green_api_webhook_token is None
+    assert settings.green_api_api_url == "https://api.green-api.com"
     assert settings.whatsapp_request_timeout_seconds == 15
     assert settings.log_level == "INFO"
 
@@ -39,11 +38,10 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "45.5")
     monkeypatch.setenv("OPENAI_MAX_RETRIES", "4")
     monkeypatch.setenv("CHAT_MAX_MESSAGE_CHARS", "1500")
-    monkeypatch.setenv("WHATSAPP_ACCESS_TOKEN", secret_marker)
-    monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "123456789012345")
-    monkeypatch.setenv("WHATSAPP_VERIFY_TOKEN", secret_marker)
-    monkeypatch.setenv("META_APP_SECRET", secret_marker)
-    monkeypatch.setenv("META_GRAPH_API_VERSION", "v25.0")
+    monkeypatch.setenv("GREEN_API_INSTANCE_ID", "123456789012")
+    monkeypatch.setenv("GREEN_API_TOKEN_INSTANCE", secret_marker)
+    monkeypatch.setenv("GREEN_API_WEBHOOK_TOKEN", secret_marker)
+    monkeypatch.setenv("GREEN_API_API_URL", "https://7107.api.greenapi.com/")
     monkeypatch.setenv("WHATSAPP_REQUEST_TIMEOUT_SECONDS", "22.5")
 
     settings = Settings(_env_file=None)
@@ -54,14 +52,12 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.openai_timeout_seconds == 45.5
     assert settings.openai_max_retries == 4
     assert settings.chat_max_message_chars == 1500
-    assert settings.whatsapp_access_token is not None
-    assert settings.whatsapp_access_token.get_secret_value() == secret_marker
-    assert settings.whatsapp_phone_number_id == "123456789012345"
-    assert settings.whatsapp_verify_token is not None
-    assert settings.whatsapp_verify_token.get_secret_value() == secret_marker
-    assert settings.meta_app_secret is not None
-    assert settings.meta_app_secret.get_secret_value() == secret_marker
-    assert settings.meta_graph_api_version == "v25.0"
+    assert settings.green_api_instance_id == "123456789012"
+    assert settings.green_api_token_instance is not None
+    assert settings.green_api_token_instance.get_secret_value() == secret_marker
+    assert settings.green_api_webhook_token is not None
+    assert settings.green_api_webhook_token.get_secret_value() == secret_marker
+    assert settings.green_api_api_url == "https://7107.api.greenapi.com"
     assert settings.whatsapp_request_timeout_seconds == 22.5
 
 
@@ -76,11 +72,10 @@ def test_settings_load_dotenv_file(tmp_path: Path) -> None:
                 "OPENAI_MODEL=dotenv-model",
                 "OPENAI_TIMEOUT_SECONDS=12",
                 "CHAT_MAX_MESSAGE_CHARS=750",
-                f"WHATSAPP_ACCESS_TOKEN={secret_marker}",
-                "WHATSAPP_PHONE_NUMBER_ID=123456789012345",
-                f"WHATSAPP_VERIFY_TOKEN={secret_marker}",
-                f"META_APP_SECRET={secret_marker}",
-                "META_GRAPH_API_VERSION=v25.0",
+                "GREEN_API_INSTANCE_ID=123456789012",
+                f"GREEN_API_TOKEN_INSTANCE={secret_marker}",
+                f"GREEN_API_WEBHOOK_TOKEN={secret_marker}",
+                "GREEN_API_API_URL=https://7107.api.greenapi.com/",
                 "WHATSAPP_REQUEST_TIMEOUT_SECONDS=18",
             )
         ),
@@ -93,14 +88,12 @@ def test_settings_load_dotenv_file(tmp_path: Path) -> None:
     assert settings.openai_model == "dotenv-model"
     assert settings.openai_timeout_seconds == 12
     assert settings.chat_max_message_chars == 750
-    assert settings.whatsapp_access_token is not None
-    assert settings.whatsapp_access_token.get_secret_value() == secret_marker
-    assert settings.whatsapp_phone_number_id == "123456789012345"
-    assert settings.whatsapp_verify_token is not None
-    assert settings.whatsapp_verify_token.get_secret_value() == secret_marker
-    assert settings.meta_app_secret is not None
-    assert settings.meta_app_secret.get_secret_value() == secret_marker
-    assert settings.meta_graph_api_version == "v25.0"
+    assert settings.green_api_instance_id == "123456789012"
+    assert settings.green_api_token_instance is not None
+    assert settings.green_api_token_instance.get_secret_value() == secret_marker
+    assert settings.green_api_webhook_token is not None
+    assert settings.green_api_webhook_token.get_secret_value() == secret_marker
+    assert settings.green_api_api_url == "https://7107.api.greenapi.com"
     assert settings.whatsapp_request_timeout_seconds == 18
 
 
@@ -136,11 +129,10 @@ def test_invalid_secret_error_does_not_reveal_value() -> None:
     assert secret_marker not in error_text
 
 
-def test_whatsapp_secrets_are_hidden_from_text_representations() -> None:
+def test_green_api_secrets_are_hidden_from_text_representations() -> None:
     markers = {
-        "whatsapp_access_token": "test-only-whatsapp-access-token",
-        "whatsapp_verify_token": "test-only-whatsapp-verify-token",
-        "meta_app_secret": "test-only-meta-app-secret",
+        "green_api_token_instance": "test-only-green-api-token-instance",
+        "green_api_webhook_token": "test-only-green-api-webhook-token",
     }
     settings = Settings(
         openai_api_key=make_non_key_secret_marker(),
@@ -157,9 +149,9 @@ def test_whatsapp_secrets_are_hidden_from_text_representations() -> None:
 
 @pytest.mark.parametrize(
     "field_name",
-    ("whatsapp_access_token", "whatsapp_verify_token", "meta_app_secret"),
+    ("green_api_token_instance", "green_api_webhook_token"),
 )
-def test_invalid_whatsapp_secret_error_does_not_reveal_value(field_name: str) -> None:
+def test_invalid_provider_secret_error_does_not_reveal_value(field_name: str) -> None:
     secret_marker = f"test-only-{field_name}-marker"
 
     with pytest.raises(ValidationError) as exc_info:
@@ -201,16 +193,19 @@ def test_settings_reject_unsafe_numeric_limits(field_name: str, invalid_value: i
 @pytest.mark.parametrize(
     ("field_name", "invalid_value"),
     (
-        ("whatsapp_phone_number_id", "123-invalid"),
-        ("whatsapp_phone_number_id", " 123456 "),
-        ("whatsapp_phone_number_id", "1" * 65),
-        ("meta_graph_api_version", "26.0"),
-        ("meta_graph_api_version", "v26"),
-        ("meta_graph_api_version", "v26.1"),
-        ("meta_graph_api_version", "https://graph.facebook.com/v26.0"),
+        ("green_api_instance_id", "123-invalid"),
+        ("green_api_instance_id", " 1100000001 "),
+        ("green_api_instance_id", "0"),
+        ("green_api_instance_id", "1" * 21),
+        ("green_api_api_url", "http://api.green-api.com"),
+        ("green_api_api_url", "https://example.com"),
+        ("green_api_api_url", "https://api.green-api.com/private"),
+        ("green_api_api_url", "https://user:password@api.green-api.com"),
+        ("green_api_api_url", "https://api.green-api.com?debug=true"),
+        ("green_api_api_url", "https://greenapi.com.example.com"),
     ),
 )
-def test_settings_reject_invalid_whatsapp_identifiers(
+def test_settings_reject_invalid_green_api_configuration(
     field_name: str,
     invalid_value: str,
 ) -> None:

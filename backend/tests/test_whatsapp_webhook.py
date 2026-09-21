@@ -1,6 +1,4 @@
 import asyncio
-import hashlib
-import hmac
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -21,6 +19,8 @@ from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 
 WEBHOOK_PATH = "/api/v1/whatsapp/webhook"
+WEBHOOK_TOKEN = "test-only-green-api-webhook-token"
+INSTANCE_ID = "123456789012"
 
 
 class RecordingMessageOrchestrator:
@@ -70,19 +70,19 @@ class FakeWhatsAppSender:
         preview_url: bool = False,
     ) -> str:
         self.calls.append((recipient, text, preview_url))
-        return "wamid.test-only-outbound-message-id"
+        return "3EB0C767D097B7C7C030"
 
 
 def make_application(
-    verify_token: str | None = "test-only-verify-token-marker",
-    app_secret: str | None = "test-only-meta-app-secret-marker",
+    webhook_token: str | None = WEBHOOK_TOKEN,
+    instance_id: str | None = INSTANCE_ID,
     orchestrator: MessageOrchestrator | RecordingMessageOrchestrator | None = None,
 ) -> FastAPI:
     application = create_app(HttpSettings(app_env="testing", log_level="INFO", _env_file=None))
     settings = Settings(
         openai_api_key="test-only-openai-credential-placeholder",
-        whatsapp_verify_token=verify_token,
-        meta_app_secret=app_secret,
+        green_api_webhook_token=webhook_token,
+        green_api_instance_id=instance_id,
         _env_file=None,
     )
     application.dependency_overrides[get_settings] = lambda: settings
@@ -99,62 +99,37 @@ def make_application(
     return application
 
 
-async def send_handshake(
-    application: FastAPI,
-    params: list[tuple[str, str]],
-) -> httpx.Response:
-    transport = httpx.ASGITransport(app=application)
-    async with httpx.AsyncClient(
-        transport=transport,
-        base_url="http://testserver",
-    ) as client:
-        return await client.get(WEBHOOK_PATH, params=params)
-
-
-def valid_params(verify_token: str, challenge: str = "1158201444") -> list[tuple[str, str]]:
-    return [
-        ("hub.mode", "subscribe"),
-        ("hub.verify_token", verify_token),
-        ("hub.challenge", challenge),
-    ]
-
-
-def sign_payload(app_secret: str, raw_body: bytes) -> str:
-    digest = hmac.new(app_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
-    return f"sha256={digest}"
-
-
 def text_message_payload(
-    sender: str,
+    chat_id: str,
     text: str,
     *,
-    message_id: str = "wamid.test-only-inbound-message-id",
+    message_id: str = "F7AEC1B7086ECDC7E6E45923F5EDB825",
+    instance_id: int = 123_456_789_012,
 ) -> bytes:
     payload = {
-        "object": "whatsapp_business_account",
-        "entry": [
-            {
-                "changes": [
-                    {
-                        "field": "messages",
-                        "value": {
-                            "messaging_product": "whatsapp",
-                            "messages": [
-                                {
-                                    "from": sender,
-                                    "id": message_id,
-                                    "timestamp": "1720000000",
-                                    "type": "text",
-                                    "text": {"body": text},
-                                }
-                            ],
-                        },
-                    }
-                ]
-            }
-        ],
+        "typeWebhook": "incomingMessageReceived",
+        "instanceData": {
+            "idInstance": instance_id,
+            "wid": "5215559999999@c.us",
+            "typeInstance": "whatsapp",
+        },
+        "timestamp": 1_720_000_000,
+        "idMessage": message_id,
+        "senderData": {
+            "chatId": chat_id,
+            "sender": chat_id,
+            "senderName": "Cliente",
+        },
+        "messageData": {
+            "typeMessage": "textMessage",
+            "textMessageData": {"textMessage": text},
+        },
     }
     return json.dumps(payload, separators=(",", ":")).encode()
+
+
+def authorization_headers(token: str = WEBHOOK_TOKEN) -> list[tuple[str, str]]:
+    return [("Authorization", f"Bearer {token}")]
 
 
 async def send_webhook(
@@ -163,22 +138,18 @@ async def send_webhook(
     headers: list[tuple[str, str]],
 ) -> httpx.Response:
     transport = httpx.ASGITransport(app=application)
-    async with httpx.AsyncClient(
-        transport=transport,
-        base_url="http://testserver",
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         return await client.post(WEBHOOK_PATH, content=raw_body, headers=headers)
 
 
-def make_direct_request(raw_body: bytes, app_secret: str, request_id: str) -> Request:
-    signature = sign_payload(app_secret, raw_body).encode("ascii")
+def make_direct_request(raw_body: bytes, webhook_token: str, request_id: str) -> Request:
     scope = {
         "type": "http",
         "method": "POST",
         "path": WEBHOOK_PATH,
         "raw_path": WEBHOOK_PATH.encode("ascii"),
         "query_string": b"",
-        "headers": [(b"x-hub-signature-256", signature)],
+        "headers": [(b"authorization", f"Bearer {webhook_token}".encode("ascii"))],
         "scheme": "http",
         "server": ("testserver", 80),
         "client": ("127.0.0.1", 12345),
@@ -197,103 +168,30 @@ def make_direct_request(raw_body: bytes, app_secret: str, request_id: str) -> Re
     return request
 
 
-def test_valid_handshake_returns_only_challenge_and_does_not_log_token(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    verify_token = "test-only-verify-token-marker"
-    challenge = "1158201444"
-    application = make_application(verify_token)
+def test_get_handshake_is_not_exposed_for_green_api() -> None:
+    application = make_application()
 
-    with caplog.at_level(logging.INFO, logger=HTTP_LOGGER_NAME):
-        response = asyncio.run(send_handshake(application, valid_params(verify_token, challenge)))
+    async def send_get() -> httpx.Response:
+        transport = httpx.ASGITransport(app=application)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return await client.get(WEBHOOK_PATH)
 
-    assert response.status_code == 200
-    assert response.content == challenge.encode("ascii")
-    assert response.headers["content-type"].startswith("text/plain")
-    assert verify_token not in caplog.text
-    assert challenge not in caplog.text
+    response = asyncio.run(send_get())
+
+    assert response.status_code == 405
 
 
-def test_incorrect_verify_token_is_rejected_without_reflection_or_logging(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    configured_token = "test-only-configured-token-marker"
-    incorrect_token = "test-only-incorrect-token-marker"
-    application = make_application(configured_token)
+def test_valid_bearer_authorization_is_accepted() -> None:
+    application = make_application()
 
-    with caplog.at_level(logging.INFO, logger=HTTP_LOGGER_NAME):
-        response = asyncio.run(send_handshake(application, valid_params(incorrect_token)))
-
-    assert response.status_code == 403
-    assert response.content == b""
-    assert configured_token not in response.text
-    assert incorrect_token not in response.text
-    assert configured_token not in caplog.text
-    assert incorrect_token not in caplog.text
-
-
-@pytest.mark.parametrize(
-    "params",
-    (
-        [
-            ("hub.mode", "unsubscribe"),
-            ("hub.verify_token", "test-only-verify-token-marker"),
-            ("hub.challenge", "1158201444"),
-        ],
-        [
-            ("hub.mode", "subscribe"),
-            ("hub.verify_token", "test-only-verify-token-marker"),
-            ("hub.challenge", "not-an-integer"),
-        ],
-        [
-            ("hub.mode", "subscribe"),
-            ("hub.verify_token", "test-only-verify-token-marker"),
-        ],
-        [
-            ("hub.mode", "subscribe"),
-            ("hub.verify_token", "test-only-verify-token-marker"),
-            ("hub.challenge", "1158201444"),
-            ("hub.challenge", "1158201445"),
-        ],
-    ),
-)
-def test_invalid_mode_or_challenge_is_rejected(params: list[tuple[str, str]]) -> None:
-    application = make_application("test-only-verify-token-marker")
-
-    response = asyncio.run(send_handshake(application, params))
-
-    assert response.status_code == 403
-    assert response.content == b""
-
-
-def test_missing_verify_token_configuration_fails_closed() -> None:
-    application = make_application(verify_token=None)
-
-    response = asyncio.run(
-        send_handshake(application, valid_params("test-only-verify-token-marker"))
-    )
-
-    assert response.status_code == 503
-    assert response.content == b""
-
-
-def test_valid_post_signature_over_exact_raw_body_is_accepted() -> None:
-    app_secret = "test-only-meta-app-secret-marker"
-    raw_body = b'{"object":"whatsapp_business_account","entry":[]}'
-    application = make_application(app_secret=app_secret)
-    signature = sign_payload(app_secret, raw_body)
-
-    response = asyncio.run(
-        send_webhook(application, raw_body, [("X-Hub-Signature-256", signature)])
-    )
+    response = asyncio.run(send_webhook(application, b"{}", authorization_headers()))
 
     assert response.status_code == 200
     assert response.content == b""
 
 
 def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks() -> None:
-    app_secret = "test-only-meta-app-secret-marker"
-    sender = "5215550000001"
+    chat_id = "5215550000001@c.us"
     inbound_text = "test-only-private-inbound-text-marker"
     answer = "test-only-private-answer-marker"
     chat_service = FakeChatResponder(answer=answer)
@@ -303,33 +201,27 @@ def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks(
         whatsapp_client,
         InMemoryIdempotencyStore(),
     )
-    application = make_application(app_secret=app_secret, orchestrator=orchestrator)
-    raw_body = text_message_payload(sender, f"  {inbound_text}  ")
+    application = make_application(orchestrator=orchestrator)
+    raw_body = text_message_payload(chat_id, f"  {inbound_text}  ")
 
-    response = asyncio.run(
-        send_webhook(
-            application,
-            raw_body,
-            [("X-Hub-Signature-256", sign_payload(app_secret, raw_body))],
-        )
-    )
+    response = asyncio.run(send_webhook(application, raw_body, authorization_headers()))
 
     assert response.status_code == 200
     assert response.content == b""
     assert chat_service.messages == [inbound_text]
-    assert whatsapp_client.calls == [(sender, answer, False)]
+    assert whatsapp_client.calls == [(chat_id, answer, False)]
 
 
 def test_authenticated_route_queues_work_without_awaiting_external_processing() -> None:
-    app_secret = "test-only-meta-app-secret-marker"
     request_id = "background-scheduling-request-id"
-    raw_body = text_message_payload("5215550000001", "mensaje diferido")
-    request = make_direct_request(raw_body, app_secret, request_id)
+    raw_body = text_message_payload("5215550000001@c.us", "mensaje diferido")
+    request = make_direct_request(raw_body, WEBHOOK_TOKEN, request_id)
     background_tasks = BackgroundTasks()
     background_processor = RecordingBackgroundProcessor()
     settings = Settings(
         openai_api_key="test-only-openai-credential-placeholder",
-        meta_app_secret=app_secret,
+        green_api_webhook_token=WEBHOOK_TOKEN,
+        green_api_instance_id=INSTANCE_ID,
         _env_file=None,
     )
 
@@ -360,8 +252,7 @@ def test_authenticated_route_queues_work_without_awaiting_external_processing() 
 
 
 def test_duplicate_authenticated_message_id_is_acked_without_a_second_response() -> None:
-    app_secret = "test-only-meta-app-secret-marker"
-    sender = "5215550000001"
+    chat_id = "5215550000001@c.us"
     inbound_text = "test-only-duplicate-inbound-text-marker"
     answer = "test-only-single-answer-marker"
     chat_service = FakeChatResponder(answer=answer)
@@ -371,13 +262,12 @@ def test_duplicate_authenticated_message_id_is_acked_without_a_second_response()
         whatsapp_client,
         InMemoryIdempotencyStore(),
     )
-    application = make_application(app_secret=app_secret, orchestrator=orchestrator)
-    raw_body = text_message_payload(sender, inbound_text)
-    headers = [("X-Hub-Signature-256", sign_payload(app_secret, raw_body))]
+    application = make_application(orchestrator=orchestrator)
+    raw_body = text_message_payload(chat_id, inbound_text)
 
     async def send_twice() -> tuple[httpx.Response, httpx.Response]:
-        first = await send_webhook(application, raw_body, headers)
-        second = await send_webhook(application, raw_body, headers)
+        first = await send_webhook(application, raw_body, authorization_headers())
+        second = await send_webhook(application, raw_body, authorization_headers())
         return first, second
 
     first_response, duplicate_response = asyncio.run(send_twice())
@@ -386,14 +276,13 @@ def test_duplicate_authenticated_message_id_is_acked_without_a_second_response()
     assert duplicate_response.status_code == 200
     assert first_response.content == duplicate_response.content == b""
     assert chat_service.messages == [inbound_text]
-    assert whatsapp_client.calls == [(sender, answer, False)]
+    assert whatsapp_client.calls == [(chat_id, answer, False)]
 
 
 def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leaking_data(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    app_secret = "test-only-meta-app-secret-marker"
-    sender = "5215550000001"
+    chat_id = "5215550000001@c.us"
     inbound_text = "test-only-private-inbound-text-marker"
     answer = "test-only-private-answer-marker"
     internal_detail = "test-only-private-provider-failure-marker"
@@ -407,23 +296,17 @@ def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leakin
         whatsapp_client,
         InMemoryIdempotencyStore(),
     )
-    application = make_application(app_secret=app_secret, orchestrator=orchestrator)
-    raw_body = text_message_payload(sender, inbound_text)
+    application = make_application(orchestrator=orchestrator)
+    raw_body = text_message_payload(chat_id, inbound_text)
 
     with caplog.at_level(logging.INFO):
-        response = asyncio.run(
-            send_webhook(
-                application,
-                raw_body,
-                [("X-Hub-Signature-256", sign_payload(app_secret, raw_body))],
-            )
-        )
+        response = asyncio.run(send_webhook(application, raw_body, authorization_headers()))
 
     assert response.status_code == 200
     assert response.content == b""
     assert whatsapp_client.calls == []
     rendered = f"{response.text}\n{caplog.text}"
-    assert sender not in rendered
+    assert chat_id not in rendered
     assert inbound_text not in rendered
     assert answer not in rendered
     assert internal_detail not in rendered
@@ -432,59 +315,34 @@ def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leakin
     assert WHATSAPP_BACKGROUND_LOGGER_NAME in caplog.text
 
 
-def test_signature_is_checked_against_untouched_raw_body() -> None:
-    app_secret = "test-only-meta-app-secret-marker"
-    signed_body = b'{"object":"whatsapp_business_account","entry":[]}'
-    changed_body = b'{ "object": "whatsapp_business_account", "entry": [] }'
-    application = make_application(app_secret=app_secret)
-    signature = sign_payload(app_secret, signed_body)
-
-    response = asyncio.run(
-        send_webhook(application, changed_body, [("X-Hub-Signature-256", signature)])
-    )
-
-    assert response.status_code == 403
-    assert response.content == b""
-
-
-def test_unauthenticated_payload_is_rejected_before_json_is_accessed(
+def test_unauthenticated_payload_is_rejected_before_body_is_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    json_was_accessed = False
+    body_was_read = False
 
-    async def track_json_access(request: Request) -> object:
-        nonlocal json_was_accessed
-        json_was_accessed = True
-        return {}
+    async def track_body_access(request: Request) -> bytes:
+        nonlocal body_was_read
+        body_was_read = True
+        return b"{}"
 
-    monkeypatch.setattr(Request, "json", track_json_access)
+    monkeypatch.setattr(Request, "body", track_body_access)
     application = make_application()
 
     response = asyncio.run(
-        send_webhook(
-            application,
-            b'{"untrusted":"payload"}',
-            [("X-Hub-Signature-256", "sha256=" + "0" * 64)],
-        )
+        send_webhook(application, b'{"untrusted":"payload"}', authorization_headers("wrong"))
     )
 
     assert response.status_code == 403
     assert response.content == b""
-    assert json_was_accessed is False
+    assert body_was_read is False
 
 
 def test_unauthenticated_text_does_not_build_provider_adapters() -> None:
     application = make_application()
     application.dependency_overrides.pop(get_message_orchestrator_factory)
-    raw_body = text_message_payload("5215550000001", "texto no autenticado")
+    raw_body = text_message_payload("5215550000001@c.us", "texto no autenticado")
 
-    response = asyncio.run(
-        send_webhook(
-            application,
-            raw_body,
-            [("X-Hub-Signature-256", "sha256=" + "0" * 64)],
-        )
-    )
+    response = asyncio.run(send_webhook(application, raw_body, authorization_headers("wrong")))
 
     assert response.status_code == 403
     assert response.content == b""
@@ -494,16 +352,17 @@ def test_unauthenticated_text_does_not_build_provider_adapters() -> None:
     "headers",
     (
         [],
-        [("X-Hub-Signature-256", "sha1=" + "0" * 64)],
-        [("X-Hub-Signature-256", "sha256=not-hex")],
-        [("X-Hub-Signature-256", "sha256=" + "0" * 63)],
+        [("Authorization", "Basic test-only-token")],
+        [("Authorization", "Bearer")],
+        [("Authorization", "Bearer wrong-token")],
+        [("Authorization", "Bearer " + "x" * 2049)],
         [
-            ("X-Hub-Signature-256", "sha256=" + "0" * 64),
-            ("X-Hub-Signature-256", "sha256=" + "1" * 64),
+            ("Authorization", f"Bearer {WEBHOOK_TOKEN}"),
+            ("Authorization", f"Bearer {WEBHOOK_TOKEN}"),
         ],
     ),
 )
-def test_missing_or_malformed_post_signature_is_rejected(
+def test_missing_or_malformed_authorization_is_rejected(
     headers: list[tuple[str, str]],
 ) -> None:
     application = make_application()
@@ -514,34 +373,40 @@ def test_missing_or_malformed_post_signature_is_rejected(
     assert response.content == b""
 
 
-def test_invalid_signature_does_not_expose_or_log_secret_body_or_header(
+def test_invalid_authorization_does_not_expose_or_log_secret_body_or_header(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    app_secret = "test-only-meta-app-secret-marker"
     body_marker = "test-only-private-body-marker"
-    invalid_signature = "sha256=" + "0" * 64
-    application = make_application(app_secret=app_secret)
+    invalid_authorization = "Bearer test-only-invalid-webhook-token"
+    application = make_application()
 
     with caplog.at_level(logging.WARNING, logger=HTTP_LOGGER_NAME):
         response = asyncio.run(
             send_webhook(
                 application,
                 body_marker.encode("utf-8"),
-                [("X-Hub-Signature-256", invalid_signature)],
+                [("Authorization", invalid_authorization)],
             )
         )
 
     assert response.status_code == 403
     assert response.content == b""
-    assert app_secret not in caplog.text
+    assert WEBHOOK_TOKEN not in caplog.text
     assert body_marker not in caplog.text
-    assert invalid_signature not in caplog.text
+    assert invalid_authorization not in caplog.text
 
 
-def test_missing_meta_app_secret_fails_closed() -> None:
-    application = make_application(app_secret=None)
+@pytest.mark.parametrize(
+    ("webhook_token", "instance_id"),
+    ((None, INSTANCE_ID), (WEBHOOK_TOKEN, None)),
+)
+def test_missing_green_api_webhook_configuration_fails_closed(
+    webhook_token: str | None,
+    instance_id: str | None,
+) -> None:
+    application = make_application(webhook_token=webhook_token, instance_id=instance_id)
 
-    response = asyncio.run(send_webhook(application, b"{}", []))
+    response = asyncio.run(send_webhook(application, b"{}", authorization_headers()))
 
     assert response.status_code == 503
     assert response.content == b""
@@ -552,42 +417,44 @@ def test_missing_meta_app_secret_fails_closed() -> None:
     (
         b"not-json",
         b"[]",
-        b'{"object":"whatsapp_business_account","entry":"unexpected"}',
+        b'{"typeWebhook":"incomingMessageReceived","instanceData":"unexpected"}',
     ),
 )
 def test_authenticated_unusual_payload_does_not_break_webhook(raw_body: bytes) -> None:
-    app_secret = "test-only-meta-app-secret-marker"
-    application = make_application(app_secret=app_secret)
-    signature = sign_payload(app_secret, raw_body)
+    application = make_application()
 
-    response = asyncio.run(
-        send_webhook(application, raw_body, [("X-Hub-Signature-256", signature)])
-    )
+    response = asyncio.run(send_webhook(application, raw_body, authorization_headers()))
 
     assert response.status_code == 200
     assert response.content == b""
 
 
-def test_authenticated_payload_body_is_not_logged(
+def test_wrong_instance_is_acked_without_scheduling_processing() -> None:
+    orchestrator = RecordingMessageOrchestrator()
+    application = make_application(orchestrator=orchestrator)
+    raw_body = text_message_payload(
+        "5215550000001@c.us",
+        "mensaje de otra instancia",
+        instance_id=123_456_789_013,
+    )
+
+    response = asyncio.run(send_webhook(application, raw_body, authorization_headers()))
+
+    assert response.status_code == 200
+    assert orchestrator.messages == []
+
+
+def test_authenticated_payload_body_and_authorization_are_not_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    app_secret = "test-only-meta-app-secret-marker"
     body_marker = "test-only-private-text-body-marker"
-    raw_body = (
-        '{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages",'
-        '"value":{"messaging_product":"whatsapp","messages":[{"from":"5215550000001",'
-        '"id":"wamid.test-only-id","type":"text","text":{"body":"'
-        f"{body_marker}"
-        '"}}]}}]}]}'
-    ).encode()
-    application = make_application(app_secret=app_secret)
-    signature = sign_payload(app_secret, raw_body)
+    raw_body = text_message_payload("5215550000001@c.us", body_marker)
+    application = make_application()
 
     with caplog.at_level(logging.INFO, logger=HTTP_LOGGER_NAME):
-        response = asyncio.run(
-            send_webhook(application, raw_body, [("X-Hub-Signature-256", signature)])
-        )
+        response = asyncio.run(send_webhook(application, raw_body, authorization_headers()))
 
     assert response.status_code == 200
     assert body_marker not in caplog.text
     assert raw_body.decode() not in caplog.text
+    assert WEBHOOK_TOKEN not in caplog.text

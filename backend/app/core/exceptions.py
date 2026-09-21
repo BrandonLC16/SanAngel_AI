@@ -61,30 +61,41 @@ class WhatsAppClientConfigurationError(ServiceUnavailableError):
 
 
 class WhatsAppProviderError(ServiceUnavailableError):
-    """Base exception for failures returned by Meta's Graph API."""
+    """Base exception for failures returned by the configured WhatsApp provider."""
 
     error_code = "whatsapp_service_unavailable"
     public_message = "El canal de WhatsApp no está disponible temporalmente."
 
 
 class WhatsAppProviderTimeoutError(WhatsAppProviderError):
-    """Raised when Graph API exceeds the configured timeout."""
+    """Raised when the WhatsApp provider exceeds the configured timeout."""
 
 
 class WhatsAppProviderRateLimitError(WhatsAppProviderError):
-    """Raised when Graph API rejects a request due to rate limits."""
+    """Raised when the WhatsApp provider rejects a request due to rate limits."""
 
 
 class WhatsAppProviderConnectionError(WhatsAppProviderError):
-    """Raised when Graph API cannot be reached."""
+    """Raised when the WhatsApp provider cannot be reached."""
 
 
 class WhatsAppProviderStatusError(WhatsAppProviderError):
-    """Raised when Graph API returns a non-success HTTP status."""
+    """Raised when the WhatsApp provider returns a failure response."""
+
+    def __init__(
+        self,
+        internal_detail: str | None = None,
+        *,
+        provider_code: int | None = None,
+        provider_subcode: int | None = None,
+    ) -> None:
+        super().__init__(internal_detail)
+        self.provider_code = provider_code
+        self.provider_subcode = provider_subcode
 
 
 class WhatsAppProviderResponseError(WhatsAppProviderError):
-    """Raised when a successful Graph API response has no usable message ID."""
+    """Raised when a provider response has no usable message ID."""
 
 
 class MessageProcessingError(ServiceUnavailableError):
@@ -92,6 +103,19 @@ class MessageProcessingError(ServiceUnavailableError):
 
     error_code = "message_processing_failed"
     public_message = "No fue posible procesar el mensaje recibido."
+
+    def __init__(
+        self,
+        internal_detail: str | None = None,
+        *,
+        source_error_code: str | None = None,
+        provider_code: int | None = None,
+        provider_subcode: int | None = None,
+    ) -> None:
+        super().__init__(internal_detail)
+        self.source_error_code = source_error_code
+        self.provider_code = provider_code
+        self.provider_subcode = provider_subcode
 
 
 class IdempotencyStoreError(ServiceUnavailableError):

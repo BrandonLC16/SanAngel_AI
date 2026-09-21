@@ -42,7 +42,7 @@ class FakeWhatsAppSender:
         self.calls.append((recipient, text, preview_url))
         if self.error is not None:
             raise self.error
-        return "wamid.test-only-outbound-message-id"
+        return "3EB0C767D097B7C7C030"
 
 
 class ContextualFakeWhatsAppSender(FakeWhatsAppSender):
@@ -62,8 +62,8 @@ class ContextualFakeWhatsAppSender(FakeWhatsAppSender):
 
 def inbound_message(*, text: str = "Hola") -> InboundMessage:
     return InboundMessage(
-        external_message_id="wamid.test-only-inbound-message-id",
-        sender_id="5215550000001",
+        external_message_id="F7AEC1B7086ECDC7E6E45923F5EDB825",
+        sender_id="5215550000001@c.us",
         text=text,
         timestamp=1720000000,
     )
@@ -82,7 +82,7 @@ def test_process_message_connects_normalized_input_answer_and_sender() -> None:
 
     assert result is True
     assert chat_service.messages == ["Pregunta"]
-    assert whatsapp_client.calls == [("5215550000001", "Respuesta del chatbot", False)]
+    assert whatsapp_client.calls == [("5215550000001@c.us", "Respuesta del chatbot", False)]
 
 
 def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
@@ -90,8 +90,8 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
 ) -> None:
     settings = Settings(
         openai_api_key="test-only-openai-credential-placeholder",
-        whatsapp_access_token="test-only-whatsapp-access-token-placeholder",
-        whatsapp_phone_number_id="100000000000001",
+        green_api_instance_id="1100000001",
+        green_api_token_instance="test-only-green-api-token-placeholder",
         _env_file=None,
     )
     chat_service = FakeChatResponder(answer="Respuesta conectada")
@@ -119,7 +119,7 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
     assert whatsapp_client.entered is True
     assert whatsapp_client.closed is True
     assert chat_service.messages == ["Pregunta conectada"]
-    assert whatsapp_client.calls == [("5215550000001", "Respuesta conectada", False)]
+    assert whatsapp_client.calls == [("5215550000001@c.us", "Respuesta conectada", False)]
 
 
 def test_chat_failure_is_mapped_and_prevents_outbound_send() -> None:
@@ -136,7 +136,10 @@ def test_chat_failure_is_mapped_and_prevents_outbound_send() -> None:
     assert private_detail not in str(exc_info.value)
     assert "texto privado" not in str(exc_info.value)
     assert exc_info.value.__cause__ is None
-    assert asyncio.run(idempotency_store.claim("whatsapp:wamid.test-only-inbound-message-id"))
+    assert exc_info.value.source_error_code == "ai_service_unavailable"
+    assert exc_info.value.provider_code is None
+    assert exc_info.value.provider_subcode is None
+    assert asyncio.run(idempotency_store.claim("whatsapp:F7AEC1B7086ECDC7E6E45923F5EDB825"))
 
 
 def test_outbound_failure_is_mapped_without_message_or_recipient_detail() -> None:
@@ -150,11 +153,14 @@ def test_outbound_failure_is_mapped_without_message_or_recipient_detail() -> Non
         asyncio.run(orchestrator.process_message(inbound_message(text="texto privado")))
 
     assert private_detail not in str(exc_info.value)
-    assert "5215550000001" not in str(exc_info.value)
+    assert "5215550000001@c.us" not in str(exc_info.value)
     assert "texto privado" not in str(exc_info.value)
     assert "respuesta privada" not in str(exc_info.value)
     assert exc_info.value.__cause__ is None
-    assert asyncio.run(idempotency_store.claim("whatsapp:wamid.test-only-inbound-message-id"))
+    assert exc_info.value.source_error_code == "whatsapp_service_unavailable"
+    assert exc_info.value.provider_code is None
+    assert exc_info.value.provider_subcode is None
+    assert asyncio.run(idempotency_store.claim("whatsapp:F7AEC1B7086ECDC7E6E45923F5EDB825"))
 
 
 def test_duplicate_message_id_does_not_generate_a_second_answer_or_send() -> None:
@@ -176,4 +182,4 @@ def test_duplicate_message_id_does_not_generate_a_second_answer_or_send() -> Non
 
     assert results == (True, False)
     assert chat_service.messages == ["Pregunta repetida"]
-    assert whatsapp_client.calls == [("5215550000001", "Respuesta única", False)]
+    assert whatsapp_client.calls == [("5215550000001@c.us", "Respuesta única", False)]

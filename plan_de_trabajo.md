@@ -1,11 +1,11 @@
 # plan_de_trabajo.md
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
-**Última actualización:** 2026-08-27
+**Última actualización:** 2026-09-21
 **Fase activa:** Fase 2
-**Subfase siguiente:** F2.9 — Prueba real en entorno de Meta (no iniciada)
-**Estado global:** 🟨 EN DESARROLLO — Fase 2 iniciada
-**Canal principal del cliente:** WhatsApp Business Platform / Cloud API  
+**Subfase activa:** ninguna; F2.10 permanece ⬜ PENDIENTE
+**Estado global:** 🟨 EN DESARROLLO — F2.9 completada; F2.10 pendiente
+**Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
 > Este archivo es el checkpoint oficial. Codex debe actualizarlo después de cada avance relevante.
@@ -55,7 +55,7 @@ CLIENTE
 WhatsApp
    |
    v
-Meta Cloud API
+GreenAPI
    |
    v
 Webhook FastAPI
@@ -622,7 +622,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```
 
 
-# 6. FASE 2 — WhatsApp Cloud API — interfaz del cliente
+# 6. FASE 2 — WhatsApp mediante GreenAPI — interfaz del cliente
 
 **Objetivo:** Recibir mensajes de WhatsApp mediante webhook, procesarlos con el núcleo de chat y responder por WhatsApp de forma segura.
 
@@ -631,6 +631,10 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Fecha de inicio:** 2026-08-26
 
 **Documento guía:** `docs/fase_2_whatsapp.md`
+
+> Registro preservado: F2.1-F2.8 documentan la implementación original con Meta y mantienen su
+> estado histórico. El reemplazo del proveedor se autorizó y se implementa dentro de F2.9 sin
+> renumerar, reabrir ni borrar las fases ya establecidas; se conservan sus contratos internos.
 
 
 ## F2.1 — Configuración Meta/WhatsApp
@@ -1027,35 +1031,199 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```
 
 
-## F2.9 — Prueba real en entorno de Meta
+## F2.9 — Migración y prueba real con GreenAPI
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-08-27
+
+**Fecha de finalización:** 2026-09-21
 
 
 ### Alcance
 
-- [ ] configurar aplicación/número de prueba.
+- [x] preservar el registro y los contratos internos de F2.1-F2.8.
 
-- [ ] URL HTTPS accesible.
+- [x] reemplazar configuración, webhook, schemas y cliente de Meta por GreenAPI.
 
-- [ ] suscribir webhook.
+- [x] actualizar pruebas y documentación sin llamadas externas.
 
-- [ ] enviar mensaje real.
+- [x] conservar como evidencia histórica la configuración, túnel, suscripción y envío realizados
+  anteriormente con Meta.
 
-- [ ] recibir respuesta.
+- [x] configurar una instancia real, tokens y webhook de GreenAPI.
+
+- [x] enviar un mensaje real y recibir la respuesta mediante GreenAPI.
 
 
 ### Criterios de aceptación
 
-- [ ] WhatsApp -> backend -> OpenAI -> WhatsApp funciona.
+- [x] WhatsApp -> backend -> OpenAI -> WhatsApp funciona.
 
 
 ### Seguridad
 
-- [ ] tokens solo locales/secrets.
+- [x] tokens solo locales/secrets.
 
-- [ ] no pegar payloads sensibles completos en documentos.
+- [x] no pegar payloads sensibles completos en documentos.
 
+- [x] restringir el host configurable y evitar que el token incluido en la URL de GreenAPI llegue
+  a logs o errores.
+
+
+### Checkpoint histórico de Meta — 2026-08-27
+
+**Estado de la subfase:** `🟨 EN_PROGRESO`.
+
+Completado en esta sesión:
+
+- aplicación, número de prueba y WABA ID configurados localmente;
+- `cloudflared` 2026.8.2 instalado;
+- Quick Tunnel temporal levantado y salud pública comprobada con HTTP 200;
+- handshake de Meta comprobado con HTTP 200 y devolución exacta del challenge;
+- identificador del número validado inicialmente mediante Graph API con HTTP 200;
+- usuario confirmó el envío de un mensaje real desde el WhatsApp registrado;
+- secretos conservados únicamente en `.env`; no se documentaron números, tokens ni
+  payloads;
+- Uvicorn ejecutado sin access log y logs temporales anteriores eliminados para evitar
+  registrar el verify token de la query.
+
+Comandos y resultados relevantes:
+
+- `.venv\Scripts\python.exe -m pytest` -> 165 passed;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 48 archivos formateados;
+- prueba pública del handshake -> HTTP 200 y challenge coincidente;
+- dos monitores de eventos reales, de 58 y 30 segundos -> ningún POST recibido;
+- validación previa a `POST /{WABA-ID}/subscribed_apps` -> HTTP 401, `code=190`,
+  `subcode=463`; el access token temporal expiró y la suscripción no fue modificada.
+
+Archivos modificados:
+
+- `plan_de_trabajo.md` solamente;
+- `.env` contiene configuración local del usuario y permanece fuera de Git.
+
+Cierre seguro de la sesión:
+
+- backend local y Quick Tunnel temporal detenidos;
+- la URL `trycloudflare.com` usada en esta sesión ya no debe considerarse válida;
+- la próxima sesión debe generar una nueva URL y actualizar la callback de Meta.
+
+Falta para completar F2.9:
+
+- generar un nuevo `WHATSAPP_ACCESS_TOKEN` con `whatsapp_business_management` y
+  `whatsapp_business_messaging` y reemplazarlo solo en `.env`;
+- levantar un nuevo túnel temporal y actualizar/verificar su callback en Meta;
+- validar que la WABA contiene el número configurado;
+- ejecutar `POST /{WABA-ID}/subscribed_apps` y verificar la suscripción;
+- enviar otro mensaje real y comprobar POST autenticado, ACK 200, procesamiento OpenAI y
+  respuesta recibida en WhatsApp;
+- pasar F2.9 por `🧪 VALIDACION`, repetir validadores y solo entonces marcar
+  `✅ COMPLETADO` y agregar el historial de cierre.
+
+Siguiente paso exacto para la próxima sesión:
+
+1. leer `AGENTS.md`, `plan_de_trabajo.md` y `docs/fase_2_whatsapp.md`;
+2. confirmar que F2.9 sigue `🟨 EN_PROGRESO` y que F2.10 continúa pendiente;
+3. comprobar sin mostrar valores que el nuevo access token está en `.env`;
+4. retomar desde la validación segura de token/WABA y la suscripción a
+   `/{WABA-ID}/subscribed_apps`.
+
+
+### Avance histórico de Meta — 2026-09-21
+
+**Estado de la subfase:** `🟨 EN_PROGRESO`.
+
+Completado en esta sesión:
+
+- backend levantado nuevamente sin access log y salud local comprobada con HTTP 200;
+- nuevo Quick Tunnel temporal levantado, con registro DNS público y salud HTTPS comprobada con
+  HTTP 200;
+- handshake público comprobado con HTTP 200 y devolución exacta del challenge;
+- callback actualizada y verificada en Meta; el backend registró un nuevo `GET` del webhook con
+  HTTP 200;
+- el token local anterior fue rechazado por Meta con `code=190` porque pertenecía a una
+  aplicación eliminada; el usuario lo reemplazó directamente en `.env` sin compartirlo;
+- el token nuevo fue aceptado por Graph API y conserva los permisos
+  `whatsapp_business_management` y `whatsapp_business_messaging` en estado `granted`;
+- la WABA configurada fue validada y contiene exactamente el número configurado;
+- el número coincide con la configuración, usa `CLOUD_API`, conserva calidad `GREEN` y nombre
+  `AVAILABLE_WITHOUT_REVIEW`; Meta reporta `code_verification_status=NOT_VERIFIED` para este
+  número de prueba;
+- `POST /{WABA-ID}/subscribed_apps` respondió `success=true` y la lectura posterior confirmó al
+  menos una suscripción; el conteo pasó de una a dos aplicaciones suscritas;
+- backend y túnel permanecen activos para continuar la prueba real.
+
+Comandos y resultados relevantes:
+
+- `GET /health` local -> HTTP 200;
+- `GET /health` mediante el Quick Tunnel -> HTTP 200;
+- handshake público del webhook -> HTTP 200 y challenge coincidente;
+- `GET /me` -> token aceptado;
+- `GET /me/permissions` -> ambos permisos requeridos en estado `granted`;
+- consultas de WABA y número -> identificadores coincidentes y un único número asociado;
+- `POST /{WABA-ID}/subscribed_apps` -> `success=true`;
+- `GET /{WABA-ID}/subscribed_apps` -> dos aplicaciones suscritas;
+- revisión sanitizada del log -> sin errores HTTP ni errores de aplicación durante la
+  actualización; ningún body, token, número o payload fue registrado.
+
+Seguridad:
+
+- secretos conservados únicamente en `.env` y enviados a Graph API solo mediante
+  `Authorization: Bearer`;
+- ningún access token fue enviado en URL, impreso, copiado al plan o compartido en la
+  conversación;
+- el verify token no aparece en logs porque Uvicorn continúa sin access log y el middleware no
+  registra query strings;
+- no se documentaron IDs, números completos, nombres de negocio ni payloads de Meta.
+
+Falta para completar F2.9:
+
+- enviar un nuevo mensaje real al número de prueba;
+- comprobar POST autenticado, ACK HTTP 200, procesamiento OpenAI y respuesta recibida en
+  WhatsApp;
+- pasar F2.9 por `🧪 VALIDACION`, repetir validadores y solo entonces marcar
+  `✅ COMPLETADO`.
+
+### Migración a GreenAPI — 2026-09-21
+
+**Estado de la subfase:** `✅ COMPLETADO`.
+
+Cambio de proveedor autorizado por el usuario:
+
+- confirmada la viabilidad técnica con la documentación oficial de GreenAPI;
+- sustituidas las variables de Meta por ID de instancia, token de instancia, host API y token de
+  webhook de GreenAPI;
+- eliminado el handshake GET y reemplazada la firma HMAC de Meta por autenticación
+  `Authorization: Bearer` previa a la lectura del body;
+- adaptado el parser a `incomingMessageReceived`, `textMessage`, `extendedTextMessage` y
+  `quotedMessage`, validando que el evento pertenezca a la instancia configurada;
+- adaptado `WhatsAppClient` a `sendMessage`, conservando la interfaz usada por el orquestador;
+- mantenidos `InboundMessage`, `MessageOrchestrator`, idempotencia, `BackgroundTasks` y el
+  registro de fases ya establecido;
+- añadido allowlist HTTPS para hosts GreenAPI y supresión de logs informativos de `httpx` y
+  `httpcore`, ya que el protocolo del proveedor exige el token en el path;
+- actualizados tests, `.env.example`, README, guía técnica y reglas del repositorio;
+- actualizado el `.env` local: eliminadas las cinco entradas obsoletas de Meta y agregadas las
+  cuatro entradas GreenAPI; las credenciales reales se configuraron posteriormente sin
+  compartirlas ni versionarlas;
+- backend y túnel reiniciados posteriormente para cargar el código y entorno actuales.
+
+Validación automática:
+
+- suite completa -> 171 pruebas aprobadas sin red externa;
+- pruebas específicas cubren autenticación antes del body, payloads entrantes, envío saliente,
+  errores seguros, deduplicación y ausencia del token en logs;
+- validadores finales de lint, formato, dependencias y diff se registran en el historial de esta
+  migración.
+
+Cierre de la migración:
+
+- instancia autorizada, credenciales locales, host asignado y webhook configurados;
+- backend y endpoint HTTPS público verificados;
+- mensaje real procesado con ACK 200 y sin fallos de background;
+- respuesta final recibida en WhatsApp y confirmada por el usuario;
+- F2.9 pasó a `🧪 VALIDACION`; F2.10 permanece sin iniciar.
 
 ### Prompt para Codex
 
@@ -1063,9 +1231,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```text
 Lee AGENTS.md, plan_de_trabajo.md y docs/fase_2_whatsapp.md antes de modificar código.
 
-Trabaja únicamente en la subfase F2.9 — Prueba real en entorno de Meta. No inicies ninguna subfase posterior.
+Trabaja únicamente en la subfase F2.9 — Migración y prueba real con GreenAPI. No inicies ninguna subfase posterior.
 
-Alcance obligatorio: configurar aplicación/número de prueba; URL HTTPS accesible; suscribir webhook; enviar mensaje real; recibir respuesta.
+Alcance obligatorio: configurar instancia y tokens locales de GreenAPI; URL HTTPS accesible; registrar el webhook autenticado; enviar mensaje real; recibir respuesta.
 
 Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F2.9 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: WhatsApp -> backend -> OpenAI -> WhatsApp funciona. Revisa específicamente esta seguridad: tokens solo locales/secrets; no pegar payloads sensibles completos en documentos.
 
@@ -3841,13 +4009,13 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | logging sin secrets/PII | F1 | Sí | ✅ F1.4 |
 | CORS allowlist | F1 | Sí cuando haya navegador | ✅ F1.4 |
 | tests sin OpenAI real | F1 | Sí | ✅ F1.7 |
-| Meta tokens backend-only | F2 | Sí | ⬜ |
-| verificación GET webhook | F2 | Sí | ⬜ |
-| firma/autenticidad POST webhook | F2 | Sí | ⬜ |
-| raw body para firma | F2 | Sí | ⬜ |
+| tokens GreenAPI backend-only | F2 | Sí | ✅ F2.9 |
+| autenticación Bearer del webhook antes del body | F2 | Sí | ✅ F2.9 |
+| instancia del webhook validada | F2 | Sí | ✅ F2.9 |
+| host GreenAPI HTTPS en allowlist | F2 | Sí | ✅ F2.9 |
 | idempotencia de mensajes | F2/F7 | Sí | ⬜ |
-| Graph API timeout/retries acotados | F2 | Sí | ⬜ |
-| PII WhatsApp redactada en logs | F2 | Sí | ⬜ |
+| GreenAPI timeout/retries acotados | F2 | Sí | ✅ F2.9 |
+| PII WhatsApp redactada en logs | F2 | Sí | ✅ F2.9 |
 | SQLAlchemy/queries parametrizadas | F3 | Sí | ⬜ |
 | migraciones | F3 | Sí | ⬜ |
 | Decimal para dinero | F3 | Sí | ⬜ |
@@ -3926,15 +4094,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 2 — WhatsApp Cloud API (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna.
-**Última subfase completada:** F2.5 — WhatsAppClient para mensajes salientes.
-**Siguiente subfase:** F2.6 — Orquestación WhatsApp -> chatbot -> WhatsApp, pendiente de
-instrucción explícita.
-**WhatsApp:** configuración, handshake GET, autenticación del POST y parser completados; cliente
-Graph API completado; orquestación todavía no implementada.
+**Fase activa:** Fase 2 — WhatsApp mediante GreenAPI (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F2.10 permanece `⬜ PENDIENTE`.
+**Última subfase completada:** F2.9 — Migración y prueba real con GreenAPI.
+**Siguiente subfase:** F2.10 — Cierre Fase 2, pendiente y sin iniciar.
+**WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
+`sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
-No iniciar F2.6 automáticamente.
+No iniciar F2.10 automáticamente.
 
 ---
 
@@ -5465,6 +5632,245 @@ Siguiente:
 
 - F2.9 — Prueba real en entorno de Meta, sin iniciar hasta recibir instrucción explícita del
   usuario.
+
+---
+
+## 2026-09-21 — Migración del proveedor de WhatsApp a GreenAPI
+
+**Fase:** Fase 2
+**Tarea:** F2.9 — Migración y prueba real con GreenAPI
+**Estado:** 🧪 VALIDACION
+
+Cambios:
+
+- localizado el repositorio solicitado en `C:\Proyectos\SanAngel_AI` y preservados los cambios
+  existentes relacionados con diagnósticos numéricos seguros del proveedor;
+- verificada la viabilidad contra la documentación oficial vigente de GreenAPI;
+- migradas configuración, autenticación del webhook, schemas entrantes y envío saliente desde
+  Meta Cloud API a GreenAPI;
+- mantenidos los contratos `InboundMessage`, `WhatsAppClient`, `MessageOrchestrator`,
+  idempotencia y procesamiento en background;
+- conservados los estados e historial de F2.1-F2.8; el cambio de proveedor se registra en F2.9;
+- actualizadas pruebas, reglas del repositorio, ejemplo de entorno, README y diseño de Fase 2;
+- actualizado `.env` local sin mostrar valores: retiradas las entradas de Meta, agregados los
+  placeholders GreenAPI y preservada la configuración de OpenAI; no se detuvieron los procesos
+  locales existentes.
+
+Archivos:
+
+- `.env.example`
+- `AGENTS.md`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+- `backend/app/api/routes/whatsapp.py`
+- `backend/app/core/config.py`
+- `backend/app/core/exceptions.py`
+- `backend/app/schemas/whatsapp.py`
+- `backend/app/services/message_orchestrator.py`
+- `backend/app/services/whatsapp_background_processor.py`
+- `backend/app/services/whatsapp_client.py`
+- `backend/app/services/whatsapp_webhook_service.py`
+- pruebas relacionadas en `backend/tests/`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -q` -> 171 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 48 archivos con formato
+  correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores después de corregir un espacio final en este plan;
+- inspección sanitizada de `.env` -> una entrada por cada variable GreenAPI, tres credenciales aún
+  vacías, host default válido, cero entradas Meta y configuración OpenAI preservada;
+- carga de `Settings` con el `.env` actualizado -> correcta, sin imprimir secretos.
+
+Seguridad:
+
+- tokens GreenAPI protegidos con `SecretStr` y configuración ausente tratada con fallo cerrado;
+- token Bearer del webhook comparado en tiempo constante antes de leer el body;
+- `idInstance`, `chatId` y host HTTPS validados;
+- allowlist restringida a `green-api.com` y subdominios;
+- URL final de `sendMessage`, bodies, tokens, texto y destinatarios ausentes de errores/logs;
+- logs informativos de URL de `httpx` y `httpcore` deshabilitados debido al token obligatorio en
+  el path de GreenAPI;
+- pruebas reales no ejecutadas sin credenciales del usuario.
+
+Riesgos/Pendientes:
+
+- F2.9 no cumple todavía el criterio end-to-end y no se marca completada;
+- el `.env` local aún necesita valores reales para ID de instancia, token de instancia y token de
+  webhook; los procesos activos deben reiniciarse después para cargar configuración y código
+  actuales;
+- el token de instancia viaja en el path por diseño de GreenAPI; cualquier proxy externo también
+  debe evitar registrar URLs completas;
+- continúan las limitaciones conocidas de idempotencia en memoria y `BackgroundTasks` no durable.
+
+Siguiente:
+
+- continuar F2.9 con configuración local de una instancia GreenAPI, registro del webhook y prueba
+  real completa; no iniciar F2.10 automáticamente.
+
+---
+
+## 2026-09-21 — Preparación operativa del webhook GreenAPI
+
+**Fase:** Fase 2
+**Tarea:** F2.9 — Migración y prueba real con GreenAPI
+**Estado:** 🧪 VALIDACION
+
+Cambios:
+
+- cargadas de forma sanitizada las credenciales locales reales y confirmado que la instancia
+  GreenAPI está autorizada, sin imprimir ID, tokens ni URLs con secretos;
+- ampliada la validación numérica de `idInstance` hasta 20 dígitos en configuración, schema y
+  servicio de webhook para admitir el ID real de 12 dígitos;
+- ampliada la allowlist HTTPS para admitir tanto `green-api.com` como `greenapi.com` y sus
+  subdominios, incluido el host asignado por la consola de la instancia;
+- reiniciado el backend en `127.0.0.1:8000` y renovado el túnel HTTPS temporal de Cloudflare;
+- verificados el health check público y las respuestas 405/403/200 esperadas del webhook;
+- ejecutada la prueba real; el usuario confirmó la respuesta final en WhatsApp y F2.10 no fue
+  iniciada.
+
+Archivos:
+
+- `AGENTS.md`
+- `README.md`
+- `backend/app/core/config.py`
+- `backend/app/schemas/whatsapp.py`
+- `backend/app/services/whatsapp_webhook_service.py`
+- `backend/tests/test_config.py`
+- `backend/tests/test_whatsapp_webhook.py`
+- `backend/tests/test_whatsapp_webhook_service.py`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- prueba real sanitizada de `getStateInstance` -> HTTP 200 y estado `authorized`;
+- comprobación local de `GET /health` -> HTTP 200;
+- comprobación pública de `GET /health` a través del túnel -> HTTP 200;
+- comprobación pública de `GET /api/v1/whatsapp/webhook` -> HTTP 405;
+- comprobación pública de POST sin autenticación -> HTTP 403;
+- comprobación pública de POST autenticado con payload inocuo -> HTTP 200;
+- prueba real iniciada por el usuario -> notificación entrante aceptada con HTTP 200, un mensaje
+  procesado y `background_message_batch_completed message_count=1 failed_count=0`;
+- cuatro notificaciones posteriores de GreenAPI recibidas y confirmadas con HTTP 200, sin
+  inspeccionar ni almacenar sus payloads;
+- validación dirigida inicial -> 63 pruebas aprobadas; Ruff detectó finales de línea y se
+  normalizaron;
+- primera validación ampliada -> 112 pruebas aprobadas y 9 fallidas, lo que reveló el límite
+  antiguo de 10 dígitos en el schema; se corrigió antes del reinicio final;
+- segunda validación ampliada -> 121 pruebas aprobadas, lint y formato aprobados;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f29-runtime -o
+  cache_dir=.venv\pytest-cache-f29-runtime` -> 172 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 48 archivos con formato
+  correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas de conversión LF/CRLF.
+
+Seguridad:
+
+- la allowlist sigue exigiendo HTTPS, host exacto o subdominio y prohíbe credenciales, path,
+  query y fragmentos en `GREEN_API_API_URL`;
+- `idInstance` continúa limitado a dígitos, sin cero inicial y con longitud acotada;
+- los probes no mostraron tokens, números, bodies, mensajes ni URLs que contengan el token de
+  instancia;
+- el webhook rechazó solicitudes no autenticadas antes de procesar el body;
+- `.env` permaneció ignorado y no se copiaron credenciales a archivos versionados.
+
+Riesgos/Pendientes:
+
+- el túnel `trycloudflare.com` es temporal: su URL cambia si se reinicia `cloudflared` y no es
+  adecuado para producción;
+- la URL pública actual, el mismo `webhookUrlToken` local e `incomingWebhook=yes` quedaron
+  configurados en GreenAPI;
+- el recorrido WhatsApp -> GreenAPI -> webhook -> OpenAI -> GreenAPI -> WhatsApp fue confirmado
+  de extremo a extremo por el usuario;
+- continúan las limitaciones conocidas de idempotencia en memoria y `BackgroundTasks` no
+  durable.
+
+Siguiente:
+
+- ejecutar los validadores finales y cerrar F2.9; mantener F2.10 `⬜ PENDIENTE`.
+
+---
+
+## 2026-09-21 — Cierre de la migración y prueba real con GreenAPI
+
+**Fase:** Fase 2
+**Tarea:** F2.9 — Migración y prueba real con GreenAPI
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- sustituida la frontera de Meta por configuración, webhook autenticado, schemas y cliente
+  saliente de GreenAPI sin cambiar los contratos internos del chatbot;
+- admitidos el ID numérico y host HTTPS asignados por la instancia real, con longitud acotada y
+  allowlist de `green-api.com`, `greenapi.com` y sus subdominios;
+- configurados localmente instancia, token de instancia y token independiente del webhook sin
+  versionar ni mostrar sus valores;
+- publicado el webhook mediante un túnel HTTPS temporal y reiniciado el backend;
+- completado el recorrido WhatsApp -> GreenAPI -> webhook -> OpenAI -> GreenAPI -> WhatsApp;
+- confirmada por el usuario la recepción final de la respuesta;
+- F2.10 no fue iniciada.
+
+Archivos:
+
+- `.env.example`
+- `AGENTS.md`
+- `README.md`
+- `docs/fase_2_whatsapp.md`
+- `backend/app/api/routes/whatsapp.py`
+- `backend/app/core/config.py`
+- `backend/app/core/exceptions.py`
+- `backend/app/schemas/whatsapp.py`
+- `backend/app/services/message_orchestrator.py`
+- `backend/app/services/whatsapp_background_processor.py`
+- `backend/app/services/whatsapp_client.py`
+- `backend/app/services/whatsapp_webhook_service.py`
+- pruebas relacionadas en `backend/tests/`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- instancia real -> `getStateInstance` HTTP 200 y estado `authorized`;
+- health local y público -> HTTP 200;
+- webhook público -> GET HTTP 405, POST no autenticado HTTP 403 y POST autenticado HTTP 200;
+- mensaje real -> ACK HTTP 200, `message_count=1`, `failed_count=0` y respuesta recibida en
+  WhatsApp confirmada por el usuario;
+- cuatro notificaciones posteriores del proveedor -> HTTP 200 sin inspeccionar payloads;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f29-close -o
+  cache_dir=.venv\pytest-cache-f29-close` -> 172 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 48 archivos con formato
+  correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas de conversión LF/CRLF;
+- cierre operativo solicitado por el usuario -> procesos de Uvicorn y `cloudflared` detenidos,
+  puerto 8000 libre y URL temporal respondiendo HTTP 530.
+
+Seguridad:
+
+- credenciales conservadas en `.env` ignorado y representadas como `SecretStr`;
+- Bearer del webhook validado en tiempo constante antes de leer el body;
+- host restringido a HTTPS y allowlist, sin credenciales, path, query o fragmento configurable;
+- token exigido por GreenAPI en el path construido solo en backend y excluido de logs y errores;
+- no se conservaron payloads, mensajes, números, destinatarios, tokens ni respuestas completas;
+- pruebas normales ejecutadas sin red y con dobles de proveedores.
+
+Riesgos/Pendientes:
+
+- el túnel `trycloudflare.com` fue detenido y su URL ya no es válida; para otra prueba se debe
+  generar una URL nueva y actualizar `webhookUrl` en GreenAPI;
+- idempotencia continúa en memoria y no sirve para múltiples procesos/instancias;
+- `BackgroundTasks` no es una cola durable y puede perder trabajo si el proceso cae tras el ACK;
+- Fase 2 permanece abierta hasta ejecutar F2.10.
+
+Siguiente:
+
+- F2.10 — Cierre Fase 2, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
 
 ---
 

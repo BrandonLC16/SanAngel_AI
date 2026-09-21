@@ -4,9 +4,8 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SENSITIVE_ENV_NAMES = {
     "OPENAI_API_KEY",
-    "WHATSAPP_ACCESS_TOKEN",
-    "WHATSAPP_VERIFY_TOKEN",
-    "META_APP_SECRET",
+    "GREEN_API_TOKEN_INSTANCE",
+    "GREEN_API_WEBHOOK_TOKEN",
 }
 
 
@@ -29,7 +28,8 @@ def test_environment_example_keeps_all_secrets_empty() -> None:
 
     assert SENSITIVE_ENV_NAMES <= values.keys()
     assert all(values[name] == "" for name in SENSITIVE_ENV_NAMES)
-    assert values["WHATSAPP_PHONE_NUMBER_ID"] == ""
+    assert values["GREEN_API_INSTANCE_ID"] == ""
+    assert values["GREEN_API_API_URL"] == "https://api.green-api.com"
 
 
 def test_gitignore_protects_local_environment_without_hiding_example() -> None:
@@ -44,12 +44,12 @@ def test_gitignore_protects_local_environment_without_hiding_example() -> None:
     assert "!.env.example" in ignore_rules
 
 
-def test_graph_api_version_default_is_centralized_in_application_config() -> None:
-    version_pattern = re.compile(r"\bv[1-9][0-9]*\.0\b")
-    files_with_versions = {
+def test_green_api_host_default_is_centralized_in_application_config() -> None:
+    host_pattern = re.compile(r"https://api\.green-api\.com")
+    files_with_hosts = {
         path.relative_to(REPOSITORY_ROOT).as_posix()
         for path in (REPOSITORY_ROOT / "backend" / "app").rglob("*.py")
-        if version_pattern.search(path.read_text(encoding="utf-8"))
+        if host_pattern.search(path.read_text(encoding="utf-8"))
     }
 
-    assert files_with_versions == {"backend/app/core/config.py"}
+    assert files_with_hosts == {"backend/app/core/config.py"}

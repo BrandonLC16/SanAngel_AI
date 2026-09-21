@@ -37,9 +37,14 @@ class WhatsAppBackgroundProcessor:
                     except Exception as exc:
                         failed_count += 1
                         whatsapp_background_logger.error(
-                            "background_message_processing_failed request_id=%s error_category=%s",
+                            "background_message_processing_failed request_id=%s "
+                            "error_category=%s source_error_category=%s "
+                            "provider_code=%s provider_subcode=%s",
                             request_id,
                             self._error_category(exc),
+                            getattr(exc, "source_error_code", None) or "none",
+                            getattr(exc, "provider_code", None) or "none",
+                            getattr(exc, "provider_subcode", None) or "none",
                         )
         except asyncio.CancelledError:
             whatsapp_background_logger.warning(

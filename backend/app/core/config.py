@@ -7,7 +7,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 CorsOrigins = Annotated[tuple[str, ...], NoDecode]
-DEFAULT_META_GRAPH_API_VERSION = "v26.0"
+DEFAULT_GREEN_API_URL = "https://api.green-api.com"
 
 
 class HttpSettings(BaseSettings):
@@ -91,11 +91,10 @@ class Settings(HttpSettings):
 
     chat_max_message_chars: int = Field(default=2000, ge=1, le=10_000)
 
-    whatsapp_access_token: SecretStr | None = Field(default=None, repr=False)
-    whatsapp_phone_number_id: str | None = Field(default=None, repr=False)
-    whatsapp_verify_token: SecretStr | None = Field(default=None, repr=False)
-    meta_app_secret: SecretStr | None = Field(default=None, repr=False)
-    meta_graph_api_version: str = DEFAULT_META_GRAPH_API_VERSION
+    green_api_instance_id: str | None = Field(default=None, repr=False)
+    green_api_token_instance: SecretStr | None = Field(default=None, repr=False)
+    green_api_webhook_token: SecretStr | None = Field(default=None, repr=False)
+    green_api_api_url: str = DEFAULT_GREEN_API_URL
     whatsapp_request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
 
     @field_validator("openai_api_key")
@@ -116,9 +115,9 @@ class Settings(HttpSettings):
             raise ValueError("value must not be blank")
         return normalized
 
-    @field_validator("whatsapp_access_token", "whatsapp_verify_token", "meta_app_secret")
+    @field_validator("green_api_token_instance", "green_api_webhook_token")
     @classmethod
-    def validate_optional_whatsapp_secret(cls, value: SecretStr | None) -> SecretStr | None:
+    def validate_optional_provider_secret(cls, value: SecretStr | None) -> SecretStr | None:
         if value is None:
             return None
         secret = value.get_secret_value()
@@ -126,23 +125,57 @@ class Settings(HttpSettings):
             raise ValueError("configured secret must not be blank")
         if secret != secret.strip():
             raise ValueError("configured secret must not contain surrounding whitespace")
+        if "\r" in secret or "\n" in secret:
+            raise ValueError("configured secret must not contain line breaks")
         return value
 
-    @field_validator("whatsapp_phone_number_id")
+    @field_validator("green_api_token_instance")
     @classmethod
-    def validate_whatsapp_phone_number_id(cls, value: str | None) -> str | None:
+    def validate_green_api_token_instance(cls, value: SecretStr | None) -> SecretStr | None:
         if value is None:
             return None
-        if value != value.strip() or not re.fullmatch(r"[0-9]{1,64}", value):
-            raise ValueError("WHATSAPP_PHONE_NUMBER_ID must contain only digits")
+        if re.fullmatch(r"[A-Za-z0-9_-]{16,256}", value.get_secret_value()) is None:
+            raise ValueError("GREEN_API_TOKEN_INSTANCE has an invalid format")
         return value
 
-    @field_validator("meta_graph_api_version")
+    @field_validator("green_api_instance_id")
     @classmethod
-    def validate_meta_graph_api_version(cls, value: str) -> str:
-        if value != value.strip() or not re.fullmatch(r"v[1-9][0-9]*\.0", value):
-            raise ValueError("META_GRAPH_API_VERSION must use the vN.0 format")
+    def validate_green_api_instance_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value != value.strip() or not re.fullmatch(r"[1-9][0-9]{0,19}", value):
+            raise ValueError("GREEN_API_INSTANCE_ID must contain 1 to 20 digits")
         return value
+
+    @field_validator("green_api_api_url")
+    @classmethod
+    def validate_green_api_api_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed_url = urlsplit(normalized)
+
+        try:
+            parsed_url.port
+        except ValueError as exc:
+            raise ValueError("GREEN_API_API_URL must use a valid port") from exc
+
+        hostname = (parsed_url.hostname or "").lower()
+        if (
+            value != value.strip()
+            or parsed_url.scheme != "https"
+            or not hostname
+            or not any(
+                hostname == allowed_host or hostname.endswith(f".{allowed_host}")
+                for allowed_host in ("green-api.com", "greenapi.com")
+            )
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.path not in {"", "/"}
+            or parsed_url.query
+            or parsed_url.fragment
+        ):
+            raise ValueError("GREEN_API_API_URL must be an HTTPS GREEN-API host")
+
+        return normalized
 
 
 @lru_cache

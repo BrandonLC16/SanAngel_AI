@@ -18,9 +18,9 @@ from backend.app.core.exceptions import (
 )
 from backend.app.services.whatsapp_client import MAX_OUTBOUND_TEXT_CHARS, WhatsAppClient
 
-ACCESS_TOKEN_MARKER = "test-only-whatsapp-access-token-marker"
-PHONE_NUMBER_ID = "100000000000001"
-RECIPIENT = "5215550000001"
+TOKEN_INSTANCE_MARKER = "test-only-green-api-token-instance-marker"
+INSTANCE_ID = "1100000001"
+RECIPIENT = "5215550000001@c.us"
 
 Handler = Callable[[httpx.Request], httpx.Response | Awaitable[httpx.Response]]
 
@@ -28,9 +28,9 @@ Handler = Callable[[httpx.Request], httpx.Response | Awaitable[httpx.Response]]
 def make_settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
         "openai_api_key": "test-only-openai-credential-placeholder",
-        "whatsapp_access_token": ACCESS_TOKEN_MARKER,
-        "whatsapp_phone_number_id": PHONE_NUMBER_ID,
-        "meta_graph_api_version": "v25.0",
+        "green_api_instance_id": INSTANCE_ID,
+        "green_api_token_instance": TOKEN_INSTANCE_MARKER,
+        "green_api_api_url": "https://1100.api.green-api.com",
         "whatsapp_request_timeout_seconds": 17.5,
         "_env_file": None,
     }
@@ -53,42 +53,34 @@ def run_with_mock_transport(
     return asyncio.run(run())
 
 
-def test_send_text_uses_configured_url_header_timeout_and_official_payload() -> None:
+def test_send_text_uses_configured_url_timeout_and_green_api_payload() -> None:
     captured_request: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured_request.append(request)
-        return httpx.Response(
-            200,
-            json={
-                "messaging_product": "whatsapp",
-                "contacts": [{"input": RECIPIENT, "wa_id": RECIPIENT}],
-                "messages": [{"id": "wamid.test-only-outbound-message-id"}],
-            },
-        )
+        return httpx.Response(200, json={"idMessage": "3EB0C767D097B7C7C030"})
 
     message_id = run_with_mock_transport(
         handler,
         lambda client: client.send_text(RECIPIENT, "  Mensaje de prueba  ", preview_url=True),
     )
 
-    assert message_id == "wamid.test-only-outbound-message-id"
+    assert message_id == "3EB0C767D097B7C7C030"
     assert len(captured_request) == 1
     request = captured_request[0]
-    assert str(request.url) == ("https://graph.facebook.com/v25.0/100000000000001/messages")
+    assert str(request.url) == (
+        f"https://1100.api.green-api.com/waInstance1100000001/sendMessage/{TOKEN_INSTANCE_MARKER}"
+    )
     assert request.url.query == b""
-    assert request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN_MARKER}"
+    assert "Authorization" not in request.headers
     assert request.headers["Content-Type"] == "application/json"
     assert json.loads(request.content) == {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": RECIPIENT,
-        "type": "text",
-        "text": {"preview_url": True, "body": "Mensaje de prueba"},
+        "chatId": RECIPIENT,
+        "message": "Mensaje de prueba",
+        "linkPreview": True,
     }
     assert set(request.extensions["timeout"].values()) == {17.5}
-    assert ACCESS_TOKEN_MARKER not in str(request.url)
-    assert ACCESS_TOKEN_MARKER.encode() not in request.content
+    assert TOKEN_INSTANCE_MARKER.encode() not in request.content
 
 
 @pytest.mark.parametrize(
@@ -100,18 +92,47 @@ def test_send_text_uses_configured_url_header_timeout_and_official_payload() -> 
         (500, WhatsAppProviderStatusError),
     ),
 )
-def test_graph_api_status_errors_are_mapped(
+def test_green_api_status_errors_are_mapped(
     status_code: int,
     expected_error: type[Exception],
 ) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code, json={"error": {"message": "provider detail"}})
+        return httpx.Response(status_code, json={"code": status_code, "description": "private"})
 
     with pytest.raises(expected_error) as exc_info:
         run_with_mock_transport(handler, lambda client: client.send_text(RECIPIENT, "Hola"))
 
-    assert "provider detail" not in str(exc_info.value)
-    assert ACCESS_TOKEN_MARKER not in str(exc_info.value)
+    assert "private" not in str(exc_info.value)
+    assert TOKEN_INSTANCE_MARKER not in str(exc_info.value)
+
+
+def test_green_api_status_error_retains_only_numeric_diagnostics() -> None:
+    private_provider_detail = "test-only-private-provider-detail"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={"code": 403, "description": private_provider_detail},
+        )
+
+    with pytest.raises(WhatsAppProviderStatusError) as exc_info:
+        run_with_mock_transport(handler, lambda client: client.send_text(RECIPIENT, "Hola"))
+
+    assert exc_info.value.provider_code == 403
+    assert exc_info.value.provider_subcode is None
+    assert private_provider_detail not in str(exc_info.value)
+    assert TOKEN_INSTANCE_MARKER not in str(exc_info.value)
+
+
+def test_green_api_error_body_with_http_200_is_rejected() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"code": 401, "description": "private"})
+
+    with pytest.raises(WhatsAppProviderStatusError) as exc_info:
+        run_with_mock_transport(handler, lambda client: client.send_text(RECIPIENT, "Hola"))
+
+    assert exc_info.value.provider_code == 401
+    assert "private" not in str(exc_info.value)
 
 
 @pytest.mark.parametrize(
@@ -119,8 +140,8 @@ def test_graph_api_status_errors_are_mapped(
     (
         b"not-json",
         b"{}",
-        b'{"messages":[]}',
-        b'{"messages":[{}]}',
+        b'{"idMessage":""}',
+        b'{"idMessage":123}',
     ),
 )
 def test_invalid_success_response_is_mapped(response_content: bytes) -> None:
@@ -158,10 +179,11 @@ def test_transport_errors_are_mapped(
     (
         "",
         "12345",
-        "0123456789",
-        "+52 15550000001",
-        "5215550000001?token=unsafe",
-        "1" * 16,
+        "0123456789@c.us",
+        "+5215550000001@c.us",
+        "5215550000001",
+        "5215550000001@c.us?token=unsafe",
+        "not-a-chat@g.us",
     ),
 )
 def test_invalid_recipient_is_rejected_before_http(recipient: str) -> None:
@@ -190,36 +212,35 @@ def test_invalid_text_is_rejected_before_http(text: str) -> None:
 @pytest.mark.parametrize(
     "settings",
     (
-        make_settings(whatsapp_access_token=None),
-        make_settings(whatsapp_phone_number_id=None),
+        make_settings(green_api_instance_id=None),
+        make_settings(green_api_token_instance=None),
     ),
 )
 def test_missing_backend_configuration_fails_closed(settings: Settings) -> None:
     with pytest.raises(WhatsAppClientConfigurationError) as exc_info:
         WhatsAppClient(settings)
 
-    assert ACCESS_TOKEN_MARKER not in str(exc_info.value)
-    assert PHONE_NUMBER_ID not in str(exc_info.value)
+    assert TOKEN_INSTANCE_MARKER not in str(exc_info.value)
+    assert INSTANCE_ID not in str(exc_info.value)
 
 
 def test_provider_failure_does_not_log_or_expose_token_recipient_or_text(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    recipient_marker = "+5215550000001"
     text_marker = "test-only-private-outbound-text-marker"
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(500, json={"error": {"message": "private provider response"}})
+        return httpx.Response(500, json={"code": 500, "description": "private response"})
 
     with caplog.at_level(logging.DEBUG):
         with pytest.raises(WhatsAppProviderStatusError) as exc_info:
             run_with_mock_transport(
                 handler,
-                lambda client: client.send_text(recipient_marker, text_marker),
+                lambda client: client.send_text(RECIPIENT, text_marker),
             )
 
     rendered = f"{exc_info.value}\n{caplog.text}"
-    assert ACCESS_TOKEN_MARKER not in rendered
-    assert recipient_marker not in rendered
+    assert TOKEN_INSTANCE_MARKER not in rendered
+    assert RECIPIENT not in rendered
     assert text_marker not in rendered
-    assert "private provider response" not in rendered
+    assert "private response" not in rendered

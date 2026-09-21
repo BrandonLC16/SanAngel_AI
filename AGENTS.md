@@ -11,7 +11,7 @@ Construir un asistente automatizado de atención al cliente para una cadena de c
 
 ## Canal del cliente
 
-**WhatsApp Business Platform / Cloud API es la interfaz principal del cliente.**
+**WhatsApp mediante GreenAPI es la interfaz principal del cliente.**
 
 El cliente final NO utilizará directamente el endpoint interno de chat ni el panel administrativo.
 
@@ -24,7 +24,7 @@ Cliente
 WhatsApp
   |
   v
-Meta / WhatsApp Cloud API
+GreenAPI
   |
   | webhook HTTPS
   v
@@ -44,7 +44,7 @@ Responses API              |
 Respuesta
   |
   v
-WhatsApp Cloud API
+GreenAPI
   |
   v
 Cliente
@@ -115,9 +115,9 @@ Backend:
 
 Canal:
 
-- WhatsApp Business Platform / Cloud API de Meta.
+- GreenAPI como proveedor de WhatsApp.
 - Webhooks HTTPS.
-- Graph API para mensajes salientes.
+- API HTTP de GreenAPI para mensajes salientes.
 
 Persistencia:
 
@@ -342,16 +342,16 @@ Nunca:
 - incluir secretos en excepciones;
 - incluir secretos en screenshots;
 - colocar secretos en frontend;
-- colocar tokens en URLs;
+- colocar tokens en URLs salvo cuando el protocolo obligatorio del proveedor lo exija; en ese
+  caso la URL se construye solo en backend y se suprime de logs y errores;
 - registrar `Authorization`.
 
 Secretos previstos:
 
 ```text
 OPENAI_API_KEY
-WHATSAPP_ACCESS_TOKEN
-META_APP_SECRET
-WHATSAPP_VERIFY_TOKEN
+GREEN_API_TOKEN_INSTANCE
+GREEN_API_WEBHOOK_TOKEN
 ```
 
 Todos son backend-only.
@@ -379,38 +379,33 @@ Todos son backend-only.
 
 El webhook es una frontera pública y debe tratarse como input no confiable.
 
-### GET de verificación
-
-- comparar el token de verificación con configuración del servidor;
-- devolver solamente el challenge cuando la verificación sea válida;
-- no registrar el token;
-- preferir comparación segura cuando sea razonable.
-
 ### POST de eventos
 
 Antes de confiar en el payload:
 
-1. conservar el cuerpo HTTP crudo;
-2. validar la firma que corresponda a la configuración oficial vigente de Meta;
-3. solo después parsear/procesar el JSON;
+1. exigir exactamente un encabezado `Authorization` con el token configurado por el servidor;
+2. comparar en tiempo constante el valor `Bearer <GREEN_API_WEBHOOK_TOKEN>`;
+3. solo después leer y parsear/procesar el JSON;
 4. rechazar solicitudes no autenticadas;
-5. validar esquema;
+5. validar esquema e `idInstance` contra la instancia configurada;
 6. ignorar tipos de evento no utilizados.
 
-Cuando la integración use `X-Hub-Signature-256`, calcular el HMAC SHA-256 sobre el **raw body** con `META_APP_SECRET` y comparar de forma segura.
+El endpoint no tiene handshake GET: GreenAPI se configura con `webhookUrl`,
+`webhookUrlToken` e `incomingWebhook=yes`. La autenticación debe ocurrir antes de leer el body.
 
-Nunca "validar" el webhook solo porque conoce `WHATSAPP_VERIFY_TOKEN`; ese token corresponde al handshake de verificación, no reemplaza la autenticidad del POST.
-
-Antes de implementar o modificar este código, revisar la documentación oficial vigente de Meta.
+Antes de implementar o modificar este código, revisar la documentación oficial vigente de
+GreenAPI.
 
 ---
 
-## 10.4 WhatsApp — tokens y Graph API
+## 10.4 WhatsApp — tokens y API de GreenAPI
 
-- `WHATSAPP_ACCESS_TOKEN` solo backend.
-- `WHATSAPP_PHONE_NUMBER_ID` y versión de Graph API vienen de configuración.
-- no aceptar una URL de Graph API controlada por el usuario.
-- no interpolar números o IDs sin validación.
+- `GREEN_API_TOKEN_INSTANCE` y `GREEN_API_WEBHOOK_TOKEN` solo backend.
+- `GREEN_API_INSTANCE_ID` y `GREEN_API_API_URL` vienen de configuración.
+- aceptar como host API únicamente `green-api.com`, `greenapi.com` o sus subdominios HTTPS.
+- validar `idInstance` y `chatId` antes de interpolarlos o usarlos.
+- GreenAPI exige `apiTokenInstance` en el path: construirlo solo internamente, desactivar logs de
+  URL de `httpx`/`httpcore` y nunca incluir la URL final en errores.
 - usar timeout.
 - reintentos limitados solo para fallos apropiados.
 - nunca reintentar infinitamente.
@@ -615,9 +610,8 @@ Registrar solo lo necesario:
 No registrar por defecto:
 
 - OpenAI API key;
-- Meta token;
-- app secret;
-- verify token;
+- token de instancia de GreenAPI;
+- token del webhook de GreenAPI;
 - headers Authorization;
 - raw webhook body completo;
 - conversación completa;
@@ -648,7 +642,7 @@ Los tests comunes NO usan internet.
 Mockear:
 
 - OpenAI.
-- Graph API / WhatsApp.
+- API de GreenAPI / WhatsApp.
 - servicios externos.
 
 Antes de cerrar una subfase ejecutar según aplique:
@@ -661,7 +655,7 @@ ruff format --check .
 
 Si el proyecto incorpora otros validadores, ejecutarlos también.
 
-Pruebas reales contra OpenAI o Meta:
+Pruebas reales contra OpenAI o GreenAPI:
 
 - explícitas;
 - separadas;
@@ -720,7 +714,7 @@ No reescribir historial.
 
 # 18. Integraciones externas versionadas
 
-OpenAI y Meta pueden cambiar APIs, modelos y versiones.
+OpenAI y GreenAPI pueden cambiar APIs, modelos, hosts y formatos.
 
 Antes de implementar una integración:
 
@@ -730,7 +724,7 @@ Antes de implementar una integración:
 - aislar detalles del proveedor detrás de servicios;
 - documentar incompatibilidades.
 
-No hardcodear una versión de Graph API en múltiples archivos.
+No dispersar hosts ni rutas de GreenAPI en múltiples archivos.
 
 ---
 

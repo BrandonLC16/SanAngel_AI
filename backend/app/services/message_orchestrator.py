@@ -44,10 +44,15 @@ class MessageOrchestrator:
             await self._whatsapp_client.send_text(message.sender_id, answer)
             await self._idempotency_store.mark_processed(idempotency_key)
             return True
-        except ApplicationError:
+        except ApplicationError as exc:
             if claimed:
                 await self._idempotency_store.release(idempotency_key)
-            raise MessageProcessingError("inbound message flow failed") from None
+            raise MessageProcessingError(
+                "inbound message flow failed",
+                source_error_code=exc.error_code,
+                provider_code=getattr(exc, "provider_code", None),
+                provider_subcode=getattr(exc, "provider_subcode", None),
+            ) from None
         except BaseException:
             if claimed:
                 await self._idempotency_store.release(idempotency_key)

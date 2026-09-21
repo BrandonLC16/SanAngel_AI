@@ -1,67 +1,72 @@
+import re
+
 from pydantic import ValidationError
 
 from backend.app.schemas.whatsapp import (
+    GREEN_API_CHAT_ID_PATTERN,
     MAX_WHATSAPP_TEXT_CHARS,
+    GreenAPIMessageData,
+    GreenAPIWebhookPayload,
     InboundMessage,
-    WhatsAppMessagePayload,
-    WhatsAppWebhookPayload,
 )
+
+_GREEN_API_CHAT_ID = re.compile(GREEN_API_CHAT_ID_PATTERN)
+_SUPPORTED_TEXT_TYPES = {"textMessage", "extendedTextMessage", "quotedMessage"}
 
 
 class WhatsAppWebhookService:
-    """Validate authenticated Meta payloads and normalize supported text messages."""
+    """Validate authenticated GREEN-API payloads and normalize supported text messages."""
 
-    def __init__(self, *, max_text_chars: int) -> None:
+    def __init__(self, *, max_text_chars: int, expected_instance_id: str) -> None:
         if not 1 <= max_text_chars <= MAX_WHATSAPP_TEXT_CHARS:
             raise ValueError("max_text_chars is outside the supported range")
+        if re.fullmatch(r"[1-9][0-9]{0,19}", expected_instance_id) is None:
+            raise ValueError("expected_instance_id has an invalid format")
         self._max_text_chars = max_text_chars
+        self._expected_instance_id = int(expected_instance_id)
 
     def parse_messages(self, raw_body: bytes) -> tuple[InboundMessage, ...]:
         try:
-            payload = WhatsAppWebhookPayload.model_validate_json(raw_body)
+            payload = GreenAPIWebhookPayload.model_validate_json(raw_body)
         except ValidationError:
             return ()
 
-        if payload.object != "whatsapp_business_account":
+        if (
+            payload.webhook_type != "incomingMessageReceived"
+            or payload.instance_data.instance_type != "whatsapp"
+            or payload.instance_data.instance_id != self._expected_instance_id
+            or _GREEN_API_CHAT_ID.fullmatch(payload.sender_data.chat_id) is None
+        ):
             return ()
 
-        inbound_messages: list[InboundMessage] = []
-        for entry in payload.entry:
-            for change in entry.changes:
-                value = change.value
-                if (
-                    change.field != "messages"
-                    or value is None
-                    or value.messaging_product != "whatsapp"
-                ):
-                    continue
+        normalized_text = self._normalize_text(payload.message_data)
+        if normalized_text is None:
+            return ()
 
-                for message in value.messages:
-                    normalized_message = self._normalize_text_message(message)
-                    if normalized_message is not None:
-                        inbound_messages.append(normalized_message)
+        return (
+            InboundMessage(
+                external_message_id=payload.external_message_id,
+                sender_id=payload.sender_data.chat_id,
+                text=normalized_text,
+                timestamp=payload.timestamp,
+            ),
+        )
 
-        return tuple(inbound_messages)
-
-    def _normalize_text_message(
-        self,
-        message: WhatsAppMessagePayload,
-    ) -> InboundMessage | None:
-        if message.message_type != "text" or message.text is None:
+    def _normalize_text(self, message_data: GreenAPIMessageData) -> str | None:
+        if message_data.message_type not in _SUPPORTED_TEXT_TYPES:
             return None
 
-        raw_text = message.text.body
+        if message_data.message_type == "textMessage":
+            text_data = message_data.text_message_data
+        else:
+            text_data = message_data.extended_text_message_data
+
+        if text_data is None:
+            return None
+
+        raw_text = text_data.text
         if len(raw_text) > self._max_text_chars:
             return None
 
         normalized_text = raw_text.strip()
-        if not normalized_text:
-            return None
-
-        timestamp = int(message.timestamp) if message.timestamp is not None else None
-        return InboundMessage(
-            external_message_id=message.external_message_id,
-            sender_id=message.sender_id,
-            text=normalized_text,
-            timestamp=timestamp,
-        )
+        return normalized_text or None

@@ -1,39 +1,33 @@
-# Carniceria AI Chatbot
+# Carnicería AI Chatbot
 
-Backend en Python para un chatbot de atencion al cliente de una cadena de carnicerias.
-El proyecto se construye por fases para mantener los datos comerciales en fuentes
-deterministicas y evitar que el modelo invente precios, existencias, direcciones, horarios,
-promociones o pedidos.
+Backend en Python para la atención automatizada de clientes de una cadena de carnicerías por
+WhatsApp. Los datos comerciales se mantienen en fuentes determinísticas para que el modelo no
+invente precios, existencias, direcciones, horarios, promociones o pedidos.
 
 ## Estado actual
 
-La Fase 1 (F1.1-F1.9) esta completada. El repositorio cuenta con una aplicacion FastAPI,
-configuracion central validada, health check, errores HTTP seguros, request ID, logging minimo,
-CORS configurable y una integracion desacoplada con OpenAI Responses API. El endpoint interno
-de chat fue validado con pruebas sin red y con una llamada manual real.
+La Fase 1 (F1.1-F1.9) está completada. Incluye FastAPI, configuración validada, health check,
+errores HTTP seguros, request ID, logging mínimo, CORS explícito y una integración desacoplada con
+OpenAI Responses API.
 
-Fase 2 cuenta con la configuracion central de Meta/WhatsApp, el handshake GET, la autenticacion
-HMAC-SHA256 del webhook POST, el parser de mensajes de texto, un cliente saliente mockeable para
-Graph API, la orquestacion WhatsApp -> chatbot -> WhatsApp y una idempotencia minima en memoria.
-El webhook ya separa el ACK del procesamiento externo mediante una tarea local controlada.
+La Fase 2 conserva sus subfases y contratos internos, pero el proveedor de WhatsApp cambió de
+Meta Cloud API a GreenAPI dentro de F2.9. Ya están implementados y probados sin red:
 
-## Health check
+- autenticación del webhook de GreenAPI mediante un token Bearer;
+- normalización de mensajes de texto, texto extendido y texto citado;
+- cliente saliente de GreenAPI;
+- flujo WhatsApp -> chatbot -> WhatsApp;
+- idempotencia temporal en memoria;
+- ACK separado del procesamiento externo mediante `BackgroundTasks`.
 
-`GET /health` responde sin requerir credenciales de proveedor ni llamar a servicios externos:
+F2.9 está `✅ COMPLETADO`: la instancia real quedó autorizada, el webhook registrado y el
+recorrido WhatsApp -> GreenAPI -> backend -> OpenAI -> GreenAPI -> WhatsApp fue confirmado con un
+mensaje real. F2.10, cierre de la Fase 2, no ha sido iniciada.
 
-```json
-{
-  "status": "ok",
-  "service": "carniceria-ai-chatbot"
-}
-```
-
-## Requisitos
+## Requisitos y preparación local
 
 - Python 3.12, 3.13 o 3.14.
 - `pip` disponible mediante `python -m pip`.
-
-## Preparacion local
 
 En PowerShell:
 
@@ -45,188 +39,135 @@ python -m pip install -e ".[dev]"
 Copy-Item .env.example .env
 ```
 
-Completa `OPENAI_API_KEY` solamente en el archivo local `.env` cuando una tarea posterior
-requiera una prueba manual. Nunca guardes una clave real en archivos versionados.
+Completa las credenciales solamente en `.env`. Ese archivo está ignorado por Git; nunca guardes
+tokens reales en archivos versionados, comandos compartidos, logs o documentación.
 
-## Configuracion
+## Configuración
 
-`backend.app.core.config` es el unico punto de lectura de variables de entorno. `HttpSettings`
-carga al iniciar solo configuracion HTTP no sensible; `Settings` agrega la credencial y opciones
-de OpenAI cuando `OpenAIService` las solicita. Ninguno imprime secretos.
+`backend.app.core.config` es el único punto de lectura de variables de entorno. Las credenciales
+se representan con `SecretStr` y no aparecen en `repr`, serializaciones ni errores de validación.
 
-Valores y limites iniciales:
+Variables relevantes:
 
-- `OPENAI_API_KEY` es obligatoria y se mantiene como valor secreto;
-- `OPENAI_MODEL` es configurable y usa `gpt-5.6` por defecto;
-- `OPENAI_STORE_RESPONSES` usa `false` por defecto;
-- `OPENAI_TIMEOUT_SECONDS` acepta valores mayores a 0 y hasta 120 segundos;
-- `OPENAI_MAX_RETRIES` acepta de 0 a 5 y usa 2 por defecto;
-- `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN` y `META_APP_SECRET` son secretos opcionales
-  hasta habilitar los adaptadores que los consumen y se mantienen protegidos por `SecretStr`;
-- `WHATSAPP_PHONE_NUMBER_ID` es opcional y, cuando se configura, acepta solamente digitos;
-- `META_GRAPH_API_VERSION` es configurable y usa `v26.0` como version oficial vigente al
-  implementar F2.1;
-- `WHATSAPP_REQUEST_TIMEOUT_SECONDS` acepta valores mayores a 0 y hasta 120 segundos, con 15
-  segundos por defecto;
-- `CORS_ALLOWED_ORIGINS` acepta una lista separada por comas de origenes HTTP/HTTPS exactos;
-- `CHAT_MAX_MESSAGE_CHARS` acepta valores entre 1 y 10000, con 2000 por defecto.
+- `OPENAI_API_KEY`: clave backend-only para la prueba real del chatbot;
+- `OPENAI_MODEL`: modelo configurable, `gpt-5.6` por defecto;
+- `OPENAI_STORE_RESPONSES`: `false` por defecto;
+- `OPENAI_TIMEOUT_SECONDS`: mayor que 0 y hasta 120 segundos;
+- `OPENAI_MAX_RETRIES`: de 0 a 5, con 2 por defecto;
+- `GREEN_API_INSTANCE_ID`: identificador numérico de la instancia GreenAPI;
+- `GREEN_API_TOKEN_INSTANCE`: token secreto usado para enviar mensajes;
+- `GREEN_API_API_URL`: host HTTPS asignado a la instancia o
+  `https://api.green-api.com`; solo se aceptan `green-api.com`, `greenapi.com` y sus
+  subdominios;
+- `GREEN_API_WEBHOOK_TOKEN`: secreto independiente elegido para autenticar el webhook;
+- `WHATSAPP_REQUEST_TIMEOUT_SECONDS`: mayor que 0 y hasta 120 segundos, con 15 por defecto;
+- `CHAT_MAX_MESSAGE_CHARS`: entre 1 y 10000, con 2000 por defecto;
+- `CORS_ALLOWED_ORIGINS`: lista separada por comas de orígenes HTTP/HTTPS exactos.
 
-Si falta configuración obligatoria, la aplicación genera un error de validación sin incluir el
-valor de ninguna credencial.
+Si falta una credencial requerida por un adaptador, este falla de forma cerrada sin mostrar su
+valor. El health check continúa disponible sin credenciales:
 
-Sin `CORS_ALLOWED_ORIGINS`, el acceso desde navegador queda deshabilitado. Cada origen debe
-contener solo esquema, host y puerto opcional; no se permiten comodines, paths, credenciales,
-query strings ni duplicados. `.env.example` incluye exclusivamente los origenes locales de
-desarrollo.
-
-La version de Graph API vive en `Settings`; futuros clientes deben construir sus endpoints desde
-esa configuracion y no repetir una version hardcodeada. Antes de una prueba real o despliegue se
-debe confirmar que la version configurada continue soportada por Meta.
-
-## Handshake del webhook de WhatsApp
-
-`GET /api/v1/whatsapp/webhook` implementa la verificacion inicial solicitada por Meta. Requiere
-una unica instancia de `hub.mode=subscribe`, `hub.verify_token` y un `hub.challenge` decimal. Si
-el token coincide con `WHATSAPP_VERIFY_TOKEN`, responde como texto plano con solamente el
-challenge; solicitudes incorrectas reciben HTTP 403 sin cuerpo. Si el verify token no esta
-configurado, el endpoint falla de forma cerrada con HTTP 503 sin cuerpo.
-
-El token se compara de forma segura, no se refleja en respuestas y la aplicacion no registra el
-query string.
-
-El mismo path acepta POST y, antes de acceder a JSON, conserva los bytes exactos del body y valida
-`X-Hub-Signature-256` mediante HMAC-SHA256 con `META_APP_SECRET`. La firma debe usar el formato
-`sha256=<64 caracteres hexadecimales>` y se compara en tiempo constante. Una firma valida sin
-mensajes relevantes, o cuyo procesamiento termina correctamente, recibe HTTP 200 sin cuerpo;
-firmas ausentes, duplicadas, malformadas o incorrectas reciben HTTP 403 sin cuerpo. Si falta el
-App Secret, responde HTTP 503 sin cuerpo.
-
-Tras autenticarlo, el backend valida la estructura relevante mediante modelos Pydantic tolerantes
-a campos futuros. Los mensajes `type=text` se normalizan como `InboundMessage` interno con
-provider, message id, sender, texto y timestamp. El texto se recorta y se limita mediante
-`CHAT_MAX_MESSAGE_CHARS`; texto vacio o excesivo se ignora.
-
-Webhooks de estado, objetos/cambios ajenos, productos distintos de WhatsApp y tipos no soportados
-como imagen, audio, documento, ubicacion, contactos e interactivos se ignoran con ACK HTTP 200.
-JSON malformado o estructuras inesperadas tampoco generan HTTP 500.
-
-Cada `InboundMessage` de texto autenticado pasa a `MessageOrchestrator`, que solicita la respuesta
-al servicio de chat y pide su envio a `WhatsAppClient`. La ruta no conoce OpenAI ni Graph API y los
-adaptadores se construyen de forma perezosa, despues de verificar la firma. Un fallo operativo
-conocido durante el trabajo diferido se registra con categoria estable, sin texto, destinatario ni
-detalles del proveedor. Como el ACK ya fue enviado, esos fallos no intentan reemplazar la respuesta
-HTTP ni provocan reintentos automaticos.
-
-F2.7 reclama atomica y temporalmente cada `provider:external_message_id` antes de invocar el
-chatbot. Un ID ya reclamado o completado recibe ACK HTTP 200 sin generar otra respuesta. Si el
-procesamiento falla antes de completarse, la reserva se libera para permitir un reintento.
-
-La implementacion MVP `InMemoryIdempotencyStore` conserva como maximo 10000 IDs por proceso y
-desaloja primero el ID completado mas antiguo. Solo almacena IDs, no texto ni remitentes. No
-comparte estado entre procesos o instancias, pierde su contenido al reiniciar y puede volver a
-aceptar IDs antiguos despues del desalojo. No es apta para produccion: antes de desplegar debe
-reemplazarse por almacenamiento persistente y coordinado. El procesamiento y el ACK continuan
-separados mediante el mecanismo local descrito a continuacion.
-
-F2.8 usa una unica tarea `BackgroundTasks` de FastAPI por lote autenticado. La ruta conserva en el
-camino del ACK solamente lectura del raw body, firma HMAC, parsing y normalizacion; el chatbot y
-Graph API se ejecutan despues de enviar HTTP 200. El procesador abre y cierra sus adaptadores dentro
-de la tarea, maneja cada mensaje de forma independiente y continua el lote si uno falla.
-
-Los fallos de background se capturan y registran solo con request ID, categoria y conteos. Las
-cancelaciones se registran y se propagan; no se crean tareas sueltas con `asyncio.create_task` ni
-se realizan reintentos. Este mecanismo es un MVP en proceso, no una cola durable: una caida despues
-del ACK puede perder trabajo. Antes de produccion debe evaluarse una cola/worker persistente con
-apagado ordenado, metricas y recuperacion verificable.
-
-## Cliente saliente de WhatsApp
-
-`WhatsAppClient.send_text` envia mensajes mediante
-`https://graph.facebook.com/{META_GRAPH_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages`. La base
-de Graph API es fija y version, phone-number ID, timeout y access token proceden exclusivamente de
-`Settings`. El token se envia solo en `Authorization: Bearer`, nunca en URL o body.
-
-El payload declara producto WhatsApp, destinatario individual y tipo texto. Destinatarios deben
-usar formato internacional validado y el texto no puede estar vacio ni superar 4096 caracteres.
-Una respuesta valida devuelve el message ID asignado por Meta.
-
-El cliente usa `httpx` asincrono, acepta un transporte inyectado para pruebas y expone `aclose()` o
-context manager asincrono para cerrar el cliente propio. No sigue redirecciones ni realiza
-reintentos automaticos, evitando duplicados ante resultados ambiguos. Timeout, conexion, rate
-limit, estados HTTP y respuestas invalidas se convierten en excepciones internas sin incluir
-token, destinatario, texto o cuerpo del proveedor.
-
-## Servicio OpenAI
-
-`backend.app.services.openai_service.OpenAIService` encapsula el cliente asincrono oficial y
-expone una interfaz simple que puede recibir un cliente simulado. Cada solicitud usa Responses
-API con el modelo, timeout, reintentos acotados y opcion `store` provenientes de configuracion.
-El prompt provisional se versiona en `backend/app/prompts/base_system_prompt.txt`.
-
-Los errores de timeout, limite de solicitudes, conexion, estado HTTP y respuesta vacia se
-convierten a excepciones internas seguras. El servicio no registra el prompt, el mensaje ni la
-respuesta completos. La conexion desde una ruta HTTP se realiza mediante el servicio de
-aplicacion desacoplado.
-
-## Chat interno de desarrollo
-
-`POST /api/v1/chat` sirve exclusivamente para desarrollo, pruebas e integracion interna; no es
-el canal final del cliente y no debe exponerse como API publica en produccion.
-
-Request:
+```http
+GET /health
+```
 
 ```json
 {
-  "message": "Hola"
+  "status": "ok",
+  "service": "carniceria-ai-chatbot"
 }
 ```
 
-Response:
+## Webhook de GreenAPI
+
+GreenAPI debe apuntar `webhookUrl` a:
+
+```text
+https://<host-publico>/api/v1/whatsapp/webhook
+```
+
+En la configuración de la instancia se debe establecer:
+
+- `incomingWebhook=yes`;
+- `webhookUrlToken` con el mismo valor local de `GREEN_API_WEBHOOK_TOKEN`;
+- una URL HTTPS pública que reenvíe al backend.
+
+GreenAPI enviará `Authorization: Bearer <token>` en cada notificación. El backend exige una única
+cabecera válida, la compara en tiempo constante y lo hace antes de leer el body. `GET` no realiza
+un handshake y responde HTTP 405.
+
+Después de autenticarse, el payload se valida con modelos Pydantic tolerantes a campos futuros.
+Solo se procesan `incomingMessageReceived` de la instancia configurada y con estos tipos:
+
+- `textMessage`;
+- `extendedTextMessage`;
+- `quotedMessage` cuando contiene texto extendido.
+
+El mensaje se normaliza al contrato interno `InboundMessage`. Los demás eventos y tipos no
+soportados se ignoran con ACK HTTP 200. JSON malformado o una estructura inesperada tampoco
+provocan un HTTP 500.
+
+## Cliente saliente de GreenAPI
+
+`WhatsAppClient.send_text` conserva la interfaz usada por el orquestador y envía:
+
+```text
+POST {GREEN_API_API_URL}/waInstance{GREEN_API_INSTANCE_ID}/sendMessage/{GREEN_API_TOKEN_INSTANCE}
+```
+
+Payload:
 
 ```json
 {
-  "answer": "..."
+  "chatId": "5210000000000@c.us",
+  "message": "Texto de respuesta",
+  "linkPreview": false
 }
 ```
 
-El mensaje no puede estar vacio ni superar `CHAT_MAX_MESSAGE_CHARS`. Las solicitudes invalidas
-responden HTTP 422 sin devolver el contenido rechazado y los fallos del proveedor responden
-HTTP 503 con un mensaje publico estable.
+También se admiten identificadores de grupo con sufijo `@g.us`. El texto debe tener entre 1 y
+20000 caracteres. Una respuesta válida contiene `idMessage`.
 
-## Prueba manual local
+GreenAPI exige el token de instancia en el path. Por ello la URL se construye exclusivamente
+dentro del backend, los logs de URL de `httpx` y `httpcore` se elevan a nivel `WARNING`, y ninguna
+excepción incluye la URL, el token, el destinatario, el texto ni el body del proveedor. El cliente
+no sigue redirecciones ni reintenta automáticamente, lo que evita duplicar mensajes tras un
+resultado ambiguo.
 
-Guarda `OPENAI_API_KEY` solamente en `.env` o en el entorno del proceso local. No escribas la
-clave en comandos compartidos, logs, documentación ni evidencias. Inicia el backend:
+## Flujo e idempotencia
+
+Cada mensaje aceptado pasa a `MessageOrchestrator`, que consulta el servicio de chat y envía la
+respuesta con `WhatsAppClient`. La ruta no conoce OpenAI ni detalles del envío de GreenAPI.
+
+F2.7 reclama temporal y atómicamente `provider:external_message_id` antes de invocar el chatbot.
+Un ID ya reclamado o completado recibe ACK sin otra respuesta. La implementación
+`InMemoryIdempotencyStore` guarda como máximo 10000 IDs por proceso y no almacena texto ni
+remitentes.
+
+Esta idempotencia no es apta para producción: se pierde al reiniciar, no se comparte entre
+procesos y puede volver a aceptar IDs desalojados. Debe sustituirse por almacenamiento persistente
+y coordinado antes del despliegue.
+
+F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
+ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
+reintentos automáticos. Este mecanismo tampoco es una cola durable: una caída después del ACK
+puede perder trabajo.
+
+## Servicio OpenAI y chat interno
+
+`OpenAIService` encapsula el cliente asíncrono oficial de Responses API. El modelo, timeout,
+reintentos acotados y la opción `store` proceden de configuración. No registra prompts, mensajes
+ni respuestas completos.
+
+`POST /api/v1/chat` sirve solo para desarrollo, pruebas e integración interna; no es el canal
+público del cliente. Para una prueba local segura:
 
 ```powershell
 python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
-```
-
-En otra terminal ejecuta el probe seguro:
-
-```powershell
 python scripts/manual_chat_probe.py --expect success
 ```
 
-El probe solo acepta el endpoint loopback, no imprime la respuesta del modelo y reporta
-únicamente estado HTTP, presencia de request ID y longitud de la respuesta.
-
-La prueba exitosa requiere que `OPENAI_API_KEY` tenga un valor válido en un `.env` local. Si el
-archivo no existe, créalo a partir de `.env.example`; `.env` está ignorado y Codex no crea,
-solicita ni copia credenciales reales.
-Si el proveedor responde HTTP 429, revisa la cuota, facturación y límites del proyecto antes de
-repetir la prueba; el backend devolverá únicamente su error público HTTP 503.
-
-## Frontera HTTP
-
-- `X-Request-ID` se conserva si es valido o se genera de forma segura y se devuelve en la
-  respuesta;
-- las excepciones internas se convierten a un JSON estable con codigo publico y request ID;
-- los errores inesperados responden HTTP 500 sin traceback ni detalle interno;
-- los logs incluyen request ID, metodo, plantilla de endpoint, estado, duracion y categoria;
-- no se registran body, query string, headers ni `Authorization`.
-
-## Validaciones disponibles
+## Validaciones
 
 ```powershell
 pytest
@@ -235,31 +176,18 @@ ruff format --check .
 python -m pip check
 ```
 
-`pytest` activa una barrera global que rechaza resolución DNS y conexiones a direcciones no
-loopback. Las pruebas HTTP en proceso siguen funcionando y OpenAI se sustituye por dobles de
-prueba. Los valores que ocupan el lugar de credenciales son placeholders explícitos, nunca
-claves reales.
+Las pruebas automatizadas bloquean red externa y sustituyen OpenAI y GreenAPI por dobles locales.
+Los placeholders de prueba no son credenciales reales.
 
-## Estructura base
+## Seguridad y límites conocidos
 
-```text
-backend/
-  app/
-    api/routes/
-    core/
-    prompts/
-    schemas/
-    services/
-  tests/
-docs/
-```
-
-Consulta `docs/fase_1_diseno.md` para el diseño de la fase activa y
-`plan_de_trabajo.md` para el estado oficial de cada tarea.
-
-## Seguridad
-
-- La API key de OpenAI es utilizada solo por el backend y se carga desde el entorno.
 - `.env` y sus variantes locales están ignorados; `.env.example` no contiene secretos.
-- Las pruebas automatizadas normales no deben invocar servicios externos ni consumir créditos.
-- CORS utiliza origenes explicitos y no permite `*`, incluso fuera de produccion.
+- No se registran bodies, query strings, `Authorization`, textos completos ni identificadores de
+  WhatsApp sin redactar.
+- La URL configurable de GreenAPI tiene allowlist HTTPS para reducir riesgo SSRF.
+- El token del webhook es independiente del token de instancia.
+- CORS usa orígenes explícitos y nunca `*`.
+- Antes de producción faltan idempotencia persistente, una cola durable y el cierre formal F2.10.
+
+Consulta `docs/fase_2_whatsapp.md` para el diseño vigente y `plan_de_trabajo.md` para el registro
+oficial, incluyendo el historial preservado de Meta y la migración a GreenAPI.
