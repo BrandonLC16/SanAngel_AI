@@ -66,7 +66,8 @@ Reglas:
 
 - `GREEN_API_INSTANCE_ID` contiene de 1 a 20 dígitos y no empieza con cero;
 - `GREEN_API_TOKEN_INSTANCE` es `SecretStr` y acepta únicamente caracteres seguros para path;
-- `GREEN_API_WEBHOOK_TOKEN` es `SecretStr`, se compara de forma exacta y nunca se registra;
+- `GREEN_API_WEBHOOK_TOKEN` es un valor independiente, aleatorio y URL-safe de 32 a 256
+  caracteres; se representa con `SecretStr`, se compara de forma exacta y nunca se registra;
 - `GREEN_API_API_URL` exige HTTPS, sin credenciales, path, query o fragment;
 - el host debe ser `green-api.com`, `greenapi.com` o uno de sus subdominios, incluido el host
   asignado a la instancia;
@@ -303,3 +304,25 @@ El 2026-09-21 se verificó el health público, la autenticación del webhook, el
 procesamiento de un mensaje sin fallos, la aceptación de `SendMessage` y la recepción final de la
 respuesta confirmada por el usuario. La evidencia conservada contiene solo estados y conteos
 seguros; no incluye texto, números, IDs externos, tokens o payloads.
+
+## 13. Cierre de Fase 2 — F2.10
+
+F2.10 y la Fase 2 están `✅ COMPLETADO`. El cierre comprobó que:
+
+- F2.1-F2.9 están completadas y el flujo real fue confirmado;
+- la suite automatizada bloquea red y usa dobles de OpenAI y GreenAPI;
+- `.env` permanece ignorado y `.env.example` conserva secretos vacíos;
+- `GREEN_API_WEBHOOK_TOKEN` exige entre 32 y 256 caracteres URL-safe;
+- README y este diseño permiten reproducir la configuración sin incluir credenciales;
+- el backend y el túnel temporal permanecen detenidos al cierre.
+
+La Fase 2 completa el MVP del canal, pero no declara el sistema apto para producción. Persisten
+estos riesgos conocidos:
+
+- la idempotencia vive en memoria y no coordina procesos o instancias;
+- `BackgroundTasks` no es durable y puede perder trabajo después del ACK;
+- falta un endpoint HTTPS estable; la URL temporal de F2.9 ya no es válida;
+- faltan rate limiting, secret manager, rotación operativa, observabilidad y controles de
+  despliegue previstos en fases posteriores;
+- el token local corto utilizado para la prueba debe rotarse tanto en `.env` como en GreenAPI
+  antes del próximo arranque; la aplicación falla de forma cerrada mientras no cumpla el formato.

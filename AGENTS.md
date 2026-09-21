@@ -401,6 +401,8 @@ GreenAPI.
 ## 10.4 WhatsApp — tokens y API de GreenAPI
 
 - `GREEN_API_TOKEN_INSTANCE` y `GREEN_API_WEBHOOK_TOKEN` solo backend.
+- `GREEN_API_WEBHOOK_TOKEN` debe ser independiente, aleatorio, URL-safe y tener entre 32 y 256
+  caracteres.
 - `GREEN_API_INSTANCE_ID` y `GREEN_API_API_URL` vienen de configuración.
 - aceptar como host API únicamente `green-api.com`, `greenapi.com` o sus subdominios HTTPS.
 - validar `idInstance` y `chatId` antes de interpolarlos o usarlos.

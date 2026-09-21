@@ -2,9 +2,9 @@
 ## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
 
 **Última actualización:** 2026-09-21
-**Fase activa:** Fase 2
-**Subfase activa:** ninguna; F2.10 permanece ⬜ PENDIENTE
-**Estado global:** 🟨 EN DESARROLLO — F2.9 completada; F2.10 pendiente
+**Fase activa:** ninguna; Fase 2 completada
+**Subfase activa:** ninguna; F3.1 permanece ⬜ PENDIENTE
+**Estado global:** 🟨 EN DESARROLLO — Fase 2 completada; Fase 3 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -626,9 +626,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Recibir mensajes de WhatsApp mediante webhook, procesarlos con el núcleo de chat y responder por WhatsApp de forma segura.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 
 **Fecha de inicio:** 2026-08-26
+
+**Fecha de finalización:** 2026-09-21
 
 **Documento guía:** `docs/fase_2_whatsapp.md`
 
@@ -1243,28 +1245,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F2.10 — Cierre Fase 2
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-21
+
+**Fecha de finalización:** 2026-09-21
 
 
 ### Alcance
 
-- [ ] pruebas.
+- [x] pruebas.
 
-- [ ] documentación.
+- [x] documentación.
 
-- [ ] revisión seguridad.
+- [x] revisión seguridad.
 
-- [ ] actualizar plan.
+- [x] actualizar plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 2 completa y reproducible.
+- [x] Fase 2 completa y reproducible.
 
 
 ### Seguridad
 
-- [ ] no declarar producción-ready todavía.
+- [x] no declarar producción-ready todavía.
 
 
 ### Prompt para Codex
@@ -4016,6 +4022,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | idempotencia de mensajes | F2/F7 | Sí | ⬜ |
 | GreenAPI timeout/retries acotados | F2 | Sí | ✅ F2.9 |
 | PII WhatsApp redactada en logs | F2 | Sí | ✅ F2.9 |
+| token webhook fuerte y acotado | F2 | Sí | ✅ F2.10 |
 | SQLAlchemy/queries parametrizadas | F3 | Sí | ⬜ |
 | migraciones | F3 | Sí | ⬜ |
 | Decimal para dinero | F3 | Sí | ⬜ |
@@ -4094,14 +4101,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 2 — WhatsApp mediante GreenAPI (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F2.10 permanece `⬜ PENDIENTE`.
-**Última subfase completada:** F2.9 — Migración y prueba real con GreenAPI.
-**Siguiente subfase:** F2.10 — Cierre Fase 2, pendiente y sin iniciar.
+**Fase activa:** ninguna; Fase 2 — WhatsApp mediante GreenAPI está `✅ COMPLETADO`.
+**Subfase activa:** ninguna; F3.1 permanece `⬜ PENDIENTE`.
+**Última subfase completada:** F2.10 — Cierre Fase 2.
+**Siguiente subfase:** F3.1 — SQLAlchemy + Alembic + SQLite, pendiente y sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
-No iniciar F2.10 automáticamente.
+No iniciar Fase 3 automáticamente.
 
 ---
 
@@ -5871,6 +5878,80 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F2.10 — Cierre Fase 2, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
+
+---
+
+## 2026-09-21 — Cierre de Fase 2
+
+**Fase:** Fase 2 — WhatsApp mediante GreenAPI
+**Tarea:** F2.10 — Cierre Fase 2
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- verificados F2.1-F2.10, incluido el recorrido real completado en F2.9;
+- reforzado `GREEN_API_WEBHOOK_TOKEN` con formato URL-safe y longitud de 32 a 256 caracteres;
+- aislada una prueba de caché de configuración respecto del `.env` local;
+- documentada la generación y rotación segura del token del webhook;
+- actualizado `.env.example` sin agregar valores sensibles;
+- documentado que el MVP de Fase 2 no es production-ready;
+- mantenidos backend y túnel detenidos;
+- Fase 3 no fue iniciada.
+
+Archivos:
+
+- `.env.example`
+- `AGENTS.md`
+- `README.md`
+- `backend/app/core/config.py`
+- `backend/tests/test_config.py`
+- `docs/fase_2_whatsapp.md`
+- `plan_de_trabajo.md`
+
+Validación:
+
+- validación base previa al refuerzo -> 172 pruebas aprobadas, lint/formato aprobados,
+  dependencias consistentes y diff sin errores;
+- primera validación dirigida del token -> 61 pruebas aprobadas y 1 fallida porque una prueba de
+  caché heredaba el `.env` real; la prueba se aisló con un marcador seguro;
+- segunda validación dirigida -> 62 pruebas aprobadas, lint y formato aprobados;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f210-final -o
+  cache_dir=.venv\pytest-cache-f210-final` -> 175 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 48 archivos con formato
+  correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas de conversión LF/CRLF;
+- `git ls-files .env .env.example` y `git check-ignore -v .env` -> solo `.env.example` está
+  versionado y `.env` permanece ignorado;
+- escaneo exacto sanitizado de secretos fuertes -> cero coincidencias en archivos versionados y
+  logs de runtime;
+- inspección de procesos -> puerto 8000 libre y `cloudflared` detenido.
+
+Seguridad:
+
+- el token corto usado durante la prueba real no se mostró y ahora es rechazado por
+  configuración; el backend falla cerrado hasta rotarlo;
+- la rotación debe aplicar el mismo valor aleatorio nuevo en `.env` y `webhookUrlToken` de
+  GreenAPI antes del próximo arranque;
+- `.env.example` conserva vacíos todos los secretos;
+- no se registraron payloads, conversaciones, números, tokens ni URLs con credenciales;
+- se mantienen autenticación previa al body, comparación constante, validación de instancia,
+  allowlist HTTPS y errores seguros;
+- la documentación declara expresamente los controles pendientes antes de producción.
+
+Riesgos/Pendientes:
+
+- rotar `GREEN_API_WEBHOOK_TOKEN` localmente y en GreenAPI antes de reiniciar;
+- sustituir el túnel temporal por HTTPS estable antes de cualquier despliegue;
+- reemplazar idempotencia en memoria por persistencia coordinada;
+- reemplazar `BackgroundTasks` por procesamiento durable cuando el riesgo operativo lo exija;
+- completar rate limiting, secret manager, observabilidad, backups y demás controles de
+  producción en sus fases correspondientes.
+
+Siguiente:
+
+- F3.1 — SQLAlchemy + Alembic + SQLite, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
 
 ---
 

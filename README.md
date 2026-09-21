@@ -22,7 +22,7 @@ Meta Cloud API a GreenAPI dentro de F2.9. Ya están implementados y probados sin
 
 F2.9 está `✅ COMPLETADO`: la instancia real quedó autorizada, el webhook registrado y el
 recorrido WhatsApp -> GreenAPI -> backend -> OpenAI -> GreenAPI -> WhatsApp fue confirmado con un
-mensaje real. F2.10, cierre de la Fase 2, no ha sido iniciada.
+mensaje real. F2.10 y la Fase 2 están `✅ COMPLETADO`; Fase 3 no ha sido iniciada.
 
 ## Requisitos y preparación local
 
@@ -42,6 +42,17 @@ Copy-Item .env.example .env
 Completa las credenciales solamente en `.env`. Ese archivo está ignorado por Git; nunca guardes
 tokens reales en archivos versionados, comandos compartidos, logs o documentación.
 
+Genera un token independiente y URL-safe para el webhook; el siguiente comando produce un valor
+de 43 caracteres:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Copia el resultado directamente a `GREEN_API_WEBHOOK_TOKEN` y al `webhookUrlToken` de GreenAPI.
+No lo reutilices como token de instancia ni lo compartas. Un valor anterior de menos de 32
+caracteres debe rotarse antes del próximo arranque.
+
 ## Configuración
 
 `backend.app.core.config` es el único punto de lectura de variables de entorno. Las credenciales
@@ -59,7 +70,8 @@ Variables relevantes:
 - `GREEN_API_API_URL`: host HTTPS asignado a la instancia o
   `https://api.green-api.com`; solo se aceptan `green-api.com`, `greenapi.com` y sus
   subdominios;
-- `GREEN_API_WEBHOOK_TOKEN`: secreto independiente elegido para autenticar el webhook;
+- `GREEN_API_WEBHOOK_TOKEN`: secreto independiente, aleatorio y URL-safe de 32 a 256 caracteres
+  para autenticar el webhook;
 - `WHATSAPP_REQUEST_TIMEOUT_SECONDS`: mayor que 0 y hasta 120 segundos, con 15 por defecto;
 - `CHAT_MAX_MESSAGE_CHARS`: entre 1 y 10000, con 2000 por defecto;
 - `CORS_ALLOWED_ORIGINS`: lista separada por comas de orígenes HTTP/HTTPS exactos.
@@ -186,8 +198,14 @@ Los placeholders de prueba no son credenciales reales.
   WhatsApp sin redactar.
 - La URL configurable de GreenAPI tiene allowlist HTTPS para reducir riesgo SSRF.
 - El token del webhook es independiente del token de instancia.
+- Un token local que no cumpla la longitud y formato requeridos produce un fallo cerrado; se debe
+  rotar el mismo valor en `.env` y en `webhookUrlToken` de GreenAPI antes de reiniciar.
 - CORS usa orígenes explícitos y nunca `*`.
-- Antes de producción faltan idempotencia persistente, una cola durable y el cierre formal F2.10.
+- La Fase 2 valida el MVP y no declara el sistema production-ready. Antes de producción faltan,
+  entre otros controles, idempotencia persistente, cola durable, HTTPS estable, rate limiting,
+  secret manager, rotación operativa de secretos y observabilidad.
+- El backend y el túnel temporal están detenidos; la URL `trycloudflare.com` usada en F2.9 ya no
+  es válida.
 
 Consulta `docs/fase_2_whatsapp.md` para el diseño vigente y `plan_de_trabajo.md` para el registro
 oficial, incluyendo el historial preservado de Meta y la migración a GreenAPI.

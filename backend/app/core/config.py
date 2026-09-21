@@ -138,6 +138,15 @@ class Settings(HttpSettings):
             raise ValueError("GREEN_API_TOKEN_INSTANCE has an invalid format")
         return value
 
+    @field_validator("green_api_webhook_token")
+    @classmethod
+    def validate_green_api_webhook_token(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        if re.fullmatch(r"[A-Za-z0-9_-]{32,256}", value.get_secret_value()) is None:
+            raise ValueError("GREEN_API_WEBHOOK_TOKEN has an invalid format")
+        return value
+
     @field_validator("green_api_instance_id")
     @classmethod
     def validate_green_api_instance_id(cls, value: str | None) -> str | None:

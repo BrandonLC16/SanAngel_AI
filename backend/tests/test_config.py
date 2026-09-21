@@ -197,6 +197,9 @@ def test_settings_reject_unsafe_numeric_limits(field_name: str, invalid_value: i
         ("green_api_instance_id", " 1100000001 "),
         ("green_api_instance_id", "0"),
         ("green_api_instance_id", "1" * 21),
+        ("green_api_webhook_token", "x" * 31),
+        ("green_api_webhook_token", "x" * 257),
+        ("green_api_webhook_token", "x" * 31 + "!"),
         ("green_api_api_url", "http://api.green-api.com"),
         ("green_api_api_url", "https://example.com"),
         ("green_api_api_url", "https://api.green-api.com/private"),
@@ -220,6 +223,10 @@ def test_settings_reject_invalid_green_api_configuration(
 def test_get_settings_caches_validated_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", make_non_key_secret_marker())
     monkeypatch.setenv("OPENAI_MODEL", "first-model")
+    monkeypatch.setenv(
+        "GREEN_API_WEBHOOK_TOKEN",
+        "test-only-green-api-webhook-token",
+    )
     get_settings.cache_clear()
 
     try:
