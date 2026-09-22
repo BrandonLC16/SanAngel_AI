@@ -29,8 +29,9 @@ la entidad de sucursal, el alcance fijo por instalación y la carga idempotente 
 F3.3 está `✅ COMPLETADO`: implementa productos con categoría, estado activo, alcance obligatorio
 de sucursal y un repositorio de consulta determinista. F3.4 está `✅ COMPLETADO`: implementa
 precios exactos por sucursal, producto y unidad. F3.5 está `✅ COMPLETADO`: implementa servicios
-de consulta comercial de solo lectura con alcance de sucursal inyectado. F3.6 permanece sin
-iniciar.
+de consulta comercial de solo lectura con alcance de sucursal inyectado. F3.6 y la Fase 3 están
+`✅ COMPLETADO`: quedaron verificadas la integridad y reversibilidad de las migraciones y el
+procedimiento de respaldo previo a cambios productivos. La Fase 4 permanece sin iniciar.
 
 ## Modelo de los siete asistentes
 
@@ -156,6 +157,35 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
+Las pruebas de F3.6 crean una base vacía, recorren las cuatro revisiones y verifican que el
+esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
+la reversión de migraciones en una base temporal y el rollback completo de una transacción que
+viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
+en pruebas o tras un procedimiento de recuperación aprobado.
+
+### Respaldo previo a una migración productiva
+
+Antes de cualquier futura migración sobre una instalación con datos, detener webhooks, tareas y
+otras escrituras, confirmar el archivo SQLite de **esa** instalación y crear un respaldo nuevo en
+un directorio protegido fuera del repositorio. Por ejemplo, adaptando ambas rutas a la sucursal:
+
+```powershell
+$sourceDb = "C:\datos\sucursal-1.db"
+$backupDb = "D:\respaldos-protegidos\sucursal-1-$(Get-Date -Format yyyyMMdd-HHmmss).db"
+python -m scripts.backup_sqlite --source $sourceDb --destination $backupDb
+```
+
+El comando usa la API de respaldo de SQLite para incluir datos confirmados aun si existe un WAL,
+rechaza un origen inexistente y nunca reemplaza un respaldo previo. Exige que
+`PRAGMA integrity_check` devuelva `ok` antes de informar éxito. Si falla, no ejecutar la migración. Verificar
+además que el respaldo se puede abrir, que corresponde a la sucursal y que la recuperación funciona
+en una copia aislada; conservarlo con acceso restringido y según la política de retención antes de
+ejecutar `python -m alembic upgrade head`. Después comprobar `current`, `check` y lecturas de
+datos representativas antes de reanudar escrituras. Ante un fallo productivo, detener escrituras
+y recuperar el respaldo verificado mediante el procedimiento operativo; no usar `downgrade` como
+sustituto del respaldo. La automatización de respaldos y restauraciones periódicas pertenece a la
+preparación para producción.
+
 ## Catálogo de productos
 
 `ProductRepository` se construye con un objeto `Branch` persistido y no admite `branch_id` ni
@@ -165,8 +195,8 @@ productos activos de esa sucursal, ordenados de forma estable por categoría, no
 
 `ProductData` rechaza campos extra, nombres o categorías vacíos, texto compuesto solo por signos,
 caracteres de control y longitudes fuera de los límites. El repositorio de F3.3 es infraestructura
-interna; las tools y servicios de consulta para el chatbot se incorporarán en F3.5 sin exponer la
-sucursal como argumento.
+interna; los servicios de consulta de F3.5 usan el mismo alcance sin exponer la sucursal como
+argumento.
 
 ## Precios exactos por sucursal
 

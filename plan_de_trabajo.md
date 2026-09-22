@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-22
-**Fase activa:** Fase 3 — Persistencia comercial
-**Subfase activa:** ninguna; F3.6 permanece ⬜ PENDIENTE
-**Estado global:** 🟨 EN DESARROLLO — F3.5 completada; F3.6 pendiente
+**Fase activa:** ninguna; Fase 3 — Persistencia comercial (`✅ COMPLETADO`)
+**Subfase activa:** ninguna; F3.6 (`✅ COMPLETADO`)
+**Estado global:** ✅ COMPLETADO — Fase 3 cerrada; Fase 4 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1317,9 +1317,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Objetivo:** Crear SQLite como primera fuente de verdad para datos comerciales, aislados por la
 sucursal asignada a cada asistente.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 
 **Fecha de inicio:** 2026-09-21
+
+**Fecha de finalización:** 2026-09-22
 
 **Documento guía:** `plan_de_trabajo.md`
 
@@ -1598,30 +1600,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F3.6 — Integridad, migraciones y cierre
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-22
+
+**Fecha de validación:** 2026-09-22
+
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] probar migración desde cero.
+- [x] probar migración desde cero.
 
-- [ ] constraints.
+- [x] constraints.
 
-- [ ] rollback.
+- [x] rollback.
 
-- [ ] README.
+- [x] README.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 3 completa.
+- [x] Fase 3 completa.
 
 
 ### Seguridad
 
-- [ ] backup antes de futuras migraciones productivas.
+- [x] backup antes de futuras migraciones productivas.
 
 
 ### Prompt para Codex
@@ -4238,17 +4246,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 3 — Persistencia comercial (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F3.6 permanece `⬜ PENDIENTE`.
-**Última subfase completada:** F3.5 — Servicios de consulta comercial.
-**Siguiente subfase:** F3.6 — Integridad, migraciones y cierre, pendiente y sin iniciar.
+**Fase activa:** ninguna; Fase 3 — Persistencia comercial (`✅ COMPLETADO`).
+**Subfase activa:** ninguna; F3.6 (`✅ COMPLETADO`).
+**Última subfase completada:** F3.6 — Integridad, migraciones y cierre.
+**Siguiente subfase recomendada:** F4.1 — Formato y fuente FAQ (`⬜ PENDIENTE`), sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-No iniciar F3.6 automáticamente.
+No iniciar Fase 4 automáticamente.
 
 ---
 
@@ -6502,6 +6510,71 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F3.6 — Integridad, migraciones y cierre, `⬜ PENDIENTE`; no iniciada.
+
+---
+
+## 2026-09-22 — F3.6 integridad, migraciones y cierre de Fase 3
+
+Fase: Fase 3 — Persistencia comercial, `✅ COMPLETADO`.
+Subfase: F3.6 — Integridad, migraciones y cierre, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- ampliadas las pruebas de migración desde una SQLite vacía, revisión por revisión, hasta
+  `20260922_0004`, y comprobado que Alembic no detecta divergencias de esquema;
+- inspeccionadas las restricciones de sucursales, productos y precios; comprobado el downgrade,
+  la nueva aplicación de migraciones, la conservación de datos de tablas anteriores y el rollback
+  completo de una transacción fallida;
+- agregado un comando de respaldo SQLite que no sobrescribe un archivo anterior y verifica la
+  integridad de la copia; documentado el respaldo y recuperación antes de migraciones productivas;
+- cerradas F3.6 y la Fase 3 sin iniciar Fase 4.
+
+Archivos:
+
+- `README.md`;
+- `migrations/README.md`;
+- `scripts/backup_sqlite.py`;
+- `backend/tests/test_backup_sqlite.py`;
+- `backend/tests/test_migrations.py`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `pytest backend/tests/test_migrations.py backend/tests/test_database_session.py -q` ->
+  `pytest` no estaba en el PATH; se usó el entorno virtual existente;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_migrations.py
+  backend/tests/test_backup_sqlite.py -q` -> 10 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 289 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 83 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git -c safe.directory=C:/Proyectos/SanAngel_AI diff --check` -> sin errores; solo
+  advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- el respaldo lee el origen en modo de solo lectura, incluye datos confirmados en WAL, rechaza
+  origen ausente y destino existente, comprueba `PRAGMA integrity_check` y evita mostrar rutas o
+  datos en el error público del comando;
+- el procedimiento exige detener escrituras, verificar que el archivo corresponde a la sucursal,
+  guardar la copia fuera del repositorio con acceso restringido y ensayar una recuperación antes
+  de una futura migración productiva; un downgrade no sustituye un respaldo;
+- las pruebas ejercitan constraints y claves foráneas en bases temporales y no alteran datos de
+  instalaciones existentes.
+
+Riesgos/Pendientes:
+
+- no se ejecutó una migración ni un respaldo de una base productiva; el procedimiento debe
+  realizarse por instalación cuando exista tal despliegue;
+- las pruebas de migración cubren SQLite; una eventual adopción de PostgreSQL requerirá sus
+  propias migraciones, pruebas y un plan de respaldo;
+- Fase 3 cerrada no implica preparación para producción: siguen pendientes idempotencia
+  persistente, cola durable, políticas operativas y demás controles planificados.
+
+Siguiente:
+
+- F4.1 — Formato y fuente FAQ, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

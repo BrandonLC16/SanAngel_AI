@@ -8,7 +8,7 @@ Comandos habituales desde la raíz del repositorio:
 ```powershell
 python -m alembic upgrade head
 python -m alembic current
-python -m alembic downgrade -1
+python -m alembic check
 ```
 
 La revisión inicial establece la base reproducible. `20260922_0002` crea `branches` para F3.2 y
@@ -17,6 +17,13 @@ unicidad de nombre por sucursal e índice para la consulta determinista del cat�
 `20260922_0004` crea `prices` para F3.4 con `NUMERIC(12,2)`, unidad validada, importe no negativo,
 unicidad por sucursal-producto-unidad y una clave foránea compuesta que impide mezclar un producto
 con la sucursal de otra instalación.
+
+En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
+`upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
+crea uno sin sobrescribir otro y comprueba su integridad. Revisar el
+procedimiento completo de protección y recuperación en el README principal. Las pruebas recorren
+`upgrade` y `downgrade` solo sobre bases temporales. Un `downgrade` productivo puede borrar tablas
+y datos; no sustituye la restauración de un respaldo.
 
 Después de `upgrade head`, cada instalación debe cargar únicamente el perfil cuyo código coincida
 con su `ASSISTANT_BRANCH_CODE` mediante:
