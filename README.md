@@ -27,7 +27,10 @@ mensaje real. F2.10 y la Fase 2 están `✅ COMPLETADO`. F3.1 está `✅ COMPLET
 SQLAlchemy, SQLite y Alembic tienen una base reproducible. F3.2 está `✅ COMPLETADO`: implementa
 la entidad de sucursal, el alcance fijo por instalación y la carga idempotente de un perfil JSON.
 F3.3 está `✅ COMPLETADO`: implementa productos con categoría, estado activo, alcance obligatorio
-de sucursal y un repositorio de consulta determinista. F3.4 (precios) permanece sin iniciar.
+de sucursal y un repositorio de consulta determinista. F3.4 está `✅ COMPLETADO`: implementa
+precios exactos por sucursal, producto y unidad. F3.5 está `✅ COMPLETADO`: implementa servicios
+de consulta comercial de solo lectura con alcance de sucursal inyectado. F3.6 permanece sin
+iniciar.
 
 ## Modelo de los siete asistentes
 
@@ -141,11 +144,12 @@ python -m alembic current
 python -m alembic check
 ```
 
-La revisión base crea `alembic_version`, la revisión F3.2 crea `branches` y la revisión F3.3 crea
-`products`. Cada producto pertenece obligatoriamente a una sucursal e incluye nombre, categoría,
-estado activo, timestamps, unicidad de nombre dentro de su sucursal y restricciones de integridad.
-Los precios se incorporarán en F3.4. Los cambios de schema deben realizarse mediante migraciones;
-el código de aplicación no ejecuta `Base.metadata.create_all()`.
+La revisión base crea `alembic_version`, la revisión F3.2 crea `branches`, la revisión F3.3 crea
+`products` y la revisión F3.4 crea `prices`. Cada producto pertenece obligatoriamente a una
+sucursal. Cada precio actual pertenece a la misma sucursal que su producto, usa `NUMERIC(12,2)`,
+incluye unidad y timestamps, y es único por sucursal, producto y unidad. Los cambios de schema
+deben realizarse mediante migraciones; el código de aplicación no ejecuta
+`Base.metadata.create_all()`.
 
 El engine y el `sessionmaker` se construyen de forma lazy. Las sesiones no hacen commit
 implícito: cada servicio o repositorio futuro debe definir sus límites transaccionales. Los
@@ -163,6 +167,38 @@ productos activos de esa sucursal, ordenados de forma estable por categoría, no
 caracteres de control y longitudes fuera de los límites. El repositorio de F3.3 es infraestructura
 interna; las tools y servicios de consulta para el chatbot se incorporarán en F3.5 sin exponer la
 sucursal como argumento.
+
+## Precios exactos por sucursal
+
+`PriceData` representa el importe con `Decimal`, rechaza explícitamente valores `float`, importes
+negativos, más de dos decimales, valores fuera de `NUMERIC(12,2)` y campos extra. La unidad es un
+código interno de hasta 24 caracteres, normalizado a minúsculas; por ejemplo, `kg`, `piece` o
+`package`.
+
+`PriceRepository` se construye con un `Branch` persistido y recibe un objeto `Product` ya resuelto
+por backend. No acepta `branch_id` ni `product_id` desde los datos del precio. Todas sus consultas
+filtran la sucursal configurada, y la clave foránea compuesta impide guardar un precio con un
+producto de otra sucursal incluso si se evita el repositorio. Cada combinación
+sucursal–producto–unidad mantiene un único precio actual; `updated_at` registra su última
+modificación.
+
+## Consultas comerciales de solo lectura
+
+`BranchScope` se crea desde `AssistantSettings`, cuyo `ASSISTANT_BRANCH_CODE` proviene únicamente
+de configuración backend. `CommercialQueryService` recibe ese scope al construirse y expone solo:
+
+- `get_branch_info()`;
+- `search_product(query)`;
+- `get_product_price(product_id, unit=...)`.
+
+Ningún método acepta `branch_id` ni `branch_code`. `search_product` consulta únicamente productos
+activos, normaliza mayúsculas y acentos, y ordena coincidencias exactas, prefijos y coincidencias
+parciales de forma determinista. Una búsqueda sin coincidencias devuelve una tupla vacía; un
+producto inexistente/inactivo o un precio no disponible producen errores de dominio específicos.
+
+Los resultados son DTOs Pydantic inmutables y separados de las entidades ORM. El servicio no
+expone operaciones de escritura, no depende de OpenAI y no registra consultas ni datos completos.
+Las tools que conectarán estos servicios con el modelo pertenecen a Fase 6, no a F3.5.
 
 ## Carga del perfil personalizado
 
@@ -297,6 +333,12 @@ Los placeholders de prueba no son credenciales reales.
 - Cada runtime exige `ASSISTANT_BRANCH_CODE`; un perfil con otro código se rechaza antes de
   escribir. El repositorio de productos exige una sucursal ya resuelta por backend, no acepta el
   alcance desde los datos del producto y tiene pruebas negativas entre dos sucursales.
+- Los importes se conservan como `Decimal`/`NUMERIC(12,2)`, nunca como `float`; la aplicación y la
+  base rechazan precios negativos, duplicados inválidos y asociaciones producto-sucursal
+  inconsistentes.
+- Las consultas comerciales reciben un `BranchScope` creado desde configuración backend. Sus
+  firmas no aceptan sucursal, sus resultados son inmutables y las pruebas intentan leer productos
+  y precios de otra sucursal para confirmar el rechazo.
 - Los archivos `*.assistant-profile.json` reales están ignorados; solo se versiona el ejemplo
   ficticio.
 - No se registran bodies, query strings, `Authorization`, textos completos ni identificadores de

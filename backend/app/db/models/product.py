@@ -36,6 +36,11 @@ class Product(Base):
             "name",
             name="uq_products_branch_id_name",
         ),
+        UniqueConstraint(
+            "id",
+            "branch_id",
+            name="uq_products_id_branch_id",
+        ),
         Index(
             "ix_products_branch_catalog",
             "branch_id",

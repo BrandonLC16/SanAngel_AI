@@ -137,3 +137,26 @@ class BranchNotConfiguredError(ServiceUnavailableError):
 
     error_code = "branch_not_configured"
     public_message = "La información de la sucursal no está configurada."
+
+
+class CommercialQueryInputError(InvalidRequestError):
+    """Raised when a read-only commercial query has invalid arguments."""
+
+    error_code = "commercial_query_invalid"
+    public_message = "La consulta comercial no es válida."
+
+
+class ProductNotFoundError(ApplicationError):
+    """Raised when no active product exists inside the configured branch."""
+
+    error_code = "product_not_found"
+    public_message = "No encontramos ese producto en esta sucursal."
+    status_code = 404
+
+
+class ProductPriceNotFoundError(ApplicationError):
+    """Raised when a scoped product has no current price for the requested unit."""
+
+    error_code = "product_price_not_found"
+    public_message = "No encontramos un precio vigente para ese producto y unidad."
+    status_code = 404

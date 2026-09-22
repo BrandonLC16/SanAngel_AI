@@ -14,6 +14,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 INITIAL_REVISION = "20260921_0001"
 BRANCH_REVISION = "20260922_0002"
 PRODUCT_REVISION = "20260922_0003"
+PRICE_REVISION = "20260922_0004"
 
 
 def sqlite_url(path: Path) -> str:
@@ -24,23 +25,25 @@ def alembic_config() -> Config:
     return Config(str(REPOSITORY_ROOT / "alembic.ini"))
 
 
-def test_migration_history_has_reproducible_product_revision() -> None:
+def test_migration_history_has_reproducible_price_revision() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [PRODUCT_REVISION]
-    assert len(revisions) == 3
+    assert scripts.get_heads() == [PRICE_REVISION]
+    assert len(revisions) == 4
     assert [revision.revision for revision in revisions] == [
+        PRICE_REVISION,
         PRODUCT_REVISION,
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == BRANCH_REVISION
-    assert revisions[1].down_revision == INITIAL_REVISION
-    assert revisions[2].down_revision is None
+    assert revisions[0].down_revision == PRODUCT_REVISION
+    assert revisions[1].down_revision == BRANCH_REVISION
+    assert revisions[2].down_revision == INITIAL_REVISION
+    assert revisions[3].down_revision is None
 
 
-def test_upgrade_head_creates_branch_and_product_schema(
+def test_upgrade_head_creates_branch_product_and_price_schema(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -65,12 +68,16 @@ def test_upgrade_head_creates_branch_and_product_schema(
                 product_unique_constraints = inspector.get_unique_constraints("products")
                 product_foreign_keys = inspector.get_foreign_keys("products")
                 product_indexes = inspector.get_indexes("products")
+                price_columns = inspector.get_columns("prices")
+                price_unique_constraints = inspector.get_unique_constraints("prices")
+                price_foreign_keys = inspector.get_foreign_keys("prices")
+                price_checks = inspector.get_check_constraints("prices")
         finally:
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == PRODUCT_REVISION
-        assert table_names == ["alembic_version", "branches", "products"]
+        assert current_revision == PRICE_REVISION
+        assert table_names == ["alembic_version", "branches", "prices", "products"]
         assert branch_columns == {
             "id",
             "code",
@@ -93,7 +100,8 @@ def test_upgrade_head_creates_branch_and_product_schema(
             "updated_at",
         }
         assert {constraint["name"] for constraint in product_unique_constraints} == {
-            "uq_products_branch_id_name"
+            "uq_products_branch_id_name",
+            "uq_products_id_branch_id",
         }
         assert product_foreign_keys == [
             {
@@ -106,6 +114,57 @@ def test_upgrade_head_creates_branch_and_product_schema(
             }
         ]
         assert {index["name"] for index in product_indexes} == {"ix_products_branch_catalog"}
+        assert {column["name"] for column in price_columns} == {
+            "id",
+            "branch_id",
+            "product_id",
+            "amount",
+            "unit",
+            "created_at",
+            "updated_at",
+        }
+        amount_column = next(column for column in price_columns if column["name"] == "amount")
+        assert amount_column["type"].precision == 12
+        assert amount_column["type"].scale == 2
+        assert {constraint["name"] for constraint in price_unique_constraints} == {
+            "uq_prices_branch_id_product_id_unit"
+        }
+        assert {
+            (
+                foreign_key["name"],
+                tuple(foreign_key["constrained_columns"]),
+                foreign_key["referred_table"],
+                tuple(foreign_key["referred_columns"]),
+                foreign_key["options"].get("ondelete"),
+            )
+            for foreign_key in price_foreign_keys
+        } == {
+            (
+                "fk_prices_branch_id_branches",
+                ("branch_id",),
+                "branches",
+                ("id",),
+                "RESTRICT",
+            ),
+            (
+                "fk_prices_product_id_branch_id_products",
+                ("product_id", "branch_id"),
+                "products",
+                ("id", "branch_id"),
+                "RESTRICT",
+            ),
+        }
+        assert {constraint["name"] for constraint in price_checks} == {
+            "ck_prices_amount_maximum",
+            "ck_prices_amount_non_negative",
+            "ck_prices_amount_scale",
+            "ck_prices_unit_characters",
+            "ck_prices_unit_hyphens",
+            "ck_prices_unit_length",
+            "ck_prices_unit_lowercase",
+            "ck_prices_unit_prefix",
+            "ck_prices_unit_suffix",
+        }
     finally:
         get_database_settings.cache_clear()
 
@@ -159,5 +218,37 @@ def test_downgrade_product_revision_removes_only_product_schema(
 
         assert current_revision == BRANCH_REVISION
         assert table_names == ["alembic_version", "branches"]
+    finally:
+        get_database_settings.cache_clear()
+
+
+def test_downgrade_price_revision_removes_price_schema_and_auxiliary_constraint(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_url = sqlite_url(tmp_path / "price-downgrade.db")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_database_settings.cache_clear()
+
+    try:
+        config = alembic_config()
+        command.upgrade(config, "head")
+        command.downgrade(config, PRODUCT_REVISION)
+
+        engine = create_database_engine(database_url)
+        try:
+            with engine.connect() as connection:
+                current_revision = MigrationContext.configure(connection).get_current_revision()
+                inspector = inspect(connection)
+                table_names = inspector.get_table_names()
+                product_unique_constraints = inspector.get_unique_constraints("products")
+        finally:
+            engine.dispose()
+
+        assert current_revision == PRODUCT_REVISION
+        assert table_names == ["alembic_version", "branches", "products"]
+        assert {constraint["name"] for constraint in product_unique_constraints} == {
+            "uq_products_branch_id_name"
+        }
     finally:
         get_database_settings.cache_clear()

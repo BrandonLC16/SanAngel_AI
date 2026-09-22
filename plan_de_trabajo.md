@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-22
 **Fase activa:** Fase 3 — Persistencia comercial
-**Subfase activa:** ninguna; F3.4 permanece ⬜ PENDIENTE
-**Estado global:** 🟨 EN DESARROLLO — F3.3 completada; F3.4 pendiente
+**Subfase activa:** ninguna; F3.6 permanece ⬜ PENDIENTE
+**Estado global:** 🟨 EN DESARROLLO — F3.5 completada; F3.6 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1486,44 +1486,46 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F3.4 — Entidad precios por sucursal
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-22
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] Price.
+- [x] Price.
 
-- [ ] producto+sucursal.
+- [x] producto+sucursal.
 
-- [ ] unidad.
+- [x] unidad.
 
-- [ ] vigencia/updated_at.
+- [x] vigencia/updated_at.
 
-- [ ] constraints.
+- [x] constraints.
 
-- [ ] repositorio.
+- [x] repositorio.
 
-- [ ] filtro obligatorio por sucursal inyectado por backend.
+- [x] filtro obligatorio por sucursal inyectado por backend.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] precio exacto por producto/sucursal.
+- [x] precio exacto por producto/sucursal.
 
-- [ ] no duplicados inválidos.
+- [x] no duplicados inválidos.
 
-- [ ] una instalación no puede leer el precio de otra sucursal.
+- [x] una instalación no puede leer el precio de otra sucursal.
 
 
 ### Seguridad
 
-- [ ] Decimal, no float para dinero.
+- [x] Decimal, no float para dinero.
 
-- [ ] precio no negativo.
+- [x] precio no negativo.
 
-- [ ] `branch_id` no se acepta desde el modelo o cliente.
+- [x] `branch_id` no se acepta desde el modelo o cliente.
 
 
 ### Prompt para Codex
@@ -1544,36 +1546,38 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F3.5 — Servicios de consulta comercial
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-22
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] get_branch_info.
+- [x] get_branch_info.
 
-- [ ] search_product.
+- [x] search_product.
 
-- [ ] get_product_price.
+- [x] get_product_price.
 
-- [ ] `BranchScope` inyectado desde `ASSISTANT_BRANCH_CODE`.
+- [x] `BranchScope` inyectado desde `ASSISTANT_BRANCH_CODE`.
 
-- [ ] casos no encontrados.
+- [x] casos no encontrados.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] servicios no dependen de OpenAI.
+- [x] servicios no dependen de OpenAI.
 
-- [ ] la API interna del asistente no recibe sucursal como argumento.
+- [x] la API interna del asistente no recibe sucursal como argumento.
 
 
 ### Seguridad
 
-- [ ] solo lectura para chatbot.
+- [x] solo lectura para chatbot.
 
-- [ ] pruebas de acceso cruzado entre al menos dos sucursales.
+- [x] pruebas de acceso cruzado entre al menos dos sucursales.
 
 
 ### Prompt para Codex
@@ -4150,9 +4154,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | migraciones | F3 | Sí | ✅ F3.1 |
 | identidad fija por instalación | F3 | Sí | ✅ F3.2 |
 | carga de perfil limitada a sucursal | F3 | Sí | ✅ F3.2 |
-| consultas DB con alcance de sucursal | F3/F6 | Sí | ⬜ |
-| pruebas de acceso cruzado | F3/F6/F8 | Sí | ⬜ |
-| Decimal para dinero | F3 | Sí | ⬜ |
+| consultas DB con alcance de sucursal | F3/F6 | Sí | ✅ F3.5 |
+| pruebas de acceso cruzado | F3/F6/F8 | Sí | ✅ F3.5 |
+| Decimal para dinero | F3 | Sí | ✅ F3.4 |
 | integridad/constraints | F3 | Sí | ⬜ |
 | documentos tratados como no confiables | F4 | Sí | ⬜ |
 | defensa prompt injection | F4/F6 | Sí | ⬜ |
@@ -4235,16 +4239,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 3 — Persistencia comercial (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F3.4 permanece `⬜ PENDIENTE`.
-**Última subfase completada:** F3.3 — Entidad productos.
-**Siguiente subfase:** F3.4 — Entidad precios por sucursal, pendiente y sin iniciar.
+**Subfase activa:** ninguna; F3.6 permanece `⬜ PENDIENTE`.
+**Última subfase completada:** F3.5 — Servicios de consulta comercial.
+**Siguiente subfase:** F3.6 — Integridad, migraciones y cierre, pendiente y sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-No iniciar F3.4 automáticamente.
+No iniciar F3.6 automáticamente.
 
 ---
 
@@ -6336,6 +6340,168 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F3.4 — Entidad precios por sucursal, `⬜ PENDIENTE`; no iniciada.
+
+---
+
+## 2026-09-22 — Precios exactos por sucursal
+
+**Fase:** Fase 3 — Persistencia comercial
+**Tarea:** F3.4 — Entidad precios por sucursal
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- creada la entidad `Price` para mantener un único precio actual por sucursal, producto y unidad,
+  con `Decimal`/`NUMERIC(12,2)`, `created_at` y `updated_at`;
+- agregada la migración reproducible `20260922_0004`, con importe no negativo, escala máxima de
+  dos decimales, límite de precisión, unidad validada y unicidad comercial;
+- agregada una relación compuesta producto-sucursal que impide persistir un precio bajo una
+  sucursal distinta a la propietaria del producto;
+- agregada a `products` la unicidad auxiliar `(id, branch_id)` requerida por esa relación, sin
+  cambiar el comportamiento del catálogo de F3.3;
+- implementado `PriceData`, que rechaza `float`, campos extra, importes negativos o inexactos y
+  unidades inválidas;
+- implementado `PriceRepository`, ligado a un `Branch` persistido, con CRUD y consultas
+  deterministas siempre filtradas por la sucursal backend;
+- agregadas pruebas de exactitud decimal, vigencia mediante `updated_at`, duplicados, constraints,
+  rollback de migración y accesos cruzados entre dos sucursales;
+- F3.5 y los servicios/tools de consulta comercial no fueron iniciados.
+
+Archivos:
+
+- `README.md`;
+- `backend/app/db/models/price.py`, `backend/app/db/models/product.py`,
+  `backend/app/db/models/__init__.py`;
+- `backend/app/schemas/price.py`;
+- `backend/app/repositories/price_repository.py`, `backend/app/repositories/__init__.py`;
+- `migrations/versions/20260922_0004_prices.py`, `migrations/env.py`,
+  `migrations/README.md`;
+- `backend/tests/test_prices.py`, `backend/tests/test_migrations.py`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- baseline dirigido de productos, migraciones y seguridad -> 31 pruebas aprobadas;
+- validación dirigida de precios, productos y migraciones -> 47 pruebas aprobadas;
+- prueba dirigida final de precios -> 22 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f34-final-2 -o
+  cache_dir=.venv\pytest-cache-f34-final-2` -> 263 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 77 archivos con formato
+  correcto;
+- Alembic sobre SQLite temporal -> `upgrade head`, `current`, `check`, `downgrade
+  20260922_0003`, nuevo `upgrade head` y segundo `check` correctos; head `20260922_0004` y cero
+  operaciones nuevas detectadas;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- auditoría estática -> sin `Float`, conversiones `float`, `execute_sql`, SQL concatenado,
+  `create_all()` ni ids de sucursal/producto expuestos en schemas públicos.
+
+Seguridad:
+
+- el importe se representa como `Decimal` en Python y `NUMERIC(12,2)` en SQL; los `float` se
+  rechazan antes de validar o escribir;
+- aplicación y DB rechazan precios negativos, más de dos decimales y valores fuera de precisión;
+- `PriceData` no acepta `branch_id` ni `product_id`; el repositorio recibe entidades resueltas por
+  backend y filtra todas las lecturas por la sucursal fijada;
+- la clave foránea compuesta y las pruebas negativas impiden mezclar productos y precios entre
+  sucursales incluso al evitar el repositorio;
+- consultas SQLAlchemy parametrizadas y pruebas automatizadas sin red ni secretos.
+
+Riesgos/Pendientes:
+
+- F3.4 conserva solo el precio actual y usa `updated_at` como vigencia operacional; un historial
+  o programación de precios futuros requeriría un diseño temporal explícito posterior;
+- las unidades son códigos internos validados, pero su catálogo comercial y traducción para el
+  cliente deberán definirse antes de importaciones o administración masiva;
+- el repositorio es infraestructura interna: `get_product_price` y las tools del chatbot siguen
+  pendientes para F3.5;
+- durante el MVP cada instalación debe mantener preferentemente su propio archivo SQLite; antes
+  de compartir PostgreSQL se debe volver a validar aislamiento y precisión del tipo monetario.
+
+Siguiente:
+
+- F3.5 — Servicios de consulta comercial, `⬜ PENDIENTE`; no iniciada.
+
+---
+
+## 2026-09-22 — Consultas comerciales con alcance backend
+
+**Fase:** Fase 3 — Persistencia comercial
+**Tarea:** F3.5 — Servicios de consulta comercial
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- agregado `BranchScope` inmutable, validado y construible desde `AssistantSettings`, para
+  transportar el `ASSISTANT_BRANCH_CODE` de confianza sin recibir sucursal desde el cliente;
+- implementado `CommercialQueryService` con los únicos métodos públicos `get_branch_info`,
+  `search_product` y `get_product_price`;
+- agregada búsqueda determinista solo sobre productos activos, con límite de entrada,
+  normalización Unicode, comparación sin mayúsculas/acentos y ranking exacto/prefijo/parcial;
+- agregada consulta exacta de precios por id de producto y unidad dentro de la sucursal inyectada;
+- agregados casos explícitos para sucursal no configurada, producto inexistente/inactivo, precio
+  ausente, búsqueda sin coincidencias e inputs inválidos;
+- agregados DTOs Pydantic inmutables para impedir que el chatbot reciba entidades ORM mutables;
+- agregados errores de dominio con mensajes públicos fijos y sin datos de sucursal o consultas;
+- agregadas pruebas negativas con dos sucursales, verificación de solo lectura, firmas sin
+  sucursal y ausencia de dependencia de OpenAI;
+- F3.6, las tools y cualquier integración con el modelo no fueron iniciadas.
+
+Archivos:
+
+- `README.md`;
+- `backend/app/core/exceptions.py`;
+- `backend/app/services/branch_scope.py`;
+- `backend/app/services/commercial_query_service.py`;
+- `backend/app/schemas/commercial.py`;
+- `backend/tests/test_commercial_query_service.py`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- baseline dirigido de sucursales, productos, precios y seguridad -> 64 pruebas aprobadas;
+- validación dirigida inicial de servicios y persistencia -> 77 pruebas aprobadas;
+- prueba dirigida final del servicio comercial -> 21 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f35-final-2 -o
+  cache_dir=.venv\pytest-cache-f35-final-2` -> 284 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 81 archivos con formato
+  correcto;
+- Alembic sobre SQLite temporal -> `upgrade head`, `current` y `check` correctos; head
+  `20260922_0004` y cero operaciones nuevas detectadas;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- auditoría estática y de firmas -> sin importaciones de OpenAI, métodos de escritura ni
+  argumentos públicos `branch_id`/`branch_code`; el único código de sucursal observado procede
+  del `BranchScope` interno.
+
+Seguridad:
+
+- el servicio recibe `BranchScope` por construcción y nunca acepta la sucursal en sus tres
+  métodos públicos;
+- las búsquedas y lecturas reutilizan repositorios filtrados por la sucursal configurada;
+- un id válido de producto de otra sucursal se presenta como no encontrado, sin revelar su
+  existencia ni precio;
+- el servicio expone solo lectura, no hace commit ni mutaciones y devuelve DTOs congelados;
+- inputs de búsqueda, producto y unidad tienen validación y límites antes de consultar;
+- errores públicos no incluyen query, ids internos, código de sucursal, SQL ni secretos.
+
+Riesgos/Pendientes:
+
+- la búsqueda MVP recorre el catálogo activo de la sucursal en memoria; antes de catálogos
+  grandes conviene incorporar claves normalizadas e índices manteniendo el mismo aislamiento;
+- la búsqueda usa el nombre del producto, sin aliases, sinónimos ni categorías; la desambiguación
+  conversacional pertenece a F6.5;
+- `get_product_price` exige una unidad exacta y validada; su traducción a lenguaje del cliente se
+  resolverá en las futuras tools/orquestación;
+- F3.5 no conecta el servicio con OpenAI, WhatsApp ni rutas HTTP; esa separación es intencional y
+  las tools se implementarán en Fase 6;
+- F3.6 debe ejecutar el cierre integral de migraciones e integridad antes de completar Fase 3.
+
+Siguiente:
+
+- F3.6 — Integridad, migraciones y cierre, `⬜ PENDIENTE`; no iniciada.
 
 ---
 
