@@ -80,6 +80,7 @@ def make_application(
 ) -> FastAPI:
     application = create_app(HttpSettings(app_env="testing", log_level="INFO", _env_file=None))
     settings = Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key="test-only-openai-credential-placeholder",
         green_api_webhook_token=webhook_token,
         green_api_instance_id=instance_id,
@@ -219,6 +220,7 @@ def test_authenticated_route_queues_work_without_awaiting_external_processing() 
     background_tasks = BackgroundTasks()
     background_processor = RecordingBackgroundProcessor()
     settings = Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key="test-only-openai-credential-placeholder",
         green_api_webhook_token=WEBHOOK_TOKEN,
         green_api_instance_id=INSTANCE_ID,

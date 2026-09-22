@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+*.assistant-profile.json
 
 # Repository-local agent and checkpoint files
 AGENTS.md

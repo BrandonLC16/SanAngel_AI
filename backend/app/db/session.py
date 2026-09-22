@@ -2,8 +2,9 @@
 
 from collections.abc import Iterator
 from functools import lru_cache
+from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,11 +18,26 @@ def create_database_engine(database_url: str) -> Engine:
     if parsed_url.drivername not in {"sqlite", "sqlite+pysqlite"}:
         raise ValueError("database_url must use SQLite")
 
-    return create_engine(
+    engine = create_engine(
         parsed_url,
         connect_args={"check_same_thread": False},
         pool_pre_ping=True,
     )
+    event.listen(engine, "connect", _enable_sqlite_foreign_keys)
+    return engine
+
+
+def _enable_sqlite_foreign_keys(
+    dbapi_connection: Any,
+    _connection_record: Any,
+) -> None:
+    """Enforce declared relationships on every SQLite connection."""
+
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 
 
 def create_database_session_factory(engine: Engine) -> sessionmaker[Session]:

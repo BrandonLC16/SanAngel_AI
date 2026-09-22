@@ -11,6 +11,22 @@ from sqlalchemy.exc import ArgumentError
 CorsOrigins = Annotated[tuple[str, ...], NoDecode]
 DEFAULT_GREEN_API_URL = "https://api.green-api.com"
 DEFAULT_DATABASE_URL = "sqlite+pysqlite:///./carniceria.db"
+BRANCH_CODE_PATTERN = re.compile(r"[a-z][a-z0-9-]{1,47}")
+
+
+def validate_branch_code(value: str) -> str:
+    """Validate the immutable public identifier used to scope one assistant install."""
+
+    if (
+        value != value.strip()
+        or BRANCH_CODE_PATTERN.fullmatch(value) is None
+        or value.endswith("-")
+        or "--" in value
+    ):
+        raise ValueError(
+            "branch code must contain 2 to 48 lowercase letters, digits, or single hyphens"
+        )
+    return value
 
 
 class HttpSettings(BaseSettings):
@@ -124,8 +140,32 @@ class DatabaseSettings(BaseSettings):
         return value
 
 
+class AssistantSettings(BaseSettings):
+    """Non-secret identity that binds one deployment to exactly one branch."""
+
+    assistant_branch_code: str = Field(min_length=2, max_length=48)
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+        case_sensitive=False,
+        frozen=True,
+        hide_input_in_errors=True,
+        validate_default=True,
+    )
+
+    @field_validator("assistant_branch_code")
+    @classmethod
+    def validate_assistant_branch_code(cls, value: str) -> str:
+        return validate_branch_code(value)
+
+
 class Settings(HttpSettings):
     """Validated complete application configuration loaded from the environment."""
+
+    assistant_branch_code: str = Field(min_length=2, max_length=48)
 
     openai_api_key: SecretStr = Field(repr=False)
     openai_model: str = Field(default="gpt-5.6", min_length=1, max_length=100)
@@ -140,6 +180,11 @@ class Settings(HttpSettings):
     green_api_webhook_token: SecretStr | None = Field(default=None, repr=False)
     green_api_api_url: str = DEFAULT_GREEN_API_URL
     whatsapp_request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
+
+    @field_validator("assistant_branch_code")
+    @classmethod
+    def validate_assistant_branch_code(cls, value: str) -> str:
+        return validate_branch_code(value)
 
     @field_validator("openai_api_key")
     @classmethod
@@ -243,6 +288,13 @@ def get_database_settings() -> DatabaseSettings:
     """Return validated database configuration without loading provider secrets."""
 
     return DatabaseSettings()
+
+
+@lru_cache
+def get_assistant_settings() -> AssistantSettings:
+    """Return the immutable branch identity for this application process."""
+
+    return AssistantSettings()
 
 
 @lru_cache

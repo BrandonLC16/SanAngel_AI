@@ -1,8 +1,9 @@
 # Carnicería AI Chatbot
 
-Backend en Python para la atención automatizada de clientes de una cadena de carnicerías por
-WhatsApp. Los datos comerciales se mantienen en fuentes determinísticas para que el modelo no
-invente precios, existencias, direcciones, horarios, promociones o pedidos.
+Backend en Python para siete asistentes de atención por WhatsApp, uno por sucursal y número. Los
+siete usan el mismo código y las mismas instrucciones; cada instalación queda fijada a una
+sucursal y solo puede consultar sus datos comerciales determinísticos, para que el modelo no
+invente ni mezcle precios, existencias, direcciones, horarios, promociones o pedidos.
 
 ## Estado actual
 
@@ -23,7 +24,29 @@ Meta Cloud API a GreenAPI dentro de F2.9. Ya están implementados y probados sin
 F2.9 está `✅ COMPLETADO`: la instancia real quedó autorizada, el webhook registrado y el
 recorrido WhatsApp -> GreenAPI -> backend -> OpenAI -> GreenAPI -> WhatsApp fue confirmado con un
 mensaje real. F2.10 y la Fase 2 están `✅ COMPLETADO`. F3.1 está `✅ COMPLETADO`:
-SQLAlchemy, SQLite y Alembic tienen una base reproducible. F3.2 no ha sido iniciada.
+SQLAlchemy, SQLite y Alembic tienen una base reproducible. F3.2 está `✅ COMPLETADO`: implementa
+la entidad de sucursal, el alcance fijo por instalación y la carga idempotente de un perfil JSON.
+F3.3 está `✅ COMPLETADO`: implementa productos con categoría, estado activo, alcance obligatorio
+de sucursal y un repositorio de consulta determinista. F3.4 (precios) permanece sin iniciar.
+
+## Modelo de los siete asistentes
+
+Cada número se instala como una instancia independiente del mismo proyecto:
+
+```text
+instalación/número 1 -> ASSISTANT_BRANCH_CODE=sucursal-1 -> DB/perfil sucursal 1
+instalación/número 2 -> ASSISTANT_BRANCH_CODE=sucursal-2 -> DB/perfil sucursal 2
+...
+instalación/número 7 -> ASSISTANT_BRANCH_CODE=sucursal-7 -> DB/perfil sucursal 7
+```
+
+El prompt base es único y no contiene datos de una tienda. La identidad de la sucursal proviene
+solo de configuración backend. Ni el cliente ni el modelo pueden enviar o cambiar un
+`branch_id`/`branch_code`; los servicios de negocio inyectan ese alcance automáticamente.
+
+Para el MVP con SQLite se recomienda un archivo de base de datos distinto por instalación. Esto
+añade aislamiento físico al aislamiento lógico del servicio. Si en el futuro se comparte una
+base PostgreSQL, todas las consultas deberán continuar filtradas por la sucursal configurada.
 
 ## Requisitos y preparación local
 
@@ -43,6 +66,16 @@ Copy-Item .env.example .env
 Completa las credenciales solamente en `.env`. Ese archivo está ignorado por Git; nunca guardes
 tokens reales en archivos versionados, comandos compartidos, logs o documentación.
 
+En cada una de las siete instalaciones configura valores propios para:
+
+- `ASSISTANT_BRANCH_CODE`;
+- `DATABASE_URL`;
+- `GREEN_API_INSTANCE_ID`, `GREEN_API_TOKEN_INSTANCE` y `GREEN_API_WEBHOOK_TOKEN`.
+
+`ASSISTANT_BRANCH_CODE` debe tener de 2 a 48 caracteres en minúsculas, comenzar con letra y usar
+solo letras, números o guiones simples. Aunque no es un secreto, fija la frontera de datos y no
+debe cambiarse durante una conversación.
+
 Genera un token independiente y URL-safe para el webhook; el siguiente comando produce un valor
 de 43 caracteres:
 
@@ -61,6 +94,7 @@ se representan con `SecretStr` y no aparecen en `repr`, serializaciones ni error
 
 Variables relevantes:
 
+- `ASSISTANT_BRANCH_CODE`: código inmutable de la única sucursal atendida por esta instalación;
 - `OPENAI_API_KEY`: clave backend-only para la prueba real del chatbot;
 - `OPENAI_MODEL`: modelo configurable, `gpt-5.6` por defecto;
 - `OPENAI_STORE_RESPONSES`: `false` por defecto;
@@ -107,14 +141,54 @@ python -m alembic current
 python -m alembic check
 ```
 
-La primera revisión es una base vacía y reproducible: crea `alembic_version`, pero no anticipa
-tablas de sucursales, productos o precios. Esas entidades comienzan en F3.2. Los cambios de
-schema deben realizarse mediante migraciones; el código de aplicación no ejecuta
-`Base.metadata.create_all()`.
+La revisión base crea `alembic_version`, la revisión F3.2 crea `branches` y la revisión F3.3 crea
+`products`. Cada producto pertenece obligatoriamente a una sucursal e incluye nombre, categoría,
+estado activo, timestamps, unicidad de nombre dentro de su sucursal y restricciones de integridad.
+Los precios se incorporarán en F3.4. Los cambios de schema deben realizarse mediante migraciones;
+el código de aplicación no ejecuta `Base.metadata.create_all()`.
 
 El engine y el `sessionmaker` se construyen de forma lazy. Las sesiones no hacen commit
 implícito: cada servicio o repositorio futuro debe definir sus límites transaccionales. Los
-archivos SQLite locales y sus sidecars están ignorados por Git.
+archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
+foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
+
+## Catálogo de productos
+
+`ProductRepository` se construye con un objeto `Branch` persistido y no admite `branch_id` ni
+`branch_code` en sus métodos. Las altas heredan ese alcance y todas las lecturas, actualizaciones,
+bajas y cambios de estado vuelven a filtrarlo o comprobarlo. `list_active()` devuelve únicamente
+productos activos de esa sucursal, ordenados de forma estable por categoría, nombre e id.
+
+`ProductData` rechaza campos extra, nombres o categorías vacíos, texto compuesto solo por signos,
+caracteres de control y longitudes fuera de los límites. El repositorio de F3.3 es infraestructura
+interna; las tools y servicios de consulta para el chatbot se incorporarán en F3.5 sin exponer la
+sucursal como argumento.
+
+## Carga del perfil personalizado
+
+Cada instalación recibe un archivo JSON propio. Copia el ejemplo y usa un nombre terminado en
+`.assistant-profile.json`, que Git ignora:
+
+```powershell
+Copy-Item examples\assistant_profile.example.json sucursal-1.assistant-profile.json
+```
+
+Edita únicamente datos de la sucursal y asegúrate de que `branch.code` coincida exactamente con
+`ASSISTANT_BRANCH_CODE`. Después aplica migraciones, valida el perfil sin escribir y confírmalo:
+
+```powershell
+python -m alembic upgrade head
+python -m backend.app.cli.provision_assistant --profile .\sucursal-1.assistant-profile.json
+python -m backend.app.cli.provision_assistant --profile .\sucursal-1.assistant-profile.json --apply
+```
+
+La carga es idempotente: crea la sucursal la primera vez, actualiza sus datos cuando cambian y no
+hace nada si el contenido ya coincide. Un perfil de otra sucursal se rechaza antes de escribir.
+El comando no muestra dirección, teléfono, horarios, URL de base de datos ni credenciales.
+
+En F3.2 el perfil contiene datos básicos de la sucursal. Las futuras cargas de productos,
+precios y FAQ conservarán el mismo contrato: el código del archivo debe coincidir con el alcance
+de la instalación y nunca será un argumento controlado por el cliente o el modelo.
 
 ## Webhook de GreenAPI
 
@@ -220,6 +294,11 @@ Los placeholders de prueba no son credenciales reales.
 ## Seguridad y límites conocidos
 
 - `.env` y sus variantes locales están ignorados; `.env.example` no contiene secretos.
+- Cada runtime exige `ASSISTANT_BRANCH_CODE`; un perfil con otro código se rechaza antes de
+  escribir. El repositorio de productos exige una sucursal ya resuelta por backend, no acepta el
+  alcance desde los datos del producto y tiene pruebas negativas entre dos sucursales.
+- Los archivos `*.assistant-profile.json` reales están ignorados; solo se versiona el ejemplo
+  ficticio.
 - No se registran bodies, query strings, `Authorization`, textos completos ni identificadores de
   WhatsApp sin redactar.
 - La URL configurable de GreenAPI tiene allowlist HTTPS para reducir riesgo SSRF.

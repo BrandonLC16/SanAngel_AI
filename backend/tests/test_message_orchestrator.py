@@ -89,6 +89,7 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key="test-only-openai-credential-placeholder",
         green_api_instance_id="1100000001",
         green_api_token_instance="test-only-green-api-token-placeholder",

@@ -123,3 +123,17 @@ class IdempotencyStoreError(ServiceUnavailableError):
 
     error_code = "idempotency_store_unavailable"
     public_message = "No fue posible verificar el estado del mensaje."
+
+
+class BranchScopeMismatchError(InvalidRequestError):
+    """Raised when installation data targets a different branch."""
+
+    error_code = "branch_scope_mismatch"
+    public_message = "El perfil no corresponde a esta instalación."
+
+
+class BranchNotConfiguredError(ServiceUnavailableError):
+    """Raised when the configured branch is absent or inactive."""
+
+    error_code = "branch_not_configured"
+    public_message = "La información de la sucursal no está configurada."

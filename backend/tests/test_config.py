@@ -3,7 +3,15 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from backend.app.core.config import HttpSettings, Settings, get_settings
+from backend.app.core.config import (
+    AssistantSettings,
+    HttpSettings,
+    Settings,
+    get_assistant_settings,
+    get_settings,
+)
+
+BRANCH_CODE = "sucursal-demo"
 
 
 def make_non_key_secret_marker() -> str:
@@ -11,12 +19,17 @@ def make_non_key_secret_marker() -> str:
 
 
 def test_settings_use_safe_defaults() -> None:
-    settings = Settings(openai_api_key=make_non_key_secret_marker(), _env_file=None)
+    settings = Settings(
+        assistant_branch_code=BRANCH_CODE,
+        openai_api_key=make_non_key_secret_marker(),
+        _env_file=None,
+    )
 
     assert settings.app_env == "development"
     assert settings.app_host == "127.0.0.1"
     assert settings.app_port == 8000
     assert settings.cors_allowed_origins == ()
+    assert settings.assistant_branch_code == BRANCH_CODE
     assert settings.openai_model == "gpt-5.6"
     assert settings.openai_store_responses is False
     assert settings.openai_timeout_seconds == 30
@@ -33,6 +46,7 @@ def test_settings_use_safe_defaults() -> None:
 def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     secret_marker = make_non_key_secret_marker()
     monkeypatch.setenv("OPENAI_API_KEY", secret_marker)
+    monkeypatch.setenv("ASSISTANT_BRANCH_CODE", "sucursal-norte")
     monkeypatch.setenv("OPENAI_MODEL", "configured-model")
     monkeypatch.setenv("OPENAI_STORE_RESPONSES", "true")
     monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "45.5")
@@ -47,6 +61,7 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     settings = Settings(_env_file=None)
 
     assert settings.openai_api_key.get_secret_value() == secret_marker
+    assert settings.assistant_branch_code == "sucursal-norte"
     assert settings.openai_model == "configured-model"
     assert settings.openai_store_responses is True
     assert settings.openai_timeout_seconds == 45.5
@@ -68,6 +83,7 @@ def test_settings_load_dotenv_file(tmp_path: Path) -> None:
         "\n".join(
             (
                 f"OPENAI_API_KEY={secret_marker}",
+                "ASSISTANT_BRANCH_CODE=sucursal-centro",
                 "APP_ENV=testing",
                 "OPENAI_MODEL=dotenv-model",
                 "OPENAI_TIMEOUT_SECONDS=12",
@@ -85,6 +101,7 @@ def test_settings_load_dotenv_file(tmp_path: Path) -> None:
     settings = Settings(_env_file=env_file)
 
     assert settings.app_env == "testing"
+    assert settings.assistant_branch_code == "sucursal-centro"
     assert settings.openai_model == "dotenv-model"
     assert settings.openai_timeout_seconds == 12
     assert settings.chat_max_message_chars == 750
@@ -101,7 +118,7 @@ def test_settings_require_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     with pytest.raises(ValidationError) as exc_info:
-        Settings(_env_file=None)
+        Settings(assistant_branch_code=BRANCH_CODE, _env_file=None)
 
     error_text = str(exc_info.value)
     assert "openai_api_key" in error_text
@@ -110,7 +127,11 @@ def test_settings_require_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_settings_hide_secret_from_text_representations() -> None:
     secret_marker = make_non_key_secret_marker()
-    settings = Settings(openai_api_key=secret_marker, _env_file=None)
+    settings = Settings(
+        assistant_branch_code=BRANCH_CODE,
+        openai_api_key=secret_marker,
+        _env_file=None,
+    )
 
     rendered_settings = f"{settings!r}\n{settings}\n{settings.model_dump_json()}"
 
@@ -122,7 +143,11 @@ def test_invalid_secret_error_does_not_reveal_value() -> None:
     secret_marker = make_non_key_secret_marker()
 
     with pytest.raises(ValidationError) as exc_info:
-        Settings(openai_api_key=f" {secret_marker} ", _env_file=None)
+        Settings(
+            assistant_branch_code=BRANCH_CODE,
+            openai_api_key=f" {secret_marker} ",
+            _env_file=None,
+        )
 
     error_text = str(exc_info.value)
     assert "openai_api_key" in error_text
@@ -135,6 +160,7 @@ def test_green_api_secrets_are_hidden_from_text_representations() -> None:
         "green_api_webhook_token": "test-only-green-api-webhook-token",
     }
     settings = Settings(
+        assistant_branch_code=BRANCH_CODE,
         openai_api_key=make_non_key_secret_marker(),
         _env_file=None,
         **markers,
@@ -156,6 +182,7 @@ def test_invalid_provider_secret_error_does_not_reveal_value(field_name: str) ->
 
     with pytest.raises(ValidationError) as exc_info:
         Settings(
+            assistant_branch_code=BRANCH_CODE,
             openai_api_key=make_non_key_secret_marker(),
             _env_file=None,
             **{field_name: f" {secret_marker} "},
@@ -183,7 +210,12 @@ def test_settings_reject_unsafe_numeric_limits(field_name: str, invalid_value: i
     secret_marker = make_non_key_secret_marker()
 
     with pytest.raises(ValidationError) as exc_info:
-        Settings(openai_api_key=secret_marker, _env_file=None, **{field_name: invalid_value})
+        Settings(
+            assistant_branch_code=BRANCH_CODE,
+            openai_api_key=secret_marker,
+            _env_file=None,
+            **{field_name: invalid_value},
+        )
 
     error_text = str(exc_info.value)
     assert field_name in error_text
@@ -214,6 +246,7 @@ def test_settings_reject_invalid_green_api_configuration(
 ) -> None:
     with pytest.raises(ValidationError):
         Settings(
+            assistant_branch_code=BRANCH_CODE,
             openai_api_key=make_non_key_secret_marker(),
             _env_file=None,
             **{field_name: invalid_value},
@@ -222,6 +255,7 @@ def test_settings_reject_invalid_green_api_configuration(
 
 def test_get_settings_caches_validated_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", make_non_key_secret_marker())
+    monkeypatch.setenv("ASSISTANT_BRANCH_CODE", BRANCH_CODE)
     monkeypatch.setenv("OPENAI_MODEL", "first-model")
     monkeypatch.setenv(
         "GREEN_API_WEBHOOK_TOKEN",
@@ -237,6 +271,46 @@ def test_get_settings_caches_validated_configuration(monkeypatch: pytest.MonkeyP
         assert get_settings().openai_model == "first-model"
     finally:
         get_settings.cache_clear()
+
+
+def test_assistant_settings_require_one_valid_branch_code() -> None:
+    with pytest.raises(ValidationError):
+        AssistantSettings(_env_file=None)
+
+    settings = AssistantSettings(assistant_branch_code=BRANCH_CODE, _env_file=None)
+
+    assert settings.assistant_branch_code == BRANCH_CODE
+
+
+@pytest.mark.parametrize(
+    "invalid_code",
+    (
+        "Sucursal-Norte",
+        " sucursal-norte ",
+        "1-sucursal",
+        "sucursal--norte",
+        "sucursal-norte-",
+        "sucursal_norte",
+        "a" * 49,
+    ),
+)
+def test_assistant_settings_reject_invalid_branch_codes(invalid_code: str) -> None:
+    with pytest.raises(ValidationError):
+        AssistantSettings(assistant_branch_code=invalid_code, _env_file=None)
+
+
+def test_get_assistant_settings_caches_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ASSISTANT_BRANCH_CODE", BRANCH_CODE)
+    get_assistant_settings.cache_clear()
+
+    try:
+        first_settings = get_assistant_settings()
+        monkeypatch.setenv("ASSISTANT_BRANCH_CODE", "sucursal-sur")
+
+        assert get_assistant_settings() is first_settings
+        assert get_assistant_settings().assistant_branch_code == BRANCH_CODE
+    finally:
+        get_assistant_settings.cache_clear()
 
 
 def test_http_settings_parse_configurable_cors_allowlist(

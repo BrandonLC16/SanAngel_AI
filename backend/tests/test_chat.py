@@ -105,6 +105,7 @@ def test_default_dependency_connects_application_service_to_reply_provider(
     non_secret_credential: str,
 ) -> None:
     settings = Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key=non_secret_credential,
         chat_max_message_chars=5,
         _env_file=None,

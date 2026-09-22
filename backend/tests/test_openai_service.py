@@ -49,6 +49,7 @@ class FakeOpenAIClient:
 
 def make_settings(**overrides: object) -> Settings:
     return Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key="test-only-credential-placeholder",
         openai_model="configured-model",
         _env_file=None,
@@ -60,7 +61,9 @@ def test_base_system_prompt_contains_business_safety_rules() -> None:
     prompt = load_base_system_prompt()
 
     assert "Nunca inventes datos específicos del negocio" in prompt
-    assert "precios, inventario, horarios, promociones ni sucursales" in prompt
+    assert "configuración del servidor" in prompt
+    assert "Nunca solicites, adivines ni cambies un identificador de sucursal" in prompt
+    assert "precios, inventario, horarios ni promociones" in prompt
     assert "credenciales" in prompt
 
 
@@ -116,6 +119,7 @@ def test_real_client_factory_receives_secret_timeout_and_bounded_retries(
 
     monkeypatch.setattr(openai_service, "AsyncOpenAI", fake_async_openai)
     settings = Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key=secret_marker,
         openai_timeout_seconds=17.5,
         openai_max_retries=1,

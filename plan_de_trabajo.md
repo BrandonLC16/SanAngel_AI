@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
-## Chatbot IA para Carnicerías — WhatsApp como interfaz del cliente
+## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-09-21
+**Última actualización:** 2026-09-22
 **Fase activa:** Fase 3 — Persistencia comercial
-**Subfase activa:** ninguna; F3.2 permanece ⬜ PENDIENTE
-**Estado global:** 🟨 EN DESARROLLO — F3.1 completada; F3.2 pendiente
+**Subfase activa:** ninguna; F3.4 permanece ⬜ PENDIENTE
+**Estado global:** 🟨 EN DESARROLLO — F3.3 completada; F3.4 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -99,6 +99,29 @@ Principios:
 6. Toda acción comercial sensible requiere validación backend.
 7. Webhooks se autentican y deduplican.
 8. El número/identificador de WhatsApp se trata como dato personal.
+9. El mismo código y prompt se despliega siete veces, una por sucursal/número.
+10. `ASSISTANT_BRANCH_CODE` fija el único alcance de datos de cada instalación.
+11. El cliente y el modelo nunca eligen `branch_id`/`branch_code`; el backend lo inyecta.
+
+## 3.1 Decisión de despliegue por sucursal — 2026-09-22
+
+```text
+mismo repositorio + mismo prompt
+             |
+             +-- instalación/número 1 -> código tienda 1 -> DB/perfil tienda 1
+             +-- instalación/número 2 -> código tienda 2 -> DB/perfil tienda 2
+             +-- ...
+             +-- instalación/número 7 -> código tienda 7 -> DB/perfil tienda 7
+```
+
+- cada instalación tiene `.env`, instancia GreenAPI, webhook token y `DATABASE_URL` propios;
+- durante el MVP se recomienda un archivo SQLite separado por instalación;
+- la carga se realiza mediante un perfil JSON versionado cuyo código debe coincidir con
+  `ASSISTANT_BRANCH_CODE`;
+- el prompt no contiene datos particulares de una tienda;
+- servicios, tools, conversaciones, importaciones y administración conservan el alcance backend;
+- si posteriormente se comparte PostgreSQL, se mantiene el aislamiento lógico y se agregan
+  pruebas explícitas contra acceso cruzado.
 
 ---
 
@@ -1291,7 +1314,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 # 7. FASE 3 — Persistencia comercial — sucursales, productos y precios
 
-**Objetivo:** Crear SQLite como primera fuente de verdad para datos comerciales.
+**Objetivo:** Crear SQLite como primera fuente de verdad para datos comerciales, aislados por la
+sucursal asignada a cada asistente.
 
 **Estado:** 🟨 EN_PROGRESO
 
@@ -1352,34 +1376,46 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```
 
 
-## F3.2 — Entidad sucursales
+## F3.2 — Entidad sucursales e identidad por asistente
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-22
+
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] modelo Branch.
+- [x] modelo Branch.
 
-- [ ] constraints.
+- [x] constraints.
 
-- [ ] repository.
+- [x] repository.
 
-- [ ] service.
+- [x] service.
 
-- [ ] fixtures ficticios.
+- [x] identidad fija `ASSISTANT_BRANCH_CODE` por instalación.
 
-- [ ] tests.
+- [x] perfil JSON versionado y carga idempotente por instalación.
+
+- [x] fixtures ficticios.
+
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] CRUD interno/repository válido.
+- [x] CRUD interno/repository válido.
+
+- [x] una instalación solo puede cargar y consultar su propia sucursal.
 
 
 ### Seguridad
 
-- [ ] dirección/teléfono tratados como datos de negocio.
+- [x] dirección/teléfono tratados como datos de negocio.
+
+- [x] `branch_id`/`branch_code` no provienen del mensaje ni de argumentos del modelo.
 
 
 ### Prompt para Codex
@@ -1388,11 +1424,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```text
 Lee AGENTS.md, plan_de_trabajo.md y plan_de_trabajo.md antes de modificar código.
 
-Trabaja únicamente en la subfase F3.2 — Entidad sucursales. No inicies ninguna subfase posterior.
+Trabaja únicamente en la subfase F3.2 — Entidad sucursales e identidad por asistente. No inicies ninguna subfase posterior.
 
-Alcance obligatorio: modelo Branch; constraints; repository; service; fixtures ficticios; tests.
+Alcance obligatorio: modelo Branch; constraints; repository; servicio limitado a la sucursal configurada; ASSISTANT_BRANCH_CODE obligatorio; perfil JSON versionado; carga idempotente con preview/confirmación; fixtures ficticios; tests.
 
-Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F3.2 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: CRUD interno/repository válido. Revisa específicamente esta seguridad: dirección/teléfono tratados como datos de negocio.
+Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F3.2 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: CRUD interno/repository válido; una instalación solo carga y consulta su propia sucursal. Revisa específicamente esta seguridad: dirección/teléfono tratados como datos de negocio; branch_id/branch_code nunca vienen del cliente o del modelo; rechazar perfiles de otra instalación antes de escribir.
 
 Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGENTS.md. Si todo pasa, marca primero 🧪 VALIDACION y después ✅ COMPLETADO, actualiza el historial de plan_de_trabajo.md y reporta archivos, comandos, resultados, seguridad, riesgos y siguiente subfase. Si algo no puede comprobarse, no lo marques completado y documenta el bloqueo.
 ```
@@ -1400,30 +1436,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F3.3 — Entidad productos
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-22
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] Product.
+- [x] Product.
 
-- [ ] categoría.
+- [x] categoría.
 
-- [ ] estado activo.
+- [x] estado activo.
 
-- [ ] repositorio.
+- [x] relación/alcance obligatorio de sucursal para disponibilidad del catálogo.
 
-- [ ] tests.
+- [x] repositorio.
+
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] productos consultables de forma determinística.
+- [x] productos consultables de forma determinística dentro de la sucursal configurada.
 
 
 ### Seguridad
 
-- [ ] nombres/inputs validados.
+- [x] nombres/inputs validados.
+
+- [x] ninguna consulta del asistente puede enumerar productos de otra sucursal.
 
 
 ### Prompt para Codex
@@ -1461,6 +1503,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] repositorio.
 
+- [ ] filtro obligatorio por sucursal inyectado por backend.
+
 - [ ] tests.
 
 
@@ -1470,12 +1514,16 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] no duplicados inválidos.
 
+- [ ] una instalación no puede leer el precio de otra sucursal.
+
 
 ### Seguridad
 
 - [ ] Decimal, no float para dinero.
 
 - [ ] precio no negativo.
+
+- [ ] `branch_id` no se acepta desde el modelo o cliente.
 
 
 ### Prompt para Codex
@@ -1507,6 +1555,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] get_product_price.
 
+- [ ] `BranchScope` inyectado desde `ASSISTANT_BRANCH_CODE`.
+
 - [ ] casos no encontrados.
 
 - [ ] tests.
@@ -1516,10 +1566,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] servicios no dependen de OpenAI.
 
+- [ ] la API interna del asistente no recibe sucursal como argumento.
+
 
 ### Seguridad
 
 - [ ] solo lectura para chatbot.
+
+- [ ] pruebas de acceso cruzado entre al menos dos sucursales.
 
 
 ### Prompt para Codex
@@ -1530,9 +1584,9 @@ Lee AGENTS.md, plan_de_trabajo.md y plan_de_trabajo.md antes de modificar códig
 
 Trabaja únicamente en la subfase F3.5 — Servicios de consulta comercial. No inicies ninguna subfase posterior.
 
-Alcance obligatorio: get_branch_info; search_product; get_product_price; casos no encontrados; tests.
+Alcance obligatorio: get_branch_info; search_product; get_product_price; BranchScope backend; casos no encontrados; pruebas de aislamiento entre sucursales.
 
-Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F3.5 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: servicios no dependen de OpenAI. Revisa específicamente esta seguridad: solo lectura para chatbot.
+Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F3.5 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: servicios no dependen de OpenAI y no reciben la sucursal desde input no confiable. Revisa específicamente esta seguridad: solo lectura para chatbot; BranchScope inyectado; pruebas negativas de acceso cruzado.
 
 Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGENTS.md. Si todo pasa, marca primero 🧪 VALIDACION y después ✅ COMPLETADO, actualiza el historial de plan_de_trabajo.md y reporta archivos, comandos, resultados, seguridad, riesgos y siguiente subfase. Si algo no puede comprobarse, no lo marques completado y documenta el bloqueo.
 ```
@@ -1602,7 +1656,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] categorías.
 
-- [ ] sucursal opcional.
+- [ ] sucursal obligatoria/interna para cada registro cargado por una instalación.
 
 - [ ] ejemplos ficticios.
 
@@ -1618,6 +1672,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] documentos son datos no instrucciones.
 
+- [ ] un asistente no busca FAQ de otra sucursal.
+
 
 ### Prompt para Codex
 
@@ -1627,7 +1683,7 @@ Lee AGENTS.md, plan_de_trabajo.md y plan_de_trabajo.md antes de modificar códig
 
 Trabaja únicamente en la subfase F4.1 — Formato y fuente FAQ. No inicies ninguna subfase posterior.
 
-Alcance obligatorio: definir estructura TXT/Markdown o tabla; categorías; sucursal opcional; ejemplos ficticios.
+Alcance obligatorio: definir estructura TXT/Markdown o tabla; categorías; alcance obligatorio de la sucursal configurada; ejemplos ficticios.
 
 Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F4.1 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: formato documentado y validable. Revisa específicamente esta seguridad: sin secretos; documentos son datos no instrucciones.
 
@@ -1648,6 +1704,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] búsqueda básica.
 
+- [ ] filtro de sucursal inyectado por backend.
+
 - [ ] errores.
 
 - [ ] tests.
@@ -1656,6 +1714,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Criterios de aceptación
 
 - [ ] FAQ consultable sin OpenAI.
+
+- [ ] resultados limitados a la instalación actual.
 
 
 ### Seguridad
@@ -1831,6 +1891,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] fecha.
 
+- [ ] código de sucursal del archivo igual a `ASSISTANT_BRANCH_CODE`.
+
 - [ ] ejemplo ficticio.
 
 
@@ -1838,12 +1900,16 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] plantilla inequívoca.
 
+- [ ] un archivo pertenece a una sola sucursal.
+
 
 ### Seguridad
 
 - [ ] no macros.
 
 - [ ] no datos reales en fixtures si no se proporcionan.
+
+- [ ] no permitir cargas multi-sucursal desde una instalación.
 
 
 ### Prompt para Codex
@@ -1885,10 +1951,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] errores por fila.
 
+- [ ] rechazo temprano de código de sucursal ajeno.
+
 
 ### Criterios de aceptación
 
 - [ ] archivo inválido no modifica DB.
+
+- [ ] archivo de otra sucursal no modifica DB.
 
 
 ### Seguridad
@@ -1966,6 +2036,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 - [ ] transacción.
 
 - [ ] upserts controlados.
+
+- [ ] `branch_id` inyectado por backend, nunca tomado como autoridad desde una celda.
 
 - [ ] rollback.
 
@@ -2106,6 +2178,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] schemas estrictos.
 
+- [ ] ningún schema expone `branch_id` o `branch_code` al modelo.
+
 
 ### Criterios de aceptación
 
@@ -2115,6 +2189,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] allowlist cerrada.
+
+- [ ] alcance de sucursal inyectado después de validar la tool.
 
 
 ### Prompt para Codex
@@ -2148,6 +2224,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] tests.
 
+- [ ] `BranchScope` obligatorio para handlers comerciales/FAQ.
+
 
 ### Criterios de aceptación
 
@@ -2157,6 +2235,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] solo mínimo privilegio.
+
+- [ ] pruebas demuestran que argumentos del modelo no cambian sucursal.
 
 
 ### Prompt para Codex
@@ -2201,6 +2281,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] prohibido execute_sql.
+
+- [ ] dispatcher compone handlers con la sucursal de la instalación.
 
 
 ### Prompt para Codex
@@ -2267,14 +2349,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```
 
 
-## F6.5 — Desambiguación de sucursal/producto
+## F6.5 — Desambiguación de producto con sucursal fija
 
 **Estado:** ⬜ PENDIENTE
 
 
 ### Alcance
 
-- [ ] si falta sucursal preguntar.
+- [ ] informar la sucursal propia cuando sea útil, sin pedir al cliente que la seleccione.
 
 - [ ] coincidencias múltiples.
 
@@ -2287,10 +2369,12 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] no mezclar precios de sucursales.
 
+- [ ] mencionar otra tienda no cambia el alcance de datos.
+
 
 ### Seguridad
 
-- [ ] nunca adivinar.
+- [ ] nunca adivinar producto ni sucursal.
 
 
 ### Prompt para Codex
@@ -2299,9 +2383,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```text
 Lee AGENTS.md, plan_de_trabajo.md y plan_de_trabajo.md antes de modificar código.
 
-Trabaja únicamente en la subfase F6.5 — Desambiguación de sucursal/producto. No inicies ninguna subfase posterior.
+Trabaja únicamente en la subfase F6.5 — Desambiguación de producto con sucursal fija. No inicies ninguna subfase posterior.
 
-Alcance obligatorio: si falta sucursal preguntar; coincidencias múltiples; producto inexistente; tests.
+Alcance obligatorio: informar sucursal propia sin permitir selección; coincidencias múltiples de producto; producto inexistente; mención de otra tienda sin cambio de alcance; tests.
 
 Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F6.5 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: no mezclar precios de sucursales. Revisa específicamente esta seguridad: nunca adivinar.
 
@@ -2446,7 +2530,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```
 
 
-## F7.2 — Identidad externa y contexto de sucursal
+## F7.2 — Identidad externa y sucursal inmutable de la instalación
 
 **Estado:** ⬜ PENDIENTE
 
@@ -2455,9 +2539,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] external_user_id.
 
-- [ ] branch context.
+- [ ] branch context derivado de la instalación.
 
-- [ ] actualización segura.
+- [ ] impedir que mensajes actualicen la sucursal.
 
 - [ ] tests.
 
@@ -2466,10 +2550,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] '¿y el rib eye?' conserva sucursal cuando corresponde.
 
+- [ ] toda conversación del número pertenece a la sucursal configurada.
+
 
 ### Seguridad
 
 - [ ] identificador redactado en logs.
+
+- [ ] no persistir una sucursal proporcionada por el cliente o el modelo.
 
 
 ### Prompt para Codex
@@ -2478,9 +2566,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ```text
 Lee AGENTS.md, plan_de_trabajo.md y plan_de_trabajo.md antes de modificar código.
 
-Trabaja únicamente en la subfase F7.2 — Identidad externa y contexto de sucursal. No inicies ninguna subfase posterior.
+Trabaja únicamente en la subfase F7.2 — Identidad externa y sucursal inmutable de la instalación. No inicies ninguna subfase posterior.
 
-Alcance obligatorio: external_user_id; branch context; actualización segura; tests.
+Alcance obligatorio: external_user_id; branch context derivado de configuración; impedir cambios desde mensajes; tests.
 
 Antes de programar revisa el estado actual del repositorio y preserva cambios existentes. Al comenzar, marca F7.2 como 🟨 EN_PROGRESO. Implementa cambios pequeños, agrega/actualiza tests y cumple estos criterios: '¿y el rib eye?' conserva sucursal cuando corresponde. Revisa específicamente esta seguridad: identificador redactado en logs.
 
@@ -2728,6 +2816,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] tests 401/403.
 
+- [ ] permisos por sucursal cuando un usuario no sea global.
+
 
 ### Criterios de aceptación
 
@@ -2737,6 +2827,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] no confiar en frontend.
+
+- [ ] backend impide CRUD cruzado entre sucursales.
 
 
 ### Prompt para Codex
@@ -2820,6 +2912,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] tests.
 
+- [ ] filtros y autorización de sucursal en backend.
+
 
 ### Criterios de aceptación
 
@@ -2829,6 +2923,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] audit log en cambios críticos.
+
+- [ ] un operador de tienda no modifica otra tienda.
 
 
 ### Prompt para Codex
@@ -2862,6 +2958,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] resultado.
 
+- [ ] mostrar la sucursal destino fijada por backend.
+
 
 ### Criterios de aceptación
 
@@ -2871,6 +2969,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] CSRF/autorización, límites archivo.
+
+- [ ] no permitir cambiar sucursal manipulando el formulario.
 
 
 ### Prompt para Codex
@@ -3173,6 +3273,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] tests.
 
+- [ ] cliente GreenAPI seleccionado por la sucursal de la conversación.
+
 
 ### Criterios de aceptación
 
@@ -3182,6 +3284,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] solo usuario autorizado.
+
+- [ ] nunca enviar desde el número de otra sucursal.
 
 
 ### Prompt para Codex
@@ -3530,6 +3634,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] .dockerignore.
 
+- [ ] una imagen común y siete configuraciones externas de despliegue.
+
 
 ### Criterios de aceptación
 
@@ -3539,6 +3645,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] secrets no baked.
+
+- [ ] perfiles/DB de sucursal no incluidos en la imagen común.
 
 
 ### Prompt para Codex
@@ -3664,6 +3772,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] rollback.
 
+- [ ] matriz de siete números, instancias, sucursales, DB y health checks sin registrar secretos.
+
 
 ### Criterios de aceptación
 
@@ -3673,6 +3783,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 ### Seguridad
 
 - [ ] sin riesgos críticos abiertos.
+
+- [ ] prueba negativa de acceso cruzado para las siete instalaciones.
 
 
 ### Prompt para Codex
@@ -3710,10 +3822,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] rollback check.
 
+- [ ] smoke test independiente de cada uno de los siete números/asistentes.
+
 
 ### Criterios de aceptación
 
 - [ ] MVP accesible de forma segura.
+
+- [ ] cada número responde únicamente con datos de su sucursal.
 
 
 ### Seguridad
@@ -4032,6 +4148,10 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | SQLAlchemy/queries parametrizadas | F3 | Sí | ✅ F3.1 |
 | URL DB configurable/protegida | F3 | Sí | ✅ F3.1 |
 | migraciones | F3 | Sí | ✅ F3.1 |
+| identidad fija por instalación | F3 | Sí | ✅ F3.2 |
+| carga de perfil limitada a sucursal | F3 | Sí | ✅ F3.2 |
+| consultas DB con alcance de sucursal | F3/F6 | Sí | ⬜ |
+| pruebas de acceso cruzado | F3/F6/F8 | Sí | ⬜ |
 | Decimal para dinero | F3 | Sí | ⬜ |
 | integridad/constraints | F3 | Sí | ⬜ |
 | documentos tratados como no confiables | F4 | Sí | ⬜ |
@@ -4104,18 +4224,27 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Severidad:** media/alta.  
 **Mitigación:** timeout, retry acotado, errores claros, cola/worker si el volumen lo exige.
 
+## R-11 — Fuga o mezcla de datos entre sucursales
+**Severidad:** crítica.
+**Mitigación:** una instalación/número por sucursal, `ASSISTANT_BRANCH_CODE` inmutable, perfil con
+código coincidente, alcance inyectado por backend, DB SQLite separada durante el MVP y pruebas
+negativas de acceso cruzado en repositorios, tools, panel y despliegue.
+
 ---
 
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 3 — Persistencia comercial (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F3.2 permanece `⬜ PENDIENTE`.
-**Última subfase completada:** F3.1 — SQLAlchemy + Alembic + SQLite.
-**Siguiente subfase:** F3.2 — Entidad sucursales, pendiente y sin iniciar.
+**Subfase activa:** ninguna; F3.4 permanece `⬜ PENDIENTE`.
+**Última subfase completada:** F3.3 — Entidad productos.
+**Siguiente subfase:** F3.4 — Entidad precios por sucursal, pendiente y sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
-No iniciar F3.2 automáticamente.
+**Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
+comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
+
+No iniciar F3.4 automáticamente.
 
 ---
 
@@ -6044,6 +6173,169 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F3.2 — Entidad sucursales, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
+
+---
+
+## 2026-09-22 — Un asistente y número por sucursal
+
+**Fase:** Fase 3 — Persistencia comercial
+**Tarea:** F3.2 — Entidad sucursales e identidad por asistente
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- cambiado el alcance de un solo número para siete tiendas a siete instalaciones/números, uno
+  por sucursal, conservando un único código y prompt común;
+- agregado `ASSISTANT_BRANCH_CODE` obligatorio, inmutable y validado para fijar el alcance de
+  cada runtime sin aceptar selección desde mensajes o argumentos del modelo;
+- creada la entidad `Branch` con código único, nombre, dirección, teléfono, horario, estado,
+  timestamps y constraints reproducibles mediante Alembic;
+- implementado CRUD interno parametrizado y `BranchService`, cuya superficie para el asistente
+  solo obtiene y aprovisiona la sucursal configurada;
+- agregado perfil JSON v1 ficticio y comando de instalación con validación previa, confirmación
+  `--apply` y upsert idempotente;
+- ignorados perfiles reales con sufijo `*.assistant-profile.json` y mantenidos fuera del prompt;
+- actualizado el prompt común para declarar una sola sucursal asignada sin datos particulares;
+- replanificadas consultas, FAQ, Excel, tools, conversaciones, panel, atención humana y
+  despliegue para conservar el alcance de sucursal en backend;
+- F3.3 y las entidades de productos/precios no fueron iniciadas.
+
+Archivos:
+
+- `.env.example`, `.gitignore`, `AGENTS.md`, `README.md`;
+- `backend/app/core/config.py`, `backend/app/core/exceptions.py`;
+- `backend/app/prompts/base_system_prompt.txt`;
+- `backend/app/schemas/branch.py`;
+- `backend/app/db/models/branch.py`, `backend/app/db/models/__init__.py`;
+- `backend/app/repositories/branch_repository.py`, `backend/app/repositories/__init__.py`;
+- `backend/app/services/branch_service.py`;
+- `backend/app/cli/provision_assistant.py`, `backend/app/cli/__init__.py`;
+- `migrations/versions/20260922_0002_branches.py`, `migrations/env.py`,
+  `migrations/README.md`;
+- `examples/assistant_profile.example.json`;
+- `backend/tests/test_branches.py` y pruebas existentes de configuración, migraciones, prompt,
+  composición y seguridad del repositorio;
+- `docs/fase_1_diseno.md`, `docs/fase_2_whatsapp.md`, `plan_de_trabajo.md`.
+
+Validación:
+
+- validación dirigida inicial -> 74 pruebas aprobadas; Ruff señaló una línea larga y cuatro
+  archivos con formato inconsistente, corregidos antes del cierre;
+- Alembic sobre SQLite temporal -> `upgrade head`, `current`, `check`, `downgrade
+  20260921_0001` y nuevo `upgrade head` correctos; head `20260922_0002` y cero operaciones
+  nuevas detectadas;
+- aprovisionamiento manual ficticio -> preview sin escritura, primer `--apply` con `created` y
+  segundo `--apply` con `unchanged`;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f32-final -o
+  cache_dir=.venv\pytest-cache-f32-final` -> 219 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 67 archivos con formato
+  correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- auditoría de archivos -> `.env` ignorado, ningún perfil real versionado, sin `execute_sql`,
+  SQL concatenado ni `create_all()` en la aplicación.
+
+Seguridad:
+
+- un perfil cuyo código no coincide con `ASSISTANT_BRANCH_CODE` se rechaza antes de escribir;
+- código de sucursal inmutable y consultas del asistente sin parámetro público de sucursal;
+- datos de perfil no se incorporan al system prompt ni a logs del aprovisionador;
+- el ejemplo contiene datos ficticios y los perfiles reales quedan ignorados;
+- la CLI usa transacción, queries SQLAlchemy parametrizadas y no imprime URL DB, dirección,
+  teléfono, horario ni secretos;
+- se preservan `SecretStr`, autenticación GreenAPI, bloqueo de red en tests y controles previos.
+
+Riesgos/Pendientes:
+
+- cada `.env` existente debe recibir un `ASSISTANT_BRANCH_CODE` válido antes de volver a iniciar
+  el chatbot; la ausencia produce fallo cerrado;
+- F3.2 carga únicamente identidad y datos básicos; productos, precios y consultas comerciales
+  se implementarán en F3.3-F3.5 y hasta entonces el asistente no los obtiene de la DB;
+- durante el MVP se recomienda una DB SQLite distinta por instalación; compartir una futura DB
+  exige mantener filtros y pruebas negativas de acceso cruzado en todas las capas;
+- la asociación operacional de cada número con su instalación vive en las credenciales GreenAPI
+  de cada `.env` y debe verificarse en el checklist de los siete despliegues.
+
+Siguiente:
+
+- F3.3 — Entidad productos, `⬜ PENDIENTE`; no iniciar sin instrucción explícita.
+
+---
+
+## 2026-09-22 — Catálogo de productos por sucursal
+
+**Fase:** Fase 3 — Persistencia comercial
+**Tarea:** F3.3 — Entidad productos
+**Estado:** ✅ COMPLETADO
+
+Cambios:
+
+- creada la entidad `Product` con nombre, categoría, estado activo, timestamps y pertenencia
+  obligatoria a una sucursal;
+- agregada la migración reproducible `20260922_0003`, con clave foránea restrictiva, checks de
+  texto, unicidad de nombre por sucursal e índice de catálogo;
+- habilitada la comprobación de claves foráneas en cada conexión SQLite;
+- agregado `ProductData` estricto, con normalización de bordes y rechazo de valores vacíos,
+  entradas sin letras/números, controles, campos extra y longitudes inválidas;
+- implementado `ProductRepository`, ligado al construirlo a un `Branch` persistido, con CRUD,
+  estado activo, consultas siempre filtradas y orden estable por categoría, nombre e id;
+- agregadas pruebas de validación, integridad, CRUD, orden determinista y aislamiento negativo
+  entre dos sucursales;
+- F3.4 y las entidades de precios no fueron iniciadas.
+
+Archivos:
+
+- `README.md`;
+- `backend/app/db/session.py`;
+- `backend/app/db/models/product.py`, `backend/app/db/models/__init__.py`;
+- `backend/app/schemas/product.py`;
+- `backend/app/repositories/product_repository.py`, `backend/app/repositories/__init__.py`;
+- `migrations/versions/20260922_0003_products.py`, `migrations/env.py`,
+  `migrations/README.md`;
+- `backend/tests/test_products.py`, `backend/tests/test_migrations.py`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- baseline dirigido de F3.2 -> 25 pruebas aprobadas;
+- validación dirigida de productos, sucursales y migraciones -> 39 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -q --basetemp=.venv\pytest-f33-final -o
+  cache_dir=.venv\pytest-cache-f33-final` -> 240 pruebas aprobadas sin red externa;
+- `.venv\Scripts\python.exe -m ruff check --no-cache .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check --no-cache .` -> 72 archivos con formato
+  correcto;
+- Alembic sobre SQLite temporal -> `upgrade head`, `current`, `check`, `downgrade
+  20260922_0002`, nuevo `upgrade head` y segundo `check` correctos; head `20260922_0003` y cero
+  operaciones nuevas detectadas;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- auditoría estática -> sin `execute_sql`, SQL concatenado, `create_all()` ni sucursal expuesta
+  en schemas públicos.
+
+Seguridad:
+
+- los datos del producto no aceptan `branch_id` ni `branch_code`; el repositorio recibe un
+  `Branch` persistido resuelto por backend y aplica su id a todas las operaciones;
+- `get_by_id`, `list_active` y `list_all` siempre filtran por sucursal; mutaciones sobre un
+  producto de otra sucursal se rechazan antes de escribir;
+- nombres y categorías se validan en Pydantic y cuentan con límites/checks adicionales en DB;
+- claves foráneas de SQLite verificadas mediante una prueba negativa con sucursal inexistente;
+- consultas SQLAlchemy parametrizadas y pruebas automatizadas sin red ni secretos.
+
+Riesgos/Pendientes:
+
+- SQLite compara la unicidad y el orden de nombres con su colación predeterminada; F3.5 deberá
+  definir la normalización de búsqueda y manejar coincidencias ambiguas sin adivinar;
+- el repositorio es infraestructura interna: aún no existen tools ni servicios del chatbot para
+  consultar productos, previstos para F3.5;
+- aún no hay precios, unidad ni vigencia; pertenecen exclusivamente a F3.4;
+- cada instalación debe seguir usando su configuración y, durante el MVP, preferentemente su
+  archivo SQLite propio para reforzar el aislamiento.
+
+Siguiente:
+
+- F3.4 — Entidad precios por sucursal, `⬜ PENDIENTE`; no iniciada.
 
 ---
 

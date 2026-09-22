@@ -23,6 +23,11 @@ F2.9 está `✅ COMPLETADO` después de completar una prueba real:
 WhatsApp -> GreenAPI -> webhook -> OpenAI -> GreenAPI -> WhatsApp
 ```
 
+El alcance posterior establece siete despliegues equivalentes: uno por sucursal y número. Cada
+despliegue conserva este mismo flujo y prompt, pero usa su propia instancia GreenAPI,
+`ASSISTANT_BRANCH_CODE`, `DATABASE_URL` y perfil de sucursal. No se agregan siete prompts ni
+ramas de código distintas.
+
 ## 2. Arquitectura
 
 ```text
@@ -49,12 +54,17 @@ BackgroundTasks -> MessageOrchestrator
                             GreenAPI sendMessage
 ```
 
+El diagrama representa una instalación. Se replica siete veces con configuración independiente.
+La instancia GreenAPI identifica el número y `ASSISTANT_BRANCH_CODE` identifica el único alcance
+de datos permitido para ese proceso.
+
 La ruta autentica y normaliza. El orquestador coordina. Los adaptadores externos están aislados
 en servicios. La ruta no contiene llamadas directas a OpenAI ni construye endpoints de GreenAPI.
 
 ## 3. Configuración
 
 ```dotenv
+ASSISTANT_BRANCH_CODE=
 GREEN_API_INSTANCE_ID=
 GREEN_API_TOKEN_INSTANCE=
 GREEN_API_API_URL=https://api.green-api.com
@@ -64,6 +74,7 @@ WHATSAPP_REQUEST_TIMEOUT_SECONDS=15
 
 Reglas:
 
+- `ASSISTANT_BRANCH_CODE` fija una sola sucursal por instalación y no se obtiene del webhook;
 - `GREEN_API_INSTANCE_ID` contiene de 1 a 20 dígitos y no empieza con cero;
 - `GREEN_API_TOKEN_INSTANCE` es `SecretStr` y acepta únicamente caracteres seguros para path;
 - `GREEN_API_WEBHOOK_TOKEN` es un valor independiente, aleatorio y URL-safe de 32 a 256
@@ -75,6 +86,10 @@ Reglas:
 
 No hay fallback a variables de Meta. La ausencia de configuración requerida produce un fallo
 cerrado y seguro. `.env` no se versiona y `.env.example` solo contiene valores vacíos o públicos.
+
+El cliente, el remitente y el modelo no pueden cambiar la sucursal. Un mensaje que mencione otra
+tienda puede recibir orientación textual en el futuro, pero nunca amplía el acceso a datos ni
+cambia el alcance del proceso.
 
 ## 4. Configuración de la instancia GreenAPI
 

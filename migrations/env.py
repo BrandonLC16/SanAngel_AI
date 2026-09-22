@@ -4,6 +4,8 @@ from alembic import context
 
 from backend.app.core.config import get_database_settings
 from backend.app.db.base import Base
+from backend.app.db.models.branch import Branch  # noqa: F401
+from backend.app.db.models.product import Product  # noqa: F401
 from backend.app.db.session import create_database_engine
 
 config = context.config

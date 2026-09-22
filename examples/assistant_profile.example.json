@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "branch": {
+    "code": "sucursal-demo",
+    "name": "Sucursal de demostración",
+    "address": "Avenida Ejemplo 123, Colonia Centro",
+    "phone": "+520000000000",
+    "business_hours": "Lunes a sábado de 09:00 a 19:00; domingo de 09:00 a 15:00"
+  }
+}

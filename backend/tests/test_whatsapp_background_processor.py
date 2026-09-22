@@ -34,6 +34,7 @@ class RecordingOrchestrator:
 
 def make_settings() -> Settings:
     return Settings(
+        assistant_branch_code="sucursal-demo",
         openai_api_key="test-only-openai-credential-placeholder",
         _env_file=None,
     )

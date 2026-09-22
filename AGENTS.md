@@ -7,7 +7,15 @@ Este archivo contiene reglas obligatorias para cualquier agente que modifique es
 
 # 1. Objetivo del sistema
 
-Construir un asistente automatizado de atención al cliente para una cadena de carnicerías.
+Construir siete asistentes automatizados de atención al cliente, uno por sucursal y número de
+WhatsApp, para una cadena de carnicerías.
+
+Todos los asistentes usan el mismo código, prompt e indicaciones. Cada instalación se vincula de
+forma inmutable a una sola sucursal mediante `ASSISTANT_BRANCH_CODE`, una instancia/número propio
+de GreenAPI y un perfil de datos de esa sucursal.
+
+La sucursal nunca se elige desde el mensaje del cliente ni desde argumentos generados por el
+modelo. El backend inyecta el alcance configurado en toda consulta a la base de datos.
 
 ## Canal del cliente
 
@@ -64,6 +72,22 @@ El panel web se implementará posteriormente y será únicamente para:
 - preguntas no resueltas;
 - atención humana;
 - auditoría y estadísticas.
+
+## Modelo de despliegue por sucursal
+
+```text
+mismo repositorio + mismo prompt
+             |
+             +-- instalación 1 -> número 1 -> ASSISTANT_BRANCH_CODE=tienda-1 -> datos tienda 1
+             +-- instalación 2 -> número 2 -> ASSISTANT_BRANCH_CODE=tienda-2 -> datos tienda 2
+             +-- ...
+             +-- instalación 7 -> número 7 -> ASSISTANT_BRANCH_CODE=tienda-7 -> datos tienda 7
+```
+
+Cada instalación debe tener su propio `.env`, credenciales GreenAPI, `DATABASE_URL` y perfil de
+sucursal. Durante el MVP con SQLite se prefiere un archivo de base de datos separado por
+instalación. Si posteriormente varias instalaciones comparten PostgreSQL, el aislamiento por
+sucursal sigue siendo obligatorio en repositorios, servicios, autorización y pruebas.
 
 ---
 
@@ -131,6 +155,7 @@ Datos:
 - SQLite como fuente operativa.
 - Excel como mecanismo de importación/actualización, no como base consultada en cada mensaje.
 - TXT/Markdown para conocimiento simple cuando corresponda.
+- perfil JSON versionado para aprovisionar la identidad y datos básicos de una instalación.
 
 Panel futuro:
 
@@ -356,6 +381,9 @@ GREEN_API_WEBHOOK_TOKEN
 
 Todos son backend-only.
 
+`ASSISTANT_BRANCH_CODE` no es un secreto, pero es una frontera de autorización/configuración: no
+puede modificarse mediante una conversación ni confiarse a datos proporcionados por el cliente.
+
 `.env.example` debe contener únicamente nombres y valores vacíos/no sensibles.
 
 ---
@@ -493,12 +521,18 @@ Cuando se implemente:
 - transacciones;
 - nunca concatenar input en SQL;
 - no exponer `execute_sql(query)` a OpenAI;
-- tools específicas y de mínimo privilegio.
+- tools específicas y de mínimo privilegio;
+- todo acceso usado por un asistente debe incluir el alcance de sucursal obtenido de
+  `ASSISTANT_BRANCH_CODE` o de un contexto backend equivalente;
+- nunca aceptar `branch_id` o `branch_code` desde texto del cliente, tool calls del modelo,
+  query params públicos o documentos recuperados;
+- una instalación no puede cargar un perfil cuyo código difiera de su alcance configurado;
+- las pruebas deben intentar accesos cruzados entre sucursales y comprobar su rechazo.
 
 Permitido:
 
 ```text
-get_product_price(product_id, branch_id)
+get_product_price(product_id) -> el backend inyecta la sucursal configurada
 ```
 
 Prohibido:

@@ -27,6 +27,7 @@ Handler = Callable[[httpx.Request], httpx.Response | Awaitable[httpx.Response]]
 
 def make_settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
+        "assistant_branch_code": "sucursal-demo",
         "openai_api_key": "test-only-openai-credential-placeholder",
         "green_api_instance_id": INSTANCE_ID,
         "green_api_token_instance": TOKEN_INSTANCE_MARKER,
