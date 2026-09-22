@@ -160,3 +160,17 @@ class ProductPriceNotFoundError(ApplicationError):
     error_code = "product_price_not_found"
     public_message = "No encontramos un precio vigente para ese producto y unidad."
     status_code = 404
+
+
+class FAQSourceError(ServiceUnavailableError):
+    """Raised when the configured FAQ source cannot be used safely."""
+
+    error_code = "faq_source_unavailable"
+    public_message = "La información FAQ no está disponible temporalmente."
+
+
+class FAQQueryInputError(InvalidRequestError):
+    """Raised when an FAQ search query has an invalid format."""
+
+    error_code = "faq_query_invalid"
+    public_message = "La consulta FAQ no es válida."

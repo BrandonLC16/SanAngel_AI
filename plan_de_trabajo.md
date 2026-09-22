@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-22
 **Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F4.1 (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F4.1 completada; F4.2 pendiente
+**Subfase activa:** ninguna; F4.2 (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F4.2 completada; F4.3 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1713,36 +1713,42 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F4.2 — Loader/servicio de FAQ
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-22
+
+**Fecha de validación:** 2026-09-22
+
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] loader.
+- [x] loader.
 
-- [ ] normalización.
+- [x] normalización.
 
-- [ ] búsqueda básica.
+- [x] búsqueda básica.
 
-- [ ] filtro de sucursal inyectado por backend.
+- [x] filtro de sucursal inyectado por backend.
 
-- [ ] errores.
+- [x] errores.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] FAQ consultable sin OpenAI.
+- [x] FAQ consultable sin OpenAI.
 
-- [ ] resultados limitados a la instalación actual.
+- [x] resultados limitados a la instalación actual.
 
 
 ### Seguridad
 
-- [ ] límites de tamaño.
+- [x] límites de tamaño.
 
-- [ ] encoding/control de errores.
+- [x] encoding/control de errores.
 
 
 ### Prompt para Codex
@@ -4255,16 +4261,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F4.1 (`✅ COMPLETADO`).
-**Última subfase completada:** F4.1 — Formato y fuente FAQ.
-**Siguiente subfase recomendada:** F4.2 — Loader/servicio de FAQ (`⬜ PENDIENTE`), sin iniciar.
+**Subfase activa:** ninguna; F4.2 (`✅ COMPLETADO`).
+**Última subfase completada:** F4.2 — Loader/servicio de FAQ.
+**Siguiente subfase recomendada:** F4.3 — Política de respuesta y desconocidos (`⬜ PENDIENTE`), sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-No iniciar F4.2 automáticamente.
+No iniciar F4.3 automáticamente.
 
 ---
 
@@ -6645,6 +6651,65 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F4.2 — Loader/servicio de FAQ, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-22 — F4.2 loader y consulta local de FAQ
+
+Fase: Fase 4 — FAQ y conocimiento general del negocio, `🟨 EN_PROGRESO`.
+Subfase: F4.2 — Loader/servicio de FAQ, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- agregado un loader TSV de snapshot único que valida cabecera y todas las filas con el alcance
+  de sucursal inyectado desde backend; no entrega resultados parciales ante errores;
+- implementada búsqueda de solo lectura sobre preguntas, con normalización de Unicode, acentos,
+  mayúsculas y espacios; ranking estable de coincidencias exactas, prefijos y parciales;
+- definidos errores seguros de fuente y de consulta, documentación operativa y pruebas de
+  lectura, búsqueda, límites, codificación y acceso cruzado.
+
+Archivos:
+
+- `README.md`;
+- `backend/app/core/exceptions.py`;
+- `backend/app/services/faq_service.py`;
+- `backend/tests/test_faq_service.py`;
+- `docs/fase_4_faq.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_service.py
+  backend/tests/test_faq_format.py -q` -> 40 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 329 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 89 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git -c safe.directory=C:/Proyectos/SanAngel_AI diff --check` -> sin errores; solo
+  advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- la lectura está acotada a 256 KiB y 500 filas, exige UTF-8 y TSV válido y rechaza una sola fila
+  de otra sucursal sin dejar FAQ parcial disponible;
+- la búsqueda limita entrada a 240 caracteres y resultados a cinco registros, no acepta
+  `branch_code` ni `branch_id` y no llama a OpenAI ni a proveedores externos;
+- `FAQSourceError` y `FAQQueryInputError` usan mensajes públicos fijos sin rutas, contenido de
+  archivo ni textos de consulta; las pruebas negativas cubren errores de archivo y ambos sentidos
+  de acceso cruzado.
+
+Riesgos/Pendientes:
+
+- la ruta del TSV debe elegirse desde configuración o código backend de cada instalación; el
+  servicio todavía no está conectado al orquestador ni a HTTP;
+- el servicio conserva un snapshot; para aplicar cambios del archivo se debe construir otro;
+- las decisiones de respuesta ante preguntas sin coincidencias o ambiguas corresponden a F4.3;
+  la aprobación y actualización del contenido real siguen siendo responsabilidad del negocio.
+
+Siguiente:
+
+- F4.3 — Política de respuesta y desconocidos, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

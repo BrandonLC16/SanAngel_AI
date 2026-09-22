@@ -36,8 +36,8 @@ procedimiento de respaldo previo a cambios productivos. La Fase 4 está en desar
 F4.1 está `✅ COMPLETADO`: define una tabla FAQ TSV por instalación, con categorías cerradas,
 versión y sucursal obligatoria en cada fila. El formato, el ejemplo ficticio y sus reglas de
 validación están en
-[`docs/fase_4_faq.md`](docs/fase_4_faq.md). La lectura y búsqueda de archivos FAQ corresponden a
-F4.2.
+[`docs/fase_4_faq.md`](docs/fase_4_faq.md). F4.2 está `✅ COMPLETADO`: añade carga acotada del TSV
+y búsqueda local de solo lectura, sin OpenAI y con el alcance de sucursal inyectado desde backend.
 
 ## Modelo de los siete asistentes
 

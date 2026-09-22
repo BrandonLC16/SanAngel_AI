@@ -1,4 +1,4 @@
-# Fase 4 — Contrato de la fuente FAQ (F4.1)
+# Fase 4 — Fuente y consulta FAQ (F4.1–F4.2)
 
 ## Fuente elegida
 
@@ -57,6 +57,41 @@ respuestas deben presentarse como contenido recuperado, con la sucursal ya autor
 no se deben promover a mensajes de sistema. Los precios, existencias, horarios, ubicaciones y
 pedidos siguen dependiendo de sus fuentes y lógica determinísticas correspondientes.
 
-F4.1 entrega el contrato y la validación de filas. La lectura del archivo, límites de tamaño y
-codificación, normalización, búsqueda y manejo de errores de la fuente pertenecen a F4.2. No hay
-consulta FAQ desde OpenAI, WhatsApp ni rutas HTTP en esta subfase.
+## Carga y búsqueda local (F4.2)
+
+`FAQService` recibe una ruta local elegida por el backend y un `BranchScope` construido desde
+configuración. Lee el TSV completo **una sola vez**, valida cabecera y todas las filas, y conserva
+un snapshot inmutable en memoria. Si una fila apunta a otra sucursal, tiene un campo inválido o
+el archivo falla, no queda disponible ninguna respuesta parcial. Un archivo con solo cabecera es
+válido y devuelve cero resultados. Para aplicar cambios del archivo se debe construir un servicio
+nuevo; no hay recarga por mensaje.
+
+La lectura está limitada a **256 KiB** y **500 filas**, con decodificación UTF-8 estricta y parser
+TSV estricto. Extensión distinta de `.tsv`, archivo ausente, permisos insuficientes, contenido
+demasiado grande, texto mal codificado o formato inválido producen `FAQSourceError`. El error
+público no contiene ruta, fila ni contenido del archivo.
+
+`search_faq(query)` acepta una cadena de hasta **240 caracteres**. Rechaza entradas vacías, no
+imprimibles o sin caracteres alfanuméricos con `FAQQueryInputError`. Normaliza Unicode, mayúsculas,
+acentos y espacios para comparar **solo la pregunta**. Ordena coincidencias exactas, de prefijo y
+parciales de manera determinista, devuelve como máximo cinco registros inmutables y devuelve una
+tupla vacía si no hay coincidencias. La firma no acepta sucursal desde el cliente o el modelo.
+
+La ruta de la fuente debe seleccionarse en código o configuración backend de la instalación,
+nunca desde el mensaje de WhatsApp ni desde argumentos de OpenAI. El servicio no llama a OpenAI,
+no escribe a la base de datos y no está conectado a rutas HTTP o al orquestador. La política para
+preguntas desconocidas y respuestas conversacionales corresponde a F4.3 y fases posteriores.
+
+Ejemplo de uso **interno** después de preparar el archivo de esa instalación:
+
+```python
+from pathlib import Path
+
+from backend.app.core.config import AssistantSettings
+from backend.app.services.branch_scope import BranchScope
+from backend.app.services.faq_service import FAQService
+
+scope = BranchScope.from_settings(AssistantSettings())
+faq = FAQService(Path("sucursal-1.assistant-faq.tsv"), branch_scope=scope)
+coincidencias = faq.search_faq("¿Qué formas de pago aceptan?")
+```
