@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-22
-**Fase activa:** ninguna; Fase 3 — Persistencia comercial (`✅ COMPLETADO`)
-**Subfase activa:** ninguna; F3.6 (`✅ COMPLETADO`)
-**Estado global:** ✅ COMPLETADO — Fase 3 cerrada; Fase 4 pendiente
+**Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`)
+**Subfase activa:** ninguna; F4.1 (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F4.1 completada; F4.2 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1652,39 +1652,47 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Responder información general mediante una fuente controlada sin convertir documentos en instrucciones privilegiadas.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+
+**Fecha de inicio:** 2026-09-22
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F4.1 — Formato y fuente FAQ
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-22
+
+**Fecha de validación:** 2026-09-22
+
+**Fecha de finalización:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] definir estructura TXT/Markdown o tabla.
+- [x] definir estructura TXT/Markdown o tabla.
 
-- [ ] categorías.
+- [x] categorías.
 
-- [ ] sucursal obligatoria/interna para cada registro cargado por una instalación.
+- [x] sucursal obligatoria/interna para cada registro cargado por una instalación.
 
-- [ ] ejemplos ficticios.
+- [x] ejemplos ficticios.
 
 
 ### Criterios de aceptación
 
-- [ ] formato documentado y validable.
+- [x] formato documentado y validable.
 
 
 ### Seguridad
 
-- [ ] sin secretos.
+- [x] sin secretos.
 
-- [ ] documentos son datos no instrucciones.
+- [x] documentos son datos no instrucciones.
 
-- [ ] un asistente no busca FAQ de otra sucursal.
+- [x] un asistente no busca FAQ de otra sucursal.
 
 
 ### Prompt para Codex
@@ -4246,17 +4254,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** ninguna; Fase 3 — Persistencia comercial (`✅ COMPLETADO`).
-**Subfase activa:** ninguna; F3.6 (`✅ COMPLETADO`).
-**Última subfase completada:** F3.6 — Integridad, migraciones y cierre.
-**Siguiente subfase recomendada:** F4.1 — Formato y fuente FAQ (`⬜ PENDIENTE`), sin iniciar.
+**Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F4.1 (`✅ COMPLETADO`).
+**Última subfase completada:** F4.1 — Formato y fuente FAQ.
+**Siguiente subfase recomendada:** F4.2 — Loader/servicio de FAQ (`⬜ PENDIENTE`), sin iniciar.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-No iniciar Fase 4 automáticamente.
+No iniciar F4.2 automáticamente.
 
 ---
 
@@ -6575,6 +6583,68 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F4.1 — Formato y fuente FAQ, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-22 — F4.1 formato y fuente FAQ
+
+Fase: Fase 4 — FAQ y conocimiento general del negocio, `🟨 EN_PROGRESO`.
+Subfase: F4.1 — Formato y fuente FAQ, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- definido TSV UTF-8 versionado con cabecera exacta, cinco categorías y campos acotados;
+- validada cada fila contra el `BranchScope` creado desde configuración backend, con código
+  obligatorio por fila y registro resultante inmutable;
+- agregado un ejemplo ficticio de cinco categorías y documentado el contrato de la fuente;
+- separados el contrato de esquema y la validación de alcance, sin implementar lectura, búsqueda
+  ni integración conversacional de F4.2.
+
+Archivos:
+
+- `.gitignore`;
+- `README.md`;
+- `backend/app/schemas/faq.py`;
+- `backend/app/services/faq_scope.py`;
+- `backend/tests/test_faq_format.py`;
+- `docs/fase_4_faq.md`;
+- `examples/faq_table.example.tsv`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_format.py -q`
+  -> 20 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 310 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 87 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git -c safe.directory=C:/Proyectos/SanAngel_AI diff --check` -> sin errores; solo
+  advertencias informativas LF/CRLF;
+- `git check-ignore` -> archivos `*.assistant-faq.tsv` ignorados; el ejemplo sigue versionable;
+- búsqueda de patrones de tokens en el ejemplo -> sin coincidencias.
+
+Seguridad:
+
+- cada fila exige un código válido coincidente con el alcance backend y la prueba negativa intenta
+  ambos sentidos de acceso cruzado entre dos sucursales;
+- columnas extra como `role`, categorías desconocidas, controles en texto y errores que revelen
+  el contenido de una respuesta se rechazan o evitan;
+- el ejemplo contiene solo datos ficticios y ningún secreto; los archivos reales se ignoran por
+  Git; el documento FAQ se trata como dato sin privilegios de prompt ni tools.
+
+Riesgos/Pendientes:
+
+- F4.1 no lee archivos en runtime ni ofrece búsqueda; límites de tamaño, codificación,
+  normalización, errores y consulta con filtro backend corresponden a F4.2;
+- el contenido FAQ real deberá ser aprobado y mantenido por el negocio; esta subfase valida su
+  forma y alcance, no verifica la veracidad de afirmaciones comerciales;
+- ninguna FAQ se conecta todavía con OpenAI, WhatsApp o rutas HTTP.
+
+Siguiente:
+
+- F4.2 — Loader/servicio de FAQ, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

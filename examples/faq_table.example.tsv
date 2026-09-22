@@ -1,0 +1,6 @@
+schema_version	branch_code	category	question	answer
+1	sucursal-demo	general	¿Dónde puedo resolver una duda general?	EJEMPLO FICTICIO: consulta al personal de la sucursal para recibir orientación.
+1	sucursal-demo	servicios	¿Qué servicios ofrecen?	EJEMPLO FICTICIO: pregunta al personal cuáles servicios están disponibles actualmente.
+1	sucursal-demo	pagos	¿Qué formas de pago aceptan?	EJEMPLO FICTICIO: confirma con el personal las formas de pago vigentes.
+1	sucursal-demo	entregas	¿Hacen entregas?	EJEMPLO FICTICIO: confirma con el personal si la sucursal ofrece entregas.
+1	sucursal-demo	politicas	¿Dónde consulto las políticas de compra?	EJEMPLO FICTICIO: solicita al personal la política vigente antes de comprar.

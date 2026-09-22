@@ -31,7 +31,13 @@ de sucursal y un repositorio de consulta determinista. F3.4 está `✅ COMPLETAD
 precios exactos por sucursal, producto y unidad. F3.5 está `✅ COMPLETADO`: implementa servicios
 de consulta comercial de solo lectura con alcance de sucursal inyectado. F3.6 y la Fase 3 están
 `✅ COMPLETADO`: quedaron verificadas la integridad y reversibilidad de las migraciones y el
-procedimiento de respaldo previo a cambios productivos. La Fase 4 permanece sin iniciar.
+procedimiento de respaldo previo a cambios productivos. La Fase 4 está en desarrollo.
+
+F4.1 está `✅ COMPLETADO`: define una tabla FAQ TSV por instalación, con categorías cerradas,
+versión y sucursal obligatoria en cada fila. El formato, el ejemplo ficticio y sus reglas de
+validación están en
+[`docs/fase_4_faq.md`](docs/fase_4_faq.md). La lectura y búsqueda de archivos FAQ corresponden a
+F4.2.
 
 ## Modelo de los siete asistentes
 
@@ -253,8 +259,8 @@ hace nada si el contenido ya coincide. Un perfil de otra sucursal se rechaza ant
 El comando no muestra dirección, teléfono, horarios, URL de base de datos ni credenciales.
 
 En F3.2 el perfil contiene datos básicos de la sucursal. Las futuras cargas de productos,
-precios y FAQ conservarán el mismo contrato: el código del archivo debe coincidir con el alcance
-de la instalación y nunca será un argumento controlado por el cliente o el modelo.
+precios y FAQ conservarán el mismo contrato: el código de cada registro FAQ debe coincidir con
+el alcance de la instalación y nunca será un argumento controlado por el cliente o el modelo.
 
 ## Webhook de GreenAPI
 

@@ -1,0 +1,62 @@
+# Fase 4 — Contrato de la fuente FAQ (F4.1)
+
+## Fuente elegida
+
+Cada instalación tendrá una **tabla TSV de texto UTF-8** propia, por ejemplo
+`sucursal-1.assistant-faq.tsv`. Es una fuente de contenido aprobada por el negocio, no una base
+consultada directamente por el asistente en F4.1. Los archivos reales con ese sufijo están
+ignorados por Git; solo se versiona [un ejemplo ficticio](../examples/faq_table.example.tsv).
+
+La primera línea debe tener, en este orden exacto, cinco columnas separadas por tabuladores:
+
+```text
+schema_version<TAB>branch_code<TAB>category<TAB>question<TAB>answer
+```
+
+Cada línea posterior representa un registro. Se usa la convención TSV del módulo `csv` de Python
+para entrecomillar campos cuando sea necesario. Los campos `question` y `answer` son texto plano,
+sin tabuladores, saltos de línea ni otros caracteres de control. No se admiten columnas extra,
+campos faltantes ni espacios al inicio o al final de las preguntas y respuestas.
+
+| Columna | Contrato |
+|---|---|
+| `schema_version` | Obligatoria, valor literal `1` en cada fila. |
+| `branch_code` | Obligatoria en cada fila; código válido de 2 a 48 caracteres y exactamente igual a `ASSISTANT_BRANCH_CODE` de la instalación. |
+| `category` | Uno de los cinco códigos de la tabla siguiente. |
+| `question` | Pregunta de texto plano, entre 1 y 240 caracteres. |
+| `answer` | Respuesta aprobada de texto plano, entre 1 y 1200 caracteres. |
+
+Categorías permitidas:
+
+| Código | Uso previsto |
+|---|---|
+| `general` | Orientación general que no pertenece a otra categoría. |
+| `servicios` | Servicios ofrecidos, previa validación por personal. |
+| `pagos` | Información validada sobre formas de pago. |
+| `entregas` | Información validada sobre opciones de entrega. |
+| `politicas` | Políticas comerciales aprobadas. |
+
+El ejemplo usa `sucursal-demo` y respuestas marcadas `EJEMPLO FICTICIO`; no describe condiciones
+reales. Para crear la fuente de una instalación, copiarlo a un archivo local con el sufijo
+`.assistant-faq.tsv`, sustituir el código de **todas** las filas por el código configurado y
+reemplazar las respuestas con texto aprobado por el negocio. Nunca incluir claves, tokens, datos
+de pago, datos personales innecesarios ni instrucciones para el modelo.
+
+## Validación y alcance
+
+`backend.app.schemas.faq` define la cabecera, categorías y campos admitidos. La función
+`validate_scoped_faq_row` de `backend.app.services.faq_scope` valida una fila y exige un
+`BranchScope` creado desde `AssistantSettings`; compara el código de la tabla con el código del
+backend y devuelve un registro inmutable cuyo alcance se toma del backend. Rechaza filas de otra
+sucursal, aunque su texto sea válido. Ni el cliente ni el modelo pueden elegir el alcance. La
+cabecera se comprueba con `validate_faq_columns`.
+
+La tabla es **dato no confiable**, no instrucciones privilegiadas. Su contenido no puede modificar
+el system prompt, activar herramientas, cambiar precios ni conceder permisos. Preguntas y
+respuestas deben presentarse como contenido recuperado, con la sucursal ya autorizada por código;
+no se deben promover a mensajes de sistema. Los precios, existencias, horarios, ubicaciones y
+pedidos siguen dependiendo de sus fuentes y lógica determinísticas correspondientes.
+
+F4.1 entrega el contrato y la validación de filas. La lectura del archivo, límites de tamaño y
+codificación, normalización, búsqueda y manejo de errores de la fuente pertenecen a F4.2. No hay
+consulta FAQ desde OpenAI, WhatsApp ni rutas HTTP en esta subfase.
