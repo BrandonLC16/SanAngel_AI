@@ -38,6 +38,9 @@ versión y sucursal obligatoria en cada fila. El formato, el ejemplo ficticio y 
 validación están en
 [`docs/fase_4_faq.md`](docs/fase_4_faq.md). F4.2 está `✅ COMPLETADO`: añade carga acotada del TSV
 y búsqueda local de solo lectura, sin OpenAI y con el alcance de sucursal inyectado desde backend.
+F4.3 está `✅ COMPLETADO`: define una política determinista. Solo una FAQ exacta y única puede
+aportar contenido; una pregunta desconocida o ambigua recibe texto fijo y una propuesta de ayuda
+humana sin ejecutar el traspaso.
 
 ## Modelo de los siete asistentes
 

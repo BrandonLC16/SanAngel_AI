@@ -1,4 +1,4 @@
-# Fase 4 — Fuente y consulta FAQ (F4.1–F4.2)
+# Fase 4 — Fuente, consulta y política FAQ (F4.1–F4.3)
 
 ## Fuente elegida
 
@@ -95,3 +95,29 @@ scope = BranchScope.from_settings(AssistantSettings())
 faq = FAQService(Path("sucursal-1.assistant-faq.tsv"), branch_scope=scope)
 coincidencias = faq.search_faq("¿Qué formas de pago aceptan?")
 ```
+
+## Respuesta confirmada y desconocidos (F4.3)
+
+`FAQResponsePolicy` usa el servicio local y decide sin OpenAI ni herramientas. Solo entrega un
+`FAQAnswer` si hay **una coincidencia exacta y única** de pregunta, normalizada por mayúsculas,
+acentos, espacios y signos de interrogación externos. El resultado identifica su fuente como
+`faq` y su nivel de confianza como `untrusted_source`: el texto sigue siendo dato recuperado,
+nunca instrucciones para el sistema o para herramientas.
+
+Una pregunta sin coincidencias devuelve `FAQFallback` con texto fijo que reconoce que no hay
+respuesta confirmada. Una coincidencia parcial o varias coincidencias exactas también devuelve
+texto fijo y pide reformular o consultar al personal. Ningún fallback copia la consulta ni inventa
+precios, existencias, horarios, ubicaciones, políticas o confirmaciones comerciales. Una consulta
+inválida mantiene el error de validación de F4.2.
+
+Cada fallback lleva una propuesta `request_human_help` con razón cerrada (`faq_unknown` o
+`faq_ambiguous`) y `executed=False`. Es una intención conceptual: no contacta a nadie, no guarda
+teléfono ni conversación y no afirma que una persona haya respondido. La ejecución, autorización,
+idempotencia y auditoría del traspaso humano pertenecen a fases posteriores.
+
+El texto del usuario y el de la tabla pueden contener intentos de prompt injection. La política
+no los ejecuta, no cambia de sucursal y no concede privilegios. Una instrucción añadida a una
+pregunta conocida deja de ser una coincidencia exacta y recibe fallback. El contenido FAQ que se
+use más adelante con un modelo debe conservar su condición de dato no confiable. Para hechos
+comerciales críticos, la fuente sigue siendo el servicio determinista correspondiente, no esta
+política FAQ.

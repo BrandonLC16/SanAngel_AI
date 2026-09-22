@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-22
 **Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F4.2 (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F4.2 completada; F4.3 pendiente
+**Subfase activa:** ninguna; F4.3 (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 4; F4.3 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1769,28 +1769,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F4.3 — Política de respuesta y desconocidos
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-22
+
+**Fecha de validación:** 2026-09-22
+
+**Fecha de cierre:** 2026-09-22
 
 
 ### Alcance
 
-- [ ] reglas no inventar.
+- [x] reglas no inventar.
 
-- [ ] fallback.
+- [x] fallback.
 
-- [ ] request_human_help conceptual.
+- [x] request_human_help conceptual.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] pregunta desconocida no genera dato falso.
+- [x] pregunta desconocida no genera dato falso.
 
 
 ### Seguridad
 
-- [ ] defensa contra prompt injection.
+- [x] defensa contra prompt injection.
 
 
 ### Prompt para Codex
@@ -4261,16 +4267,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F4.2 (`✅ COMPLETADO`).
-**Última subfase completada:** F4.2 — Loader/servicio de FAQ.
-**Siguiente subfase recomendada:** F4.3 — Política de respuesta y desconocidos (`⬜ PENDIENTE`), sin iniciar.
+**Subfase activa:** ninguna; F4.3 (`✅ COMPLETADO`).
+**Última subfase completada:** F4.3 — Política de respuesta y desconocidos.
+**Siguiente subfase:** F4.4 pendiente; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-No iniciar F4.3 automáticamente.
+No iniciar F4.4 automáticamente.
 
 ---
 
@@ -6710,6 +6716,61 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F4.3 — Política de respuesta y desconocidos, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-22 — F4.3 política de respuesta y desconocidos
+
+Fase: Fase 4 — FAQ y conocimiento general del negocio, `🟨 EN_PROGRESO`.
+Subfase: F4.3 — Política de respuesta y desconocidos, `✅ COMPLETADO`.
+
+Cambios:
+
+- incorporada una política determinista que solo devuelve el contenido de una pregunta FAQ exacta
+  y única; consultas desconocidas, parciales o ambiguas reciben texto fijo sin datos comerciales;
+- representada `request_human_help` como propuesta con motivo cerrado y `executed=False`, sin
+  contactar al personal ni guardar datos personales;
+- documentados el origen no confiable del contenido FAQ, las reglas de respuesta y las pruebas
+  de fallback, ambigüedad e intento de cambio de instrucciones.
+
+Archivos:
+
+- `README.md`;
+- `backend/app/services/faq_response_policy.py`;
+- `backend/tests/test_faq_response_policy.py`;
+- `docs/fase_4_faq.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_response_policy.py
+  backend/tests/test_faq_service.py -q` -> 27 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 337 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 91 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git -c safe.directory=C:/Proyectos/SanAngel_AI diff --check` -> sin errores; solo
+  advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- la política no invoca OpenAI, herramientas, WhatsApp ni escrituras; preserva el alcance de
+  sucursal fijado por el backend en `FAQService`;
+- consultas con instrucciones añadidas reciben fallback y no cambian permisos ni sucursal;
+- el texto recuperado se identifica como dato `untrusted_source`, nunca como instrucción
+  privilegiada; los fallback no incluyen la consulta ni contenido de la FAQ;
+- la propuesta de ayuda humana no ejecuta el traspaso ni almacena teléfono o conversación.
+
+Riesgos/Pendientes:
+
+- el contenido real de la FAQ requiere aprobación del negocio; la política no garantiza su
+  veracidad ni sustituye fuentes deterministas de precios, existencias y otros hechos críticos;
+- la política aún no está conectada al orquestador ni al canal WhatsApp; la ejecución del
+  traspaso humano requiere autorización, idempotencia y auditoría en fases posteriores.
+
+Siguiente:
+
+- F4.4 — Pruebas adversariales de conocimiento, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 
