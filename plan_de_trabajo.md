@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F5.2 — Parser y validación (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.2 completada
+**Subfase activa:** ninguna; F5.3 — Preview de cambios (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.3 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2038,26 +2038,28 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F5.3 — Preview de cambios
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-23
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] diff altas/cambios/errores.
+- [x] diff altas/cambios/errores.
 
-- [ ] sin persistir.
+- [x] sin persistir.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] administrador puede revisar impacto.
+- [x] administrador puede revisar impacto mediante resultado estructurado del servicio.
 
 
 ### Seguridad
 
-- [ ] no mostrar datos sensibles innecesarios.
+- [x] no mostrar datos sensibles innecesarios.
 
 
 ### Prompt para Codex
@@ -4287,16 +4289,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F5.2 — Parser y validación (`✅ COMPLETADO`).
-**Última subfase completada:** F5.2 — Parser y validación.
-**Siguiente subfase recomendada:** F5.3 — Preview de cambios, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F5.3 — Preview de cambios (`✅ COMPLETADO`).
+**Última subfase completada:** F5.3 — Preview de cambios.
+**Siguiente subfase recomendada:** F5.4 — Importación transaccional, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F5.2 completada por solicitud explícita; F5.3 sigue pendiente y no se inició.
+F5.3 completada por solicitud explícita; F5.4 sigue pendiente y no se inició.
 
 ---
 
@@ -7039,6 +7041,59 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F5.3 — Preview de cambios, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F5.3 Preview de cambios
+
+Fase: Fase 5 — Importación segura de Excel, `🟨 EN_PROGRESO`.
+Subfase: F5.3 — Preview de cambios.
+Estado: ✅ COMPLETADO.
+
+Cambios:
+
+- añadido servicio de preview que compara cada fila válida del XLSX con producto y precio de la
+  sucursal configurada: alta, cambio o precio sin cambio;
+- verificación de producto activo y nombre exacto, errores por fila y resumen de impacto;
+- salida mínima apta para JSON con precios como texto decimal exacto, más documentación y pruebas.
+
+Archivos:
+
+- `backend/app/services/price_import_preview.py`;
+- `backend/tests/test_price_import_preview.py`;
+- `docs/fase_5_excel.md`;
+- `README.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_price_import_preview.py -q` ->
+  6 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest` -> 390 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 99 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- solo consultas `SELECT` comprobadas con instrumentación SQL; sin `flush`, `commit` ni escritura;
+  se rechazan sesiones con cambios pendientes;
+- búsqueda de producto y precio a través de repositorios acotados por `BranchScope`; un ID ajeno
+  recibe el mismo error que uno no disponible;
+- un archivo inválido o de otra sucursal no consulta DB; la salida no repite valores inválidos,
+  datos de otras sucursales, dirección, teléfono, archivo completo ni credenciales.
+
+Riesgos/Pendientes:
+
+- el preview es una lectura puntual y puede quedar desactualizado; F5.4 deberá repetir la
+  validación en una transacción antes de escribir;
+- no existe todavía endpoint/panel administrativo ni persistencia del preview. Su futura
+  exposición requiere autenticación y autorización backend.
+
+Siguiente:
+
+- F5.4 — Importación transaccional, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

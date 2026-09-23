@@ -55,7 +55,10 @@ instalación. El ejemplo versionado contiene solo datos ficticios, un `branch_co
 y nombre de producto, unidad, precio en MXN y fecha de verificación. Todavía no existe un
 importador. F5.2 incorpora un parser de solo lectura que valida `.xlsx`, tamaño, paquete,
 sucursal configurada, cabeceras, tipos, duplicados y rangos, y devuelve errores por fila sin
-escribir en la base. El preview y la comprobación de productos contra la DB corresponden a F5.3.
+escribir en la base. F5.3 añade un preview de solo lectura: coteja ID y nombre del producto
+dentro de la sucursal configurada y presenta altas, cambios, precios iguales y errores mediante
+datos mínimos aptos para revisión administrativa. Todavía no hay endpoint de administración ni
+escritura de precios desde Excel.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en

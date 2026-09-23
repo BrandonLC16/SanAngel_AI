@@ -1,10 +1,11 @@
-# Fase 5 — Plantilla y parser de precios (F5.1–F5.2)
+# Fase 5 — Plantilla, parser y preview de precios (F5.1–F5.3)
 
 La plantilla versionada es [`price_import.example.xlsx`](../examples/price_import.example.xlsx).
 Contiene solo datos ficticios. Cada archivo de trabajo pertenece a **una instalación y una
 sucursal**. Se copia con un nombre terminado en `.assistant-prices.xlsx`, que Git ignora, y se
 reemplazan el código de sucursal y todas las filas de ejemplo antes de usarlo. F5.2 valida el
-archivo en memoria; preview, confirmación y transacción pertenecen a las subfases siguientes.
+archivo en memoria y F5.3 prepara el preview. Confirmación y transacción pertenecen a las
+subfases siguientes.
 
 ## Estructura exacta
 
@@ -49,7 +50,24 @@ unidad, nombres, IDs positivos de hasta 64 bits y duplicados `(product_id, unit)
 filas indican número, columna y código sin incluir valores del archivo. Si hay cualquier error,
 el resultado contiene cero filas válidas. No existe escritura a DB en el parser.
 
-La existencia de `product_id` y la coincidencia de `product_name` con la base de la sucursal
-configurada requieren consulta de solo lectura durante el preview de F5.3. La importación futura
-seguirá validar → preview → confirmar → transacción → auditoría. Ningún texto de la hoja se
-convierte en instrucciones para OpenAI.
+## Preview de impacto (F5.3)
+
+`PriceImportPreviewService(session, branch_scope=...).preview(content, filename=...)` recibe una
+sesión limpia y el alcance construido desde la configuración backend. Primero usa el parser; un
+archivo inválido o de otra sucursal produce errores sin consultar la DB. Después resuelve cada
+producto dentro de la sucursal configurada, comprueba que está activo y que su nombre coincide
+exactamente. Para cada precio válido informa `new` (alta), `changed` (cambio del importe) o
+`unchanged` (sin cambio), con importe actual y propuesto, unidad, producto y fila de origen.
+También resume los conteos y los errores. `is_valid` es falso si hay cualquier error; un preview
+con errores no está listo para confirmación.
+
+`to_review_data()` entrega un diccionario apto para JSON con solo esos campos comerciales. Los
+precios se expresan como texto decimal exacto y los errores incluyen únicamente fila, campo y
+código. No devuelve la hoja completa, valores inválidos, datos de otras sucursales, dirección,
+teléfono ni credenciales. El servicio solo ejecuta consultas `SELECT`, no hace `flush`, `commit`
+ni escritura y rechaza sesiones con cambios pendientes. La futura interfaz administrativa
+deberá autenticar y autorizar a quien vea este resultado. F5.3 no agrega endpoint público ni
+persiste un preview; F5.4 deberá volver a validar antes de cualquier escritura.
+
+La importación futura seguirá validar → preview → confirmar → transacción → auditoría. Ningún
+texto de la hoja se convierte en instrucciones para OpenAI.
