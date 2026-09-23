@@ -66,6 +66,9 @@ F5.5 añade auditoría persistente a cada intento de confirmación: actor opaco,
 SHA-256 del archivo como identificador lógico, sucursal, resultado, conteos y errores seguros.
 El recibo enlaza al reporte, que se consulta con alcance de sucursal. El Excel no se guarda en la
 base ni en disco. El servicio no está conectado a un endpoint ni al chatbot.
+F5.6 cierra la Fase 5 con pruebas de cargas maliciosas y revisión de seguridad del flujo interno.
+La futura interfaz administrativa aún debe autenticar al personal y limitar el upload antes de
+leerlo completo.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en
@@ -188,7 +191,8 @@ La revisión base crea `alembic_version`, la revisión F3.2 crea `branches`, la 
 `products` y la revisión F3.4 crea `prices`. Cada producto pertenece obligatoriamente a una
 sucursal. Cada precio actual pertenece a la misma sucursal que su producto, usa `NUMERIC(12,2)`,
 incluye unidad y timestamps, y es único por sucursal, producto y unidad. Los cambios de schema
-deben realizarse mediante migraciones; el código de aplicación no ejecuta
+deben realizarse mediante migraciones; la revisión F5.5 agrega `price_import_audits` con
+metadatos mínimos del intento, sin conservar el Excel. El código de aplicación no ejecuta
 `Base.metadata.create_all()`.
 
 El engine y el `sessionmaker` se construyen de forma lazy. Las sesiones no hacen commit
@@ -196,7 +200,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de F3.6 crean una base vacía, recorren las cuatro revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las cinco revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo

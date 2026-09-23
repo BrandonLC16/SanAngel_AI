@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 from openpyxl import load_workbook
@@ -14,7 +14,9 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.price_import_parser import (
+    MAX_PACKAGE_MEMBERS,
     MAX_PRICE_IMPORT_BYTES,
+    MAX_UNCOMPRESSED_BYTES,
     parse_price_import,
 )
 
@@ -143,6 +145,59 @@ def test_rejects_unsafe_package_members(part_name: str) -> None:
 
     assert result.rows == ()
     assert result.issues[0].code == "unsafe_package"
+
+
+def test_rejects_compressed_package_exceeding_uncompressed_limit() -> None:
+    output = BytesIO()
+    with ZipFile(EXAMPLE) as source, ZipFile(output, "w", compression=ZIP_DEFLATED) as target:
+        for member in source.infolist():
+            target.writestr(member.filename, source.read(member.filename))
+        target.writestr("xl/oversized.xml", b"x" * (MAX_UNCOMPRESSED_BYTES + 1))
+
+    content = output.getvalue()
+    assert len(content) < MAX_PRICE_IMPORT_BYTES
+    assert parse(content).issues[0].code == "unsafe_package"
+
+
+def test_rejects_duplicate_package_member_ignoring_case() -> None:
+    output = BytesIO()
+    with ZipFile(EXAMPLE) as source, ZipFile(output, "w") as target:
+        for member in source.infolist():
+            target.writestr(member, source.read(member.filename))
+        target.writestr("XL/WORKBOOK.XML", b"duplicate")
+
+    assert parse(output.getvalue()).issues[0].code == "unsafe_package"
+
+
+def test_rejects_package_with_too_many_members() -> None:
+    output = BytesIO()
+    with ZipFile(EXAMPLE) as source, ZipFile(output, "w") as target:
+        for member in source.infolist():
+            target.writestr(member, source.read(member.filename))
+        for index in range(MAX_PACKAGE_MEMBERS - len(source.infolist()) + 1):
+            target.writestr(f"xl/extra/{index}.txt", b"x")
+
+    assert parse(output.getvalue()).issues[0].code == "unsafe_package"
+
+
+@pytest.mark.parametrize(
+    "injected",
+    (b'<!DOCTYPE x:workbook [<!ENTITY test "untrusted">]>', b"\x00"),
+)
+def test_rejects_unsafe_xml_before_workbook_loader(injected: bytes) -> None:
+    output = BytesIO()
+    with ZipFile(EXAMPLE) as source, ZipFile(output, "w") as target:
+        for member in source.infolist():
+            content = source.read(member.filename)
+            if member.filename == "xl/workbook.xml":
+                content = content.replace(
+                    b"<x:workbook",
+                    injected + b"<x:workbook",
+                    1,
+                )
+            target.writestr(member, content)
+
+    assert parse(output.getvalue()).issues[0].code == "unsafe_package"
 
 
 def test_rejects_formula_and_external_relationship() -> None:

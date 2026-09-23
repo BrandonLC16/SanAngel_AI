@@ -6,6 +6,7 @@ from decimal import Decimal
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 from alembic import command
@@ -258,6 +259,33 @@ def test_invalid_or_foreign_product_never_writes(
         assert report.error_count >= 1
         assert report.file_sha256 == sha256(content).hexdigest()
     assert prices(factory) == before
+
+
+def test_malicious_package_is_rejected_without_price_writes(
+    catalog: tuple[sessionmaker[Session], dict[str, int]],
+) -> None:
+    factory, identifiers = catalog
+    service = PriceImportTransactionService(factory, branch_scope=SCOPE)
+    before = prices(factory)
+    output = BytesIO()
+    with ZipFile(BytesIO(import_content(identifiers))) as source, ZipFile(output, "w") as target:
+        for member in source.infolist():
+            target.writestr(member, source.read(member.filename))
+        target.writestr("xl/vbaProject.bin", b"untrusted workbook payload")
+    content = output.getvalue()
+
+    prepared = service.prepare(content, filename="precios.xlsx")
+    assert prepared.preview.issues[0].code == "unsafe_package"
+    with pytest.raises(PriceImportValidationError):
+        service.confirm(
+            content, filename="precios.xlsx", prepared=prepared, confirmed=True, actor=ACTOR
+        )
+
+    assert prices(factory) == before
+    report = service.list_reports()[0]
+    assert report.status == "rejected"
+    assert report.errors[0].code == "unsafe_package"
+    assert "untrusted workbook payload" not in str(report.to_review_data())
 
 
 def test_changed_catalog_or_price_blocks_stale_preview(

@@ -102,12 +102,19 @@ def _safe_package(package: ZipFile) -> bool:
 
     for member in members:
         name = member.filename
-        if name.endswith(".rels"):
-            root = ElementTree.fromstring(package.read(name))
+        normalized = name.lower()
+        if not normalized.endswith((".xml", ".rels")):
+            continue
+        payload = package.read(name)
+        lowered = payload.lower()
+        if b"\x00" in payload or b"<!doctype" in lowered or b"<!entity" in lowered:
+            return False
+        if normalized.endswith(".rels"):
+            root = ElementTree.fromstring(payload)
             if any(element.attrib.get("TargetMode") == "External" for element in root):
                 return False
-        if name.startswith("xl/worksheets/") and name.endswith(".xml"):
-            root = ElementTree.fromstring(package.read(name))
+        if normalized.startswith("xl/worksheets/") and normalized.endswith(".xml"):
+            root = ElementTree.fromstring(payload)
             if any(element.tag.rsplit("}", 1)[-1] == "f" for element in root.iter()):
                 return False
             for element in root.iter():

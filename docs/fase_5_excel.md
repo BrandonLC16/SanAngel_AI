@@ -1,11 +1,12 @@
-# Fase 5 — Plantilla e importación de precios (F5.1–F5.5)
+# Fase 5 — Plantilla e importación de precios (F5.1–F5.6)
 
 La plantilla versionada es [`price_import.example.xlsx`](../examples/price_import.example.xlsx).
 Contiene solo datos ficticios. Cada archivo de trabajo pertenece a **una instalación y una
 sucursal**. Se copia con un nombre terminado en `.assistant-prices.xlsx`, que Git ignora, y se
 reemplazan el código de sucursal y todas las filas de ejemplo antes de usarlo. F5.2 valida el
 archivo en memoria, F5.3 prepara el preview y F5.4 incorpora confirmación y escritura
-transaccional. F5.5 registra cada intento de confirmación con un reporte acotado.
+transaccional. F5.5 registra cada intento de confirmación con un reporte acotado. F5.6 cierra
+las pruebas y la revisión de cargas maliciosas del servicio interno.
 
 ## Estructura exacta
 
@@ -44,9 +45,10 @@ El archivo es input no confiable. `parse_price_import(content, filename=..., bra
 acepta bytes de un `.xlsx` sin abrir rutas ni escribir archivos. Usa `openpyxl` en modo de solo
 lectura; el límite es 2 MiB para el archivo, 10 MiB descomprimidos, 128 entradas ZIP y 1000 filas
 de datos. Rechaza nombres y entradas con path traversal, macros, fórmulas, vínculos externos,
-hojas o cabeceras distintas, versiones no reconocidas y códigos de sucursal ajenos al alcance
-inyectado por backend. Valida tipos, precios de `0.00` a `9999999999.99`, fecha real no futura,
-unidad, nombres, IDs positivos de hasta 64 bits y duplicados `(product_id, unit)`. Los errores de
+XML con DTD/entidades o bytes nulos, hojas o cabeceras distintas, versiones no reconocidas y
+códigos de sucursal ajenos al alcance inyectado por backend. Valida tipos, precios de `0.00` a
+`9999999999.99`, fecha real no futura, unidad, nombres, IDs positivos de hasta 64 bits y
+duplicados `(product_id, unit)`. Los errores de
 filas indican número, columna y código sin incluir valores del archivo. Si hay cualquier error,
 el resultado contiene cero filas válidas. No existe escritura a DB en el parser.
 
@@ -67,7 +69,7 @@ código. No devuelve la hoja completa, valores inválidos, datos de otras sucurs
 teléfono ni credenciales. El servicio solo ejecuta consultas `SELECT`, no hace `flush`, `commit`
 ni escritura y rechaza sesiones con cambios pendientes. La futura interfaz administrativa
 deberá autenticar y autorizar a quien vea este resultado. F5.3 no agrega endpoint público ni
-persiste un preview; F5.4 deberá volver a validar antes de cualquier escritura.
+persiste un preview; F5.4 vuelve a validar antes de cualquier escritura.
 
 ## Confirmación e importación (F5.4)
 
@@ -117,3 +119,16 @@ fila, campo y código; se conservan como máximo 200 detalles y el total permane
 No se guardan valores inválidos ni mensajes de proveedor/SQL. La futura interfaz administrativa
 debe restringir estos reportes a personal autorizado y definir retención/borrado del historial
 antes de producción. El servicio procesa bytes en memoria y no crea copias persistentes del Excel.
+
+## Cierre y revisión de carga maliciosa (F5.6)
+
+Las pruebas adversariales cubren rutas y miembros ZIP peligrosos, macros, fórmulas, relaciones
+externas, duplicados de miembros sin distinguir mayúsculas, exceso de miembros, expansión ZIP
+por encima de 10 MiB y XML con DTD. El parser rechaza esos paquetes antes de abrirlos con
+`openpyxl`; una carga maliciosa confirmada se rechaza sin escribir precios y deja un reporte con
+solo códigos de error. También se comprueban los límites de filas, tamaño del XLSX, tipos,
+importes, duplicados y sucursal ajena.
+
+La fase queda completa para el servicio interno. La futura ruta de administración tendrá que
+autenticar al personal, imponer el límite del request **antes de cargar el body completo** y
+conservar el preview solo en backend. El archivo sigue siendo no confiable en todas las capas.

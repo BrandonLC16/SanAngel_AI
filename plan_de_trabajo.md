@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-23
-**Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F5.5 — Auditoría y reporte (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.5 completada
+**Fase activa:** ninguna; Fase 5 — Importación segura de Excel (`✅ COMPLETADO`)
+**Subfase activa:** ninguna; F5.6 — Cierre Fase 5 (`✅ COMPLETADO`)
+**Estado global:** ✅ COMPLETADO — Fase 5 cerrada; Fase 6 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1911,9 +1911,10 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que personal autorizado actualice precios mediante un archivo validado y transaccional.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 
 **Fecha de inicio:** 2026-09-23
+**Fecha de finalización:** 2026-09-23
 
 **Documento guía:** `plan_de_trabajo.md`
 
@@ -2172,26 +2173,28 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F5.6 — Cierre Fase 5
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-23
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] documentación.
+- [x] documentación.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 5 completa.
+- [x] Fase 5 completa para el servicio interno de importación.
 
 
 ### Seguridad
 
-- [ ] revisión de carga maliciosa.
+- [x] revisión de carga maliciosa.
 
 
 ### Prompt para Codex
@@ -4292,17 +4295,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F5.5 — Auditoría y reporte (`✅ COMPLETADO`).
-**Última subfase completada:** F5.5 — Auditoría y reporte.
-**Siguiente subfase recomendada:** F5.6 — Cierre Fase 5, `⬜ PENDIENTE`; no iniciada.
+**Fase activa:** ninguna; Fase 5 — Importación segura de Excel (`✅ COMPLETADO`).
+**Subfase activa:** ninguna; F5.6 — Cierre Fase 5 (`✅ COMPLETADO`).
+**Última subfase completada:** F5.6 — Cierre Fase 5.
+**Siguiente subfase recomendada:** F6.1 — Schemas de tools, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F5.5 completada y validada; F5.6 sigue pendiente y no se inició.
+F5.6 y Fase 5 completadas para el servicio interno; F6.1 sigue pendiente y no se inició.
 
 ---
 
@@ -7220,6 +7223,65 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F5.6 — Cierre Fase 5, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F5.6 Cierre Fase 5
+
+Fase: Fase 5 — Importación segura de Excel, `✅ COMPLETADO`.
+Subfase: F5.6 — Cierre Fase 5, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- añadidas pruebas adversariales para expansión ZIP, exceso y duplicación de miembros, XML con
+  DTD o bytes nulos y rechazo transaccional de un paquete con macro;
+- cerrado un hallazgo de la revisión: el parser aceptaba un DTD en `xl/workbook.xml`; ahora
+  rechaza directivas DTD/entidades y bytes nulos en partes XML antes de invocar `openpyxl`;
+- actualizados la guía y README con el alcance completo de la Fase 5 y los límites de la futura
+  interfaz administrativa; cerradas F5.6 y Fase 5 sin iniciar F6.1.
+
+Archivos:
+
+- `backend/app/services/price_import_parser.py`;
+- `backend/tests/test_price_import_parser.py`;
+- `backend/tests/test_price_import_transaction.py`;
+- `docs/fase_5_excel.md`;
+- `README.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\pytest.exe backend/tests/test_price_import_parser.py
+  backend/tests/test_price_import_transaction.py backend/tests/test_price_import_preview.py
+  backend/tests/test_price_import_template.py backend/tests/test_migrations.py -q` -> 73 pruebas
+  aprobadas;
+- `.venv\Scripts\pytest.exe` -> 415 pruebas aprobadas sin red;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 104 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- los límites de 2 MiB por archivo, 10 MiB descomprimidos y 128 miembros están probados;
+  la expansión ZIP se prueba con un archivo pequeño y el parser no extrae miembros a disco;
+- se rechazan DTD/entidades y bytes nulos antes del cargador XML, además de macros, fórmulas,
+  referencias externas, path traversal y miembros duplicados;
+- un XLSX con componente de macro se rechaza durante preview y confirmación, no cambia precios,
+  y su reporte contiene solo un código de error, sin el contenido de la carga.
+
+Riesgos/Pendientes:
+
+- el servicio de importación sigue siendo interno. La futura ruta administrativa deberá exigir
+  autenticación/autorización y limitar el upload antes de recibir el body completo;
+- el historial de auditoría requiere una política de retención y borrado antes de producción;
+- las pruebas usan archivos ficticios y no sustituyen una revisión operativa de infraestructura
+  y despliegue productivo.
+
+Siguiente:
+
+- F6.1 — Schemas de tools, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 
