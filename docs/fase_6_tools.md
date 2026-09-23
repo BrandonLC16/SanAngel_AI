@@ -1,4 +1,4 @@
-# Fase 6 — Contratos, handlers, dispatcher y loop (F6.1–F6.4)
+# Fase 6 — Tools y desambiguación de producto (F6.1–F6.5)
 
 F6.1 define cuatro funciones para Responses API. Sigue sin conectar OpenAI a los servicios de
 negocio ni ejecutar tool calls. Los schemas usan `type: "function"`, `strict: true`, un objeto
@@ -91,3 +91,18 @@ Este método tiene pruebas mockeadas, sin red. El endpoint de chat y WhatsApp co
 actual de texto; la composición operativa con el dispatcher aún requiere configuración backend
 del archivo FAQ y se abordará en una subfase posterior. Un fallo o timeout de tool nunca debe
 convertirse en un dato comercial supuesto.
+
+F6.5 añade `ProductDisambiguationService.resolve(product_query)` para un término de producto
+explícito. Recibe `BranchScope` del backend y reutiliza `CommercialQueryService`: la respuesta
+indica el nombre verificado de la propia sucursal, sin aceptar un selector de sucursal. Una
+coincidencia exacta única devuelve el producto de esa sucursal; una única coincidencia parcial
+solo sugiere el nombre y pide confirmación, sin entregar un ID seleccionable. Varias coincidencias
+devuelven hasta cinco opciones de la sucursal propia y piden precisar cuál; ninguna coincidencia
+pide confirmar el nombre. La respuesta de desambiguación no incluye precios. Una mención de otra
+tienda dentro del término no cambia el alcance y puede resultar en `not_found` hasta que el
+cliente aclare el producto. Solo después de identificarlo se puede consultar el precio mediante
+`get_product_price`, que vuelve a aplicar el mismo alcance backend.
+
+Este servicio es determinista y se prueba sin modelo ni red. No agrega una quinta tool a la
+allowlist de F6.1–F6.4. La extracción del término de producto y su composición con el flujo de
+WhatsApp siguen pendientes; el código actual no afirma resolver automáticamente un mensaje libre.

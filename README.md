@@ -283,6 +283,14 @@ Los resultados son DTOs Pydantic inmutables y separados de las entidades ORM. El
 expone operaciones de escritura, no depende de OpenAI y no registra consultas ni datos completos.
 Las tools que conectarán estos servicios con el modelo pertenecen a Fase 6, no a F3.5.
 
+`ProductDisambiguationService.resolve(product_query)` ofrece un resultado de solo lectura para
+un término de producto explícito. Informa la sucursal propia, pide precisar entre varias
+coincidencias, solicita confirmación ante una sola coincidencia parcial y aclara cuando no hay
+producto. Solo una coincidencia exacta única proporciona el ID del producto para una consulta
+posterior de precio, que vuelve a filtrar por la misma sucursal. No acepta sucursal elegida por
+el cliente ni devuelve precios durante la desambiguación. Todavía no está conectado al flujo de
+WhatsApp.
+
 ## Carga del perfil personalizado
 
 Cada instalación recibe un archivo JSON propio. Copia el ejemplo y usa un nombre terminado en

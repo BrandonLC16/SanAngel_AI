@@ -27,6 +27,10 @@ from backend.app.schemas.price import PriceData
 from backend.app.schemas.product import ProductData
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.commercial_query_service import CommercialQueryService
+from backend.app.services.product_disambiguation import (
+    MAX_DISPLAYED_PRODUCTS,
+    ProductDisambiguationService,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -302,3 +306,142 @@ def test_commercial_query_implementation_has_no_openai_dependency() -> None:
     )
 
     assert all("openai" not in path.read_text(encoding="utf-8").lower() for path in source_files)
+
+
+def test_disambiguation_shows_only_own_branch_choices_without_a_price(
+    migrated_session_factory: sessionmaker[Session],
+) -> None:
+    with migrated_session_factory.begin() as session:
+        own = create_branch(session, "sucursal-uno", name="Sucursal Uno")
+        other = create_branch(session, "sucursal-dos", name="Sucursal Dos")
+        first = create_product(session, own, name="Aguja")
+        second = create_product(session, own, name="Aguja Premium")
+        foreign = create_product(session, other, name="Aguja de otra tienda")
+        create_price(session, own, first, amount="100.00")
+        create_price(session, own, second, amount="200.00")
+        create_price(session, other, foreign, amount="999.00")
+        resolver = ProductDisambiguationService(
+            session,
+            branch_scope=BranchScope.from_settings(
+                AssistantSettings(assistant_branch_code="sucursal-uno")
+            ),
+        )
+
+        result = resolver.resolve("aguja")
+
+        assert result.status == "ambiguous"
+        assert result.branch_name == "Sucursal Uno"
+        assert result.product is None
+        assert result.options == (first.name, second.name)
+        assert "¿Cuál buscas?" in result.text
+        assert "Sucursal Uno" in result.text
+        assert "Sucursal Dos" not in result.text
+        assert "999.00" not in repr(result)
+        assert "100.00" not in repr(result)
+        assert not session.new and not session.dirty and not session.deleted
+
+
+def test_unique_choice_uses_own_product_id_even_when_other_branch_has_same_name(
+    migrated_session_factory: sessionmaker[Session],
+) -> None:
+    with migrated_session_factory.begin() as session:
+        own = create_branch(session, "sucursal-uno", name="Sucursal Uno")
+        other = create_branch(session, "sucursal-dos", name="Sucursal Dos")
+        own_product = create_product(session, own, name="Aguja norteña")
+        foreign = create_product(session, other, name="Aguja norteña")
+        create_price(session, own, own_product, amount="189.90")
+        create_price(session, other, foreign, amount="999.00")
+        scope = BranchScope.from_settings(AssistantSettings(assistant_branch_code="sucursal-uno"))
+        result = ProductDisambiguationService(session, branch_scope=scope).resolve("AGUJA NORTENA")
+
+        assert result.status == "unique"
+        assert result.branch_name == "Sucursal Uno"
+        assert result.product is not None
+        assert result.product.product_id == own_product.id
+        assert result.options == ()
+        assert "Sucursal Uno" in result.text
+        assert CommercialQueryService(session, branch_scope=scope).get_product_price(
+            result.product.product_id, unit="kg"
+        ).amount == Decimal("189.90")
+        with pytest.raises(ProductNotFoundError):
+            CommercialQueryService(session, branch_scope=scope).get_product_price(
+                foreign.id, unit="kg"
+            )
+
+
+def test_missing_product_and_other_store_mention_do_not_change_scope(
+    migrated_session_factory: sessionmaker[Session],
+) -> None:
+    with migrated_session_factory.begin() as session:
+        own = create_branch(session, "sucursal-uno", name="Sucursal Uno")
+        other = create_branch(session, "sucursal-dos", name="Sucursal Dos")
+        own_product = create_product(session, own, name="Aguja")
+        foreign = create_product(session, other, name="Sirloin")
+        create_price(session, own, own_product, amount="100.00")
+        create_price(session, other, foreign, amount="999.00")
+        resolver = ProductDisambiguationService(
+            session,
+            branch_scope=BranchScope.from_settings(
+                AssistantSettings(assistant_branch_code="sucursal-uno")
+            ),
+        )
+
+        missing = resolver.resolve("sirloin")
+        mentioned = resolver.resolve("Aguja sucursal-dos")
+        own_result = resolver.resolve("Aguja")
+
+        assert missing.status == mentioned.status == "not_found"
+        assert missing.product is mentioned.product is None
+        assert missing.options == mentioned.options == ()
+        assert "Sucursal Uno" in missing.text
+        assert "Sucursal Uno" in mentioned.text
+        assert "Sucursal Dos" not in missing.text + mentioned.text
+        assert "999.00" not in repr((missing, mentioned))
+        assert own_result.status == "unique"
+        assert own_result.product is not None
+        assert own_result.product.product_id == own_product.id
+        assert "branch" not in inspect.signature(resolver.resolve).parameters
+
+
+def test_many_matches_are_bounded_and_never_auto_select(
+    migrated_session_factory: sessionmaker[Session],
+) -> None:
+    with migrated_session_factory.begin() as session:
+        own = create_branch(session, "sucursal-uno", name="Sucursal Uno")
+        for index in range(MAX_DISPLAYED_PRODUCTS + 1):
+            create_product(session, own, name=f"Corte ficticio {index}")
+        resolver = ProductDisambiguationService(
+            session,
+            branch_scope=BranchScope.from_settings(
+                AssistantSettings(assistant_branch_code="sucursal-uno")
+            ),
+        )
+
+        result = resolver.resolve("Corte ficticio")
+
+        assert result.status == "ambiguous"
+        assert result.product is None
+        assert len(result.options) == MAX_DISPLAYED_PRODUCTS
+        assert "entre otros" in result.text
+
+
+def test_single_partial_match_needs_confirmation_before_using_product_id(
+    migrated_session_factory: sessionmaker[Session],
+) -> None:
+    with migrated_session_factory.begin() as session:
+        branch = create_branch(session, "sucursal-uno", name="Sucursal Uno")
+        create_product(session, branch, name="Sirloin")
+        resolver = ProductDisambiguationService(
+            session,
+            branch_scope=BranchScope.from_settings(
+                AssistantSettings(assistant_branch_code="sucursal-uno")
+            ),
+        )
+
+        suggestion = resolver.resolve("sirlo")
+
+        assert suggestion.status == "needs_confirmation"
+        assert suggestion.product is None
+        assert suggestion.options == ("Sirloin",)
+        assert "Sirloin" in suggestion.text
+        assert "¿Es ese producto?" in suggestion.text

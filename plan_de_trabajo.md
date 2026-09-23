@@ -2422,30 +2422,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F6.5 — Desambiguación de producto con sucursal fija
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Inicio:** 2026-09-23.
+**Cierre:** 2026-09-23; pasó por `🧪 VALIDACION`.
 
 
 ### Alcance
 
-- [ ] informar la sucursal propia cuando sea útil, sin pedir al cliente que la seleccione.
+- [x] informar la sucursal propia cuando sea útil, sin pedir al cliente que la seleccione.
 
-- [ ] coincidencias múltiples.
+- [x] coincidencias múltiples.
 
-- [ ] producto inexistente.
+- [x] producto inexistente.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] no mezclar precios de sucursales.
+- [x] no mezclar precios de sucursales.
 
-- [ ] mencionar otra tienda no cambia el alcance de datos.
+- [x] mencionar otra tienda no cambia el alcance de datos.
 
 
 ### Seguridad
 
-- [ ] nunca adivinar producto ni sucursal.
+- [x] nunca adivinar producto ni sucursal.
 
 
 ### Prompt para Codex
@@ -4306,18 +4308,18 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F6.4 — Loop Responses API + tool calls (`✅ COMPLETADO`).
-**Última subfase completada:** F6.4 — Loop Responses API + tool calls.
-**Siguiente subfase recomendada:** F6.5 — Desambiguación de producto con sucursal fija,
-`⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F6.5 — Desambiguación de producto con sucursal fija (`✅ COMPLETADO`).
+**Última subfase completada:** F6.5 — Desambiguación de producto con sucursal fija.
+**Siguiente subfase recomendada:** F6.6 — Pruebas de seguridad de tools, `⬜ PENDIENTE`;
+no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.4 completada el 2026-09-23 tras 22 pruebas nuevas y 502 pruebas de la suite completa;
-F6.5 sigue pendiente y no se inició.
+F6.5 completada el 2026-09-23 tras cinco pruebas nuevas y 507 pruebas de la suite completa;
+F6.6 sigue pendiente y no se inició.
 
 ---
 
@@ -7520,6 +7522,58 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.5 — Desambiguación de producto con sucursal fija, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F6.5 Desambiguación de producto con sucursal fija
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `🟨 EN_PROGRESO`.
+Subfase: F6.5 — Desambiguación de producto con sucursal fija, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- nueva política determinista de desambiguación sobre `CommercialQueryService`, limitada a la
+  sucursal configurada: coincidencia exacta única, parcial que requiere confirmación, varias
+  opciones y producto no encontrado;
+- informa el nombre verificado de la sucursal propia; muestra hasta cinco nombres en casos
+  ambiguos y solo expone un ID seleccionable para una coincidencia exacta única;
+- prompt, README y documentación de Fase 6 actualizados; cinco pruebas nuevas con dos
+  sucursales ficticias, precios distintos y mención de otra tienda.
+
+Archivos: `backend/app/services/product_disambiguation.py`,
+`backend/tests/test_commercial_query_service.py`, `backend/app/prompts/base_system_prompt.txt`,
+`docs/fase_6_tools.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `pytest` y `ruff` sin ruta no se encontraron en `PATH`; se usaron los ejecutables de `.venv`;
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_commercial_query_service.py`:
+  26 passed;
+- `.\.venv\Scripts\python.exe -m pytest`: 507 passed;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 113 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace; avisos de conversión LF/CRLF.
+
+Seguridad:
+
+- el alcance viene de `BranchScope` del backend; la API no acepta una sucursal del cliente;
+- coincidencias parciales o múltiples no producen ID seleccionado ni precio; productos ajenos
+  no aparecen en opciones y sus IDs siguen rechazados por la consulta de precio;
+- una mención de otra tienda no cambia el alcance; los textos de respuesta no incluyen el
+  término de búsqueda sin validar ni precios de otra sucursal; pruebas sin red ni secretos.
+
+Riesgos/Pendientes:
+
+- el servicio recibe un término de producto explícito; aún no se compone con el flujo de
+  WhatsApp ni extrae productos de mensajes libres;
+- la búsqueda comercial existente recorre el catálogo activo en memoria; para catálogos grandes
+  convendrá indexarla sin alterar el aislamiento ni la regla de confirmación.
+
+Siguiente:
+
+- F6.6 — Pruebas de seguridad de tools, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 
