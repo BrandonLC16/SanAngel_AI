@@ -1,11 +1,10 @@
 """Deterministic FAQ answer policy with safe unresolved outcomes."""
 
-import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
-from backend.app.services.faq_service import FAQService
+from backend.app.services.faq_service import FAQService, normalize_faq_question
 
 UNKNOWN_FALLBACK = (
     "No tengo una respuesta confirmada para esa pregunta. "
@@ -65,8 +64,10 @@ class FAQResponsePolicy:
 
     def resolve(self, query: str) -> FAQAnswer | FAQFallback:
         matches = self._faq_service.search_faq(query)
-        query_key = _question_key(query)
-        exact = [record for record in matches if _question_key(record.question) == query_key]
+        query_key = normalize_faq_question(query)
+        exact = [
+            record for record in matches if normalize_faq_question(record.question) == query_key
+        ]
         if len(exact) == 1:
             record = exact[0]
             return FAQAnswer(text=record.answer, source_question=record.question)
@@ -79,11 +80,3 @@ class FAQResponsePolicy:
             text=UNKNOWN_FALLBACK,
             human_help=request_human_help(HumanHelpReason.FAQ_UNKNOWN),
         )
-
-
-def _question_key(value: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", value.casefold())
-    without_marks = "".join(
-        character for character in decomposed if unicodedata.category(character) != "Mn"
-    )
-    return " ".join(without_marks.strip(" ¿?¡!.,;:").split())

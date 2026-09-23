@@ -30,7 +30,7 @@ class FAQService:
         query_key = _query_key(query)
         matches: list[tuple[int, str, str, str, FAQRecord]] = []
         for record in self._records:
-            question_key = _search_key(record.question)
+            question_key = normalize_faq_question(record.question)
             if query_key not in question_key:
                 continue
             rank = (
@@ -77,12 +77,14 @@ def _query_key(value: str) -> str:
         or not any(character.isalnum() for character in normalized)
     ):
         raise FAQQueryInputError()
-    return _search_key(normalized)
+    return normalize_faq_question(normalized)
 
 
-def _search_key(value: str) -> str:
+def normalize_faq_question(value: str) -> str:
+    """Use one canonical key for both retrieval and exact-answer decisions."""
+
     decomposed = unicodedata.normalize("NFKD", value.casefold())
     without_marks = "".join(
         character for character in decomposed if unicodedata.category(character) != "Mn"
     )
-    return " ".join(without_marks.split())
+    return " ".join(without_marks.strip(" ¿?¡!.,;:").split())

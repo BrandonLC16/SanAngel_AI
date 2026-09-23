@@ -1,4 +1,4 @@
-# Fase 4 — Fuente, consulta y política FAQ (F4.1–F4.3)
+# Fase 4 — Fuente, consulta y política FAQ (F4.1–F4.4)
 
 ## Fuente elegida
 
@@ -121,3 +121,22 @@ pregunta conocida deja de ser una coincidencia exacta y recibe fallback. El cont
 use más adelante con un modelo debe conservar su condición de dato no confiable. Para hechos
 comerciales críticos, la fuente sigue siendo el servicio determinista correspondiente, no esta
 política FAQ.
+
+## Pruebas adversariales de conocimiento (F4.4)
+
+La suite `test_faq_adversarial.py` usa el loader y la política reales, con TSV temporales y sin
+red. Comprueba cuatro ataques: instrucciones añadidas por el cliente a una pregunta conocida,
+solicitudes de credenciales backend, texto de documento que se presenta como `SYSTEM` y preguntas
+FAQ equivalentes con respuestas contradictorias. También comprueba que una columna `role` es
+rechazada y que una fila de otra sucursal invalida el archivo completo. Los valores usados para
+comprobar fugas son marcadores de prueba, no credenciales.
+
+La búsqueda y la decisión de respuesta exacta comparten la misma normalización de pregunta,
+incluidos los signos exteriores. Así, `¿Aceptan tarjeta?` y `Aceptan tarjeta` cuentan como dos
+respuestas exactas para `Aceptan tarjeta?`; la política devuelve el fallback ambiguo y no elige
+ninguna. Un texto FAQ que afirma ser una instrucción del sistema sigue saliendo como dato
+`untrusted_source`: el servicio no lo ejecuta ni lo transforma en instrucciones privilegiadas.
+
+Esta comprobación cubre el servicio FAQ local. La integración futura con un modelo deberá pasar
+las respuestas FAQ exclusivamente como datos sin privilegios y volver a probar esa frontera. El
+contenido real sigue necesitando aprobación del negocio antes de cargarse.

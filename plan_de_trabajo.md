@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-09-22
+**Última actualización:** 2026-09-23
 **Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F4.3 (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 4; F4.3 completada
+**Subfase activa:** ninguna; F4.4 (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 4; F4.4 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1817,28 +1817,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F4.4 — Pruebas adversariales de conocimiento
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-23
+
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] prompt injection.
+- [x] prompt injection.
 
-- [ ] pedido de secrets.
+- [x] pedido de secrets.
 
-- [ ] conflicto documento/system.
+- [x] conflicto documento/system.
 
-- [ ] FAQ ambigua.
+- [x] FAQ ambigua.
 
 
 ### Criterios de aceptación
 
-- [ ] reglas internas prevalecen.
+- [x] reglas internas prevalecen.
 
 
 ### Seguridad
 
-- [ ] no confiar en texto recuperado.
+- [x] no confiar en texto recuperado.
 
 
 ### Prompt para Codex
@@ -4267,16 +4271,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F4.3 (`✅ COMPLETADO`).
-**Última subfase completada:** F4.3 — Política de respuesta y desconocidos.
-**Siguiente subfase:** F4.4 pendiente; no iniciada.
+**Subfase activa:** ninguna; F4.4 (`✅ COMPLETADO`).
+**Última subfase completada:** F4.4 — Pruebas adversariales de conocimiento.
+**Siguiente subfase:** F4.5 pendiente; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-No iniciar F4.4 automáticamente.
+F4.4 completada; no iniciar F4.5 automáticamente.
 
 ---
 
@@ -6771,6 +6775,74 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F4.4 — Pruebas adversariales de conocimiento, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F4.4 pruebas adversariales de conocimiento
+
+Fase: Fase 4 — FAQ y conocimiento general del negocio, `🟨 EN_PROGRESO`.
+Subfase: F4.4 — Pruebas adversariales de conocimiento, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- añadidos casos adversariales con el loader y la política reales para prompt injection del
+  cliente, pedidos de credenciales, instrucciones de documento que se presentan como `SYSTEM`,
+  una columna `role` no autorizada, intento de cambiar de sucursal y preguntas FAQ equivalentes
+  con respuestas contradictorias;
+- reproducido y corregido un conflicto de normalización: búsqueda y decisión exacta ahora
+  comparten la misma clave, de modo que respuestas equivalentes no se eligen arbitrariamente;
+- documentados la cobertura local y el límite de confianza del texto recuperado.
+
+Archivos:
+
+- `README.md`;
+- `backend/app/services/faq_service.py`;
+- `backend/app/services/faq_response_policy.py`;
+- `backend/tests/test_faq_adversarial.py`;
+- `docs/fase_4_faq.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_response_policy.py
+  backend/tests/test_faq_service.py -q` -> baseline: 27 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_adversarial.py
+  -q` -> antes de corregir, 8 aprobadas y 2 fallidas por selección indebida de una respuesta
+  entre preguntas equivalentes;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_adversarial.py
+  backend/tests/test_faq_response_policy.py backend/tests/test_faq_service.py -q` -> 38 pruebas
+  aprobadas tras la corrección;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 348 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 92 archivos con formato correcto;
+  un hallazgo inicial en el nuevo test se corrigió antes de repetir la validación;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- revisión de diff y de dependencias del servicio FAQ -> sin proveedor, tool, escritura ni acceso
+  a secretos en la ruta de respuesta.
+
+Seguridad:
+
+- los pedidos de `OPENAI_API_KEY` y tokens GreenAPI reciben fallback fijo; los marcadores de
+  prueba colocados en el entorno no aparecen en resultados;
+- el texto recuperado que se presenta como `SYSTEM` permanece identificado como
+  `untrusted_source` y no se transforma en instrucciones privilegiadas; una columna `role` se
+  rechaza al cargar la fuente;
+- una fila de otra sucursal invalida toda la fuente; las instrucciones del cliente no cambian el
+  alcance ni ejecutan ayuda humana, modificación de precios o confirmación de pedidos;
+- dos respuestas FAQ canónicamente equivalentes producen fallback ambiguo sin revelar ninguna.
+
+Riesgos/Pendientes:
+
+- una respuesta FAQ exacta conserva el texto del TSV; su contenido real requiere aprobación del
+  negocio y nunca debe promoverse a instrucciones de sistema o herramientas;
+- esta suite cubre el servicio FAQ local, todavía no integrado con OpenAI o WhatsApp; la futura
+  integración deberá volver a probar el límite de confianza del contenido recuperado.
+
+Siguiente:
+
+- F4.5 — Cierre Fase 4, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

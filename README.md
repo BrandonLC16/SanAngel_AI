@@ -41,6 +41,9 @@ y búsqueda local de solo lectura, sin OpenAI y con el alcance de sucursal inyec
 F4.3 está `✅ COMPLETADO`: define una política determinista. Solo una FAQ exacta y única puede
 aportar contenido; una pregunta desconocida o ambigua recibe texto fijo y una propuesta de ayuda
 humana sin ejecutar el traspaso.
+F4.4 está `✅ COMPLETADO`: prueba instrucciones adversariales del cliente y del documento, pedidos
+de credenciales y FAQ equivalentes con respuestas en conflicto. La búsqueda y la política usan la
+misma clave de pregunta para que esos conflictos produzcan una respuesta ambigua.
 
 ## Modelo de los siete asistentes
 
