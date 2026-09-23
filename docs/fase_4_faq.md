@@ -1,4 +1,4 @@
-# Fase 4 — Fuente, consulta y política FAQ (F4.1–F4.4)
+# Fase 4 — Fuente, consulta y política FAQ (F4.1–F4.5)
 
 ## Fuente elegida
 
@@ -140,3 +140,20 @@ ninguna. Un texto FAQ que afirma ser una instrucción del sistema sigue saliendo
 Esta comprobación cubre el servicio FAQ local. La integración futura con un modelo deberá pasar
 las respuestas FAQ exclusivamente como datos sin privilegios y volver a probar esa frontera. El
 contenido real sigue necesitando aprobación del negocio antes de cargarse.
+
+## Cierre de Fase 4 (F4.5)
+
+El alcance de esta fase es un contrato FAQ local y por instalación: formato TSV versionado,
+validación de todas las filas y de la sucursal configurada, búsqueda acotada, respuesta solo para
+una pregunta exacta y única, fallback fijo para desconocidos o ambigüedades, y pruebas
+adversariales. La suite recorre también las cinco categorías del ejemplo a través de la política
+de respuesta. Se puede comprobar sin credenciales ni servicios externos con `pytest`.
+
+No se incorpora RAG. El catálogo FAQ local tiene un máximo de 500 filas y una búsqueda
+determinista suficiente para este alcance; indexar o recuperar documentos mediante otro sistema
+añadiría una nueva fuente y otra frontera de autorización sin resolver una necesidad de esta fase.
+
+El servicio FAQ sigue sin estar conectado al orquestador, a OpenAI ni a WhatsApp. Cuando se
+integre, el backend deberá mantener fijo el alcance de sucursal, entregar el contenido como dato
+no confiable y comprobar otra vez los ataques de F4.4. Antes de cargar contenido real, el negocio
+debe aprobar sus respuestas; para aplicar una actualización del TSV se crea un nuevo snapshot.

@@ -8,7 +8,7 @@ import pytest
 
 from backend.app.core.config import AssistantSettings
 from backend.app.core.exceptions import FAQQueryInputError
-from backend.app.schemas.faq import FAQ_TSV_COLUMNS
+from backend.app.schemas.faq import FAQ_TSV_COLUMNS, FAQCategory
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.faq_response_policy import (
     AMBIGUOUS_FALLBACK,
@@ -48,6 +48,20 @@ def test_unique_exact_question_returns_only_scoped_faq_data() -> None:
     assert result.text.startswith("EJEMPLO FICTICIO:")
     with pytest.raises(FrozenInstanceError):
         result.text = "otro dato"  # type: ignore[misc]
+
+
+def test_versioned_example_answers_every_category_through_the_policy() -> None:
+    with EXAMPLE.open(encoding="utf-8", newline="") as source:
+        rows = list(csv.DictReader(source, delimiter="\t"))
+    policy = make_policy()
+
+    assert {row["category"] for row in rows} == {category.value for category in FAQCategory}
+    for row in rows:
+        result = policy.resolve(row["question"])
+        assert isinstance(result, FAQAnswer)
+        assert result.text == row["answer"]
+        assert result.source == "faq"
+        assert result.trust_level == "untrusted_source"
 
 
 def test_unknown_question_uses_fixed_fallback_without_inventing_data() -> None:

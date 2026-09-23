@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-23
-**Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F4.4 (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 4; F4.4 completada
+**Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`)
+**Subfase activa:** ninguna; F5.1 (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.1 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1652,9 +1652,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Responder información general mediante una fuente controlada sin convertir documentos en instrucciones privilegiadas.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 
 **Fecha de inicio:** 2026-09-22
+
+**Fecha de finalización:** 2026-09-23
 
 **Documento guía:** `plan_de_trabajo.md`
 
@@ -1863,26 +1865,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F4.5 — Cierre Fase 4
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-23
+
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] documentación.
+- [x] documentación.
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 4 completa.
+- [x] Fase 4 completa.
 
 
 ### Seguridad
 
-- [ ] no añadir RAG si no es necesario.
+- [x] no añadir RAG si no es necesario.
 
 
 ### Prompt para Codex
@@ -1905,47 +1911,54 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que personal autorizado actualice precios mediante un archivo validado y transaccional.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+
+**Fecha de inicio:** 2026-09-23
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F5.1 — Contrato/plantilla Excel
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-23
+
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] columnas obligatorias.
+- [x] columnas obligatorias.
 
-- [ ] IDs/nombres.
+- [x] IDs/nombres.
 
-- [ ] unidad.
+- [x] unidad.
 
-- [ ] precio.
+- [x] precio.
 
-- [ ] fecha.
+- [x] fecha.
 
-- [ ] código de sucursal del archivo igual a `ASSISTANT_BRANCH_CODE`.
+- [x] código de sucursal del archivo igual a `ASSISTANT_BRANCH_CODE`.
 
-- [ ] ejemplo ficticio.
+- [x] ejemplo ficticio.
 
 
 ### Criterios de aceptación
 
-- [ ] plantilla inequívoca.
+- [x] plantilla inequívoca.
 
-- [ ] un archivo pertenece a una sola sucursal.
+- [x] un archivo pertenece a una sola sucursal.
 
 
 ### Seguridad
 
-- [ ] no macros.
+- [x] no macros.
 
-- [ ] no datos reales en fixtures si no se proporcionan.
+- [x] no datos reales en fixtures si no se proporcionan.
 
-- [ ] no permitir cargas multi-sucursal desde una instalación.
+- [x] contrato de un solo `branch_code` por archivo; el rechazo operativo de archivos alterados
+  corresponde al parser de F5.2.
 
 
 ### Prompt para Codex
@@ -4270,17 +4283,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 4 — FAQ y conocimiento general del negocio (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F4.4 (`✅ COMPLETADO`).
-**Última subfase completada:** F4.4 — Pruebas adversariales de conocimiento.
-**Siguiente subfase:** F4.5 pendiente; no iniciada.
+**Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F5.1 (`✅ COMPLETADO`).
+**Última subfase completada:** F5.1 — Contrato/plantilla Excel.
+**Siguiente subfase recomendada:** F5.2 — Parser y validación, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F4.4 completada; no iniciar F4.5 automáticamente.
+F5.1 completada; no iniciar F5.2 automáticamente.
 
 ---
 
@@ -6843,6 +6856,129 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F4.5 — Cierre Fase 4, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F4.5 cierre de Fase 4
+
+Fase: Fase 4 — FAQ y conocimiento general del negocio, `✅ COMPLETADO`.
+Subfase: F4.5 — Cierre Fase 4, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- añadida una prueba de integración del ejemplo TSV versionado: las cinco categorías atraviesan
+  el loader y la política, devuelven su respuesta exacta y conservan `untrusted_source`;
+- actualizados README y guía de Fase 4 con el alcance completado, los límites de integración y
+  la decisión de mantener búsqueda local determinista sin RAG;
+- cerradas F4.5 y Fase 4 sin iniciar Fase 5.
+
+Archivos:
+
+- `README.md`;
+- `backend/tests/test_faq_response_policy.py`;
+- `docs/fase_4_faq.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_faq_format.py
+  backend/tests/test_faq_service.py backend/tests/test_faq_response_policy.py
+  backend/tests/test_faq_adversarial.py -q` -> baseline: 59 pruebas aprobadas; cierre: 60
+  pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 349 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 92 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- búsqueda de dependencias RAG, embeddings, vectores y librerías asociadas en servicios,
+  esquemas y `pyproject.toml` -> sin coincidencias; revisión de imports FAQ -> sin proveedor
+  OpenAI, WhatsApp ni infraestructura de recuperación adicional.
+
+Seguridad:
+
+- la FAQ mantiene el alcance de sucursal backend, valida el archivo completo y entrega respuestas
+  como datos `untrusted_source`, sin ejecutar texto recuperado como instrucciones;
+- las pruebas adversariales de F4.4 y la nueva prueba del ejemplo completo pasan sin red ni
+  credenciales reales;
+- no se añadió RAG ni dependencia nueva: el límite de 500 filas y la búsqueda local cubren este
+  alcance y evitan una frontera de autorización adicional.
+
+Riesgos/Pendientes:
+
+- el contenido real debe ser aprobado por el negocio; la suite usa solo un ejemplo ficticio;
+- el servicio FAQ aún no está conectado al orquestador, a OpenAI ni a WhatsApp. La integración
+  posterior deberá preservar el carácter no confiable del texto recuperado y repetir las pruebas
+  adversariales; la ayuda humana continúa siendo una propuesta sin ejecución.
+
+Siguiente:
+
+- F5.1 — Contrato/plantilla Excel, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F5.1 contrato y plantilla Excel de precios
+
+Fase: Fase 5 — Importación segura de Excel, `🟨 EN_PROGRESO`.
+Subfase: F5.1 — Contrato/plantilla Excel, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- definida una hoja `.xlsx` única `Precios`, versión `1`, con un solo `branch_code` de archivo en
+  `E3`, encabezados exactos en fila 6 y datos desde fila 7;
+- fijadas columnas `product_id`, `product_name`, `unit`, `price_mxn` y `verified_on`, con tipos,
+  límites, moneda, significado de fecha y correspondencia ID/nombre documentados;
+- añadido ejemplo exclusivamente ficticio y prueba del paquete Excel, de celdas numéricas y de
+  fecha, estructura, estilos, ausencia de macros, fórmulas y vínculos externos;
+- ignorados por Git los archivos locales `*.assistant-prices.xlsx`, preservando el ejemplo
+  versionado; no se implementó parser, preview ni escritura de precios.
+
+Archivos:
+
+- `.gitignore`;
+- `README.md`;
+- `backend/app/schemas/price_import_template.py`;
+- `backend/tests/test_price_import_template.py`;
+- `docs/fase_5_excel.md`;
+- `examples/price_import.example.xlsx`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider backend/tests/test_price_import_template.py
+  -q` -> 3 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest -p no:cacheprovider -q` -> 352 pruebas aprobadas sin red;
+- `.venv\Scripts\python.exe -m ruff check .` -> sin hallazgos;
+- `.venv\Scripts\python.exe -m ruff format --check .` -> 95 archivos con formato correcto;
+  un hallazgo inicial del nuevo test se corrigió antes de la validación final;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; solo advertencias informativas LF/CRLF;
+- `git check-ignore` -> un archivo de trabajo `*.assistant-prices.xlsx` se ignora y
+  `price_import.example.xlsx` permanece versionable;
+- inspección visual y del ZIP `.xlsx` -> importes y fechas legibles, una hoja, sin partes de macro,
+  fórmulas ni vínculos externos.
+
+Seguridad:
+
+- la plantilla tiene un único código de sucursal a nivel archivo; el contrato exige compararlo
+  con `ASSISTANT_BRANCH_CODE` y resolver cada producto dentro de ese alcance;
+- ejemplo, IDs, nombres y precios son ficticios; no se agregaron datos reales ni credenciales;
+- `.xlsx` sin macros ni ejecución de código; la futura carga debe seguir validación, preview,
+  confirmación, transacción y auditoría antes de escribir en DB.
+
+Riesgos/Pendientes:
+
+- la plantilla y el contrato no son un importador: F5.2 debe rechazar código ajeno, filas
+  multi-sucursal, fórmulas, archivos alterados, duplicados, tipos y rangos inválidos antes de
+  cualquier escritura;
+- `verified_on` documenta verificación comercial, no programa vigencia; la base conserva solo
+  el precio actual y su `updated_at`;
+- los IDs de ejemplo no representan productos existentes y deben reemplazarse antes de una carga.
+
+Siguiente:
+
+- F5.2 — Parser y validación, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

@@ -31,7 +31,8 @@ de sucursal y un repositorio de consulta determinista. F3.4 está `✅ COMPLETAD
 precios exactos por sucursal, producto y unidad. F3.5 está `✅ COMPLETADO`: implementa servicios
 de consulta comercial de solo lectura con alcance de sucursal inyectado. F3.6 y la Fase 3 están
 `✅ COMPLETADO`: quedaron verificadas la integridad y reversibilidad de las migraciones y el
-procedimiento de respaldo previo a cambios productivos. La Fase 4 está en desarrollo.
+procedimiento de respaldo previo a cambios productivos. La Fase 4 está `✅ COMPLETADO` en su
+alcance de servicio FAQ local.
 
 F4.1 está `✅ COMPLETADO`: define una tabla FAQ TSV por instalación, con categorías cerradas,
 versión y sucursal obligatoria en cada fila. El formato, el ejemplo ficticio y sus reglas de
@@ -44,6 +45,20 @@ humana sin ejecutar el traspaso.
 F4.4 está `✅ COMPLETADO`: prueba instrucciones adversariales del cliente y del documento, pedidos
 de credenciales y FAQ equivalentes con respuestas en conflicto. La búsqueda y la política usan la
 misma clave de pregunta para que esos conflictos produzcan una respuesta ambigua.
+F4.5 cierra la fase con una prueba del ejemplo completo a través de la política de respuesta y
+la revisión de documentación, seguridad y validaciones. La FAQ todavía no está conectada al
+orquestador ni al canal WhatsApp; esa integración corresponde a fases posteriores. No se añadió
+RAG: el TSV acotado y la búsqueda determinista cubren el alcance actual.
+
+F5.1 está `✅ COMPLETADO`: define la [plantilla Excel de precios](docs/fase_5_excel.md) por
+instalación. El ejemplo versionado contiene solo datos ficticios, un `branch_code` de archivo, ID
+y nombre de producto, unidad, precio en MXN y fecha de verificación. Todavía no existe un
+importador; F5.2 implementará el parser y la validación antes de cualquier escritura.
+
+Para preparar un archivo local de la sucursal, copia
+[`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en
+`.assistant-prices.xlsx`, sustituye `branch_code` y elimina o reemplaza las dos filas ficticias.
+Ese nombre de archivo está ignorado por Git; la plantilla de ejemplo permanece versionada.
 
 ## Modelo de los siete asistentes
 

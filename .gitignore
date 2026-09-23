@@ -4,6 +4,7 @@
 !.env.example
 *.assistant-profile.json
 *.assistant-faq.tsv
+*.assistant-prices.xlsx
 
 # Repository-local agent and checkpoint files
 AGENTS.md
