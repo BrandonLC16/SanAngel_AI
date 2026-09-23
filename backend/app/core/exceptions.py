@@ -174,3 +174,10 @@ class FAQQueryInputError(InvalidRequestError):
 
     error_code = "faq_query_invalid"
     public_message = "La consulta FAQ no es válida."
+
+
+class ToolExecutionTimeoutError(ServiceUnavailableError):
+    """Raised when a scoped tool exceeds its backend execution budget."""
+
+    error_code = "tool_execution_timeout"
+    public_message = "La consulta tardó demasiado. Inténtalo de nuevo."

@@ -74,7 +74,9 @@ F6.1 define los [contratos estrictos de cuatro tools](docs/fase_6_tools.md) para
 precio, datos de sucursal, FAQ y propuesta de ayuda humana. La allowlist y los argumentos se
 validan en backend antes de asociar la sucursal configurada. F6.2 implementa handlers locales
 de solo lectura con resultados tipados y alcance de sucursal; se pueden probar sin modelo.
-La ejecución centralizada de tool calls pertenece a F6.3 y todavía no está conectada al modelo.
+F6.3 añade un dispatcher con mapa cerrado, validación backend y timeout de espera acotado.
+Rechaza `execute_sql` y otros nombres no autorizados antes de abrir la base. La ejecución aún no
+está conectada al modelo; el loop de Responses API corresponde a F6.4.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en

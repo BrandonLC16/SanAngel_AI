@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F6.2 — Implementaciones de tools (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.2 completada
+**Subfase activa:** ninguna; F6.3 — Dispatcher allowlist (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.3 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2324,32 +2324,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F6.3 — Dispatcher allowlist
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Inicio:** 2026-09-23.
+**Cierre:** 2026-09-23; pasó por `🧪 VALIDACION`.
 
 
 ### Alcance
 
-- [ ] map nombre->handler.
+- [x] map nombre->handler.
 
-- [ ] rechazar tool desconocida.
+- [x] rechazar tool desconocida.
 
-- [ ] validar argumentos.
+- [x] validar argumentos.
 
-- [ ] timeouts.
+- [x] timeouts.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] no ejecución arbitraria.
+- [x] no ejecución arbitraria.
 
 
 ### Seguridad
 
-- [ ] prohibido execute_sql.
+- [x] prohibido execute_sql.
 
-- [ ] dispatcher compone handlers con la sucursal de la instalación.
+- [x] dispatcher compone handlers con la sucursal de la instalación.
 
 
 ### Prompt para Codex
@@ -4302,17 +4304,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F6.2 — Implementaciones de tools (`✅ COMPLETADO`).
-**Última subfase completada:** F6.2 — Implementaciones de tools.
-**Siguiente subfase recomendada:** F6.3 — Dispatcher allowlist, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F6.3 — Dispatcher allowlist (`✅ COMPLETADO`).
+**Última subfase completada:** F6.3 — Dispatcher allowlist.
+**Siguiente subfase recomendada:** F6.4 — Loop Responses API + tool calls, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.2 completada el 2026-09-23 tras 93 pruebas relacionadas y 459 pruebas de la suite completa;
-F6.3 sigue pendiente y no se inició.
+F6.3 completada el 2026-09-23 tras 21 pruebas nuevas y 480 pruebas de la suite completa;
+F6.4 sigue pendiente y no se inició.
 
 ---
 
@@ -7399,6 +7401,60 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.3 — Dispatcher allowlist, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F6.3 Dispatcher allowlist
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `🟨 EN_PROGRESO`.
+Subfase: F6.3 — Dispatcher allowlist, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- añadido un dispatcher con mapa inmutable de los cuatro nombres autorizados a los métodos
+  explícitos de `ToolHandlers`; un nombre desconocido se rechaza antes de abrir una sesión;
+- la validación de F6.1 se aplica otra vez a los argumentos y vincula el alcance desde
+  `AssistantSettings`; cada ejecución crea su sesión en el worker y compone handlers con ese
+  mismo `BranchScope`;
+- añadido timeout de espera configurable en backend (predeterminado 3 s, máximo 30 s), cuatro
+  workers como límite global y una excepción segura de timeout;
+- agregadas pruebas locales del enrutamiento, rechazo de `execute_sql`, argumentos inválidos,
+  lectura entre sucursales, propiedad de la sesión por el worker y timeout; actualizados README
+  y documentación de tools.
+
+Archivos: `backend/app/services/tool_dispatcher.py`, `backend/app/core/exceptions.py`,
+`backend/tests/test_tool_dispatcher.py`, `docs/fase_6_tools.md`, `README.md`,
+`plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_tool_dispatcher.py`: 21 passed;
+- `.\.venv\Scripts\python.exe -m pytest`: 480 passed;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 111 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace (avisos de conversión LF/CRLF).
+
+Seguridad:
+
+- mapa cerrado sin `getattr`, `eval`, SQL libre ni funciones aportadas por el modelo;
+  `execute_sql` y nombres no autorizados se rechazan antes de parsear argumentos o acceder DB;
+- argumentos extra, ambiguos o inválidos se rechazan antes de ejecutar un handler; la sucursal
+  proviene solo de configuración backend y una lectura de producto ajeno no revela su precio;
+- cada worker posee su sesión de DB; la espera está acotada y como máximo cuatro lecturas pueden
+  seguir activas tras el timeout del solicitante; los errores no incluyen argumentos recibidos.
+
+Riesgos/Pendientes:
+
+- el timeout no cancela forzosamente una consulta SQLite o lectura de archivo ya iniciada; una
+  operación que quede colgada ocupa uno de los cuatro workers hasta terminar;
+- el dispatcher aún no se conecta a Responses API ni serializa resultados para el modelo;
+  esa integración corresponde a F6.4.
+
+Siguiente:
+
+- F6.4 — Loop Responses API + tool calls, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

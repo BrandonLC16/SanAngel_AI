@@ -1,4 +1,4 @@
-# Fase 6 — Contratos e implementaciones de tools (F6.1–F6.2)
+# Fase 6 — Contratos, handlers y dispatcher (F6.1–F6.3)
 
 F6.1 define cuatro funciones para Responses API. Sigue sin conectar OpenAI a los servicios de
 negocio ni ejecutar tool calls. Los schemas usan `type: "function"`, `strict: true`, un objeto
@@ -49,4 +49,24 @@ de otra tool o con argumentos de otro tipo antes de acceder a datos.
 Las rutas y el archivo FAQ son configuración interna. Ningún método acepta sucursal, SQL, cambios
 de precio ni una acción comercial de escritura desde argumentos del modelo. Las pruebas de F6.2
 invocan estos métodos localmente sin OpenAI. La selección y ejecución centralizada de tool calls
-queda para F6.3.
+se implementa en F6.3.
+
+`ToolDispatcher.dispatch(name, arguments_json)` usa un mapa inmutable de los cuatro nombres a
+métodos explícitos de `ToolHandlers`. Rechaza un nombre desconocido (incluido `execute_sql`) antes
+de parsear argumentos o abrir una sesión. Después llama a `validate_tool_call`, que vuelve a
+validar el JSON y liga la sucursal desde `AssistantSettings`. El dispatcher construye el handler
+con ese mismo alcance y con una sesión nueva creada dentro del worker; no usa `getattr`, `eval`,
+SQL generado por el modelo ni una función proporcionada en los argumentos.
+
+El timeout predeterminado es de 3 segundos y se puede configurar en backend entre más de cero y
+30 segundos. Incluye la espera por uno de los cuatro workers y la ejecución del handler. Al
+vencer, el solicitante recibe `ToolExecutionTimeoutError` sin contenido del argumento. La tarea
+de lectura que ya comenzó puede continuar hasta terminar: el timeout limita la espera del
+solicitante, no interrumpe de forma forzosa SQLite o la lectura del archivo. La concurrencia
+global está acotada a cuatro tareas, incluso cuando vencen los timeouts; una sesión de base no
+se comparte entre threads. Los servicios subyacentes mantienen límites de tamaño para FAQ y
+consultas de solo lectura.
+
+F6.3 no llama todavía a Responses API ni serializa resultados para el modelo; ese loop pertenece
+a F6.4. El código que lo conecte debe conservar la etiqueta `untrusted_source` de la FAQ y
+tratar un timeout como fallo de consulta, nunca como permiso para inventar datos.
