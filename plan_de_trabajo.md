@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F5.1 (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.1 completada
+**Subfase activa:** ninguna; F5.2 — Parser y validación (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.2 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -1979,42 +1979,45 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F5.2 — Parser y validación
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-23
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] pandas/openpyxl.
+- [x] pandas/openpyxl: `openpyxl`.
 
-- [ ] extensión.
+- [x] extensión.
 
-- [ ] tamaño.
+- [x] tamaño.
 
-- [ ] headers.
+- [x] headers.
 
-- [ ] tipos.
+- [x] tipos.
 
-- [ ] duplicados.
+- [x] duplicados.
 
-- [ ] rangos.
+- [x] rangos.
 
-- [ ] errores por fila.
+- [x] errores por fila.
 
-- [ ] rechazo temprano de código de sucursal ajeno.
+- [x] rechazo temprano de código de sucursal ajeno.
 
 
 ### Criterios de aceptación
 
-- [ ] archivo inválido no modifica DB.
+- [x] archivo inválido no modifica DB.
 
-- [ ] archivo de otra sucursal no modifica DB.
+- [x] archivo de otra sucursal no modifica DB.
 
 
 ### Seguridad
 
-- [ ] prevenir path traversal.
+- [x] prevenir path traversal.
 
-- [ ] no ejecutar macros.
+- [x] no ejecutar macros.
 
 
 ### Prompt para Codex
@@ -4284,16 +4287,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F5.1 (`✅ COMPLETADO`).
-**Última subfase completada:** F5.1 — Contrato/plantilla Excel.
-**Siguiente subfase recomendada:** F5.2 — Parser y validación, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F5.2 — Parser y validación (`✅ COMPLETADO`).
+**Última subfase completada:** F5.2 — Parser y validación.
+**Siguiente subfase recomendada:** F5.3 — Preview de cambios, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F5.1 completada; no iniciar F5.2 automáticamente.
+F5.2 completada por solicitud explícita; F5.3 sigue pendiente y no se inició.
 
 ---
 
@@ -6979,6 +6982,63 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F5.2 — Parser y validación, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F5.2 Parser y validación
+
+Fase: Fase 5 — Importación segura de Excel, `🟨 EN_PROGRESO`.
+Subfase: F5.2 — Parser y validación.
+Estado: ✅ COMPLETADO.
+
+Cambios:
+
+- agregado `openpyxl` como única dependencia de lectura Excel; parser de `.xlsx` en memoria y
+  de solo lectura con contrato versionado, límite de tamaño/filas, tipos, rangos, duplicados y
+  errores por fila;
+- rechazo de sucursal distinta al alcance backend antes de procesar filas; cualquier error deja
+  el resultado sin filas para una futura etapa de preview;
+- añadidas pruebas adversariales y documentación del parser y sus límites.
+
+Archivos:
+
+- `pyproject.toml`;
+- `backend/app/services/price_import_parser.py`;
+- `backend/tests/test_price_import_parser.py`;
+- `docs/fase_5_excel.md`;
+- `README.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pip install -e '.[dev]'` -> instalación correcta de `openpyxl 3.1.5`;
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_price_import_parser.py -q` ->
+  32 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest` -> 384 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 97 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; advertencias informativas de LF/CRLF.
+
+Seguridad:
+
+- no se abren rutas ni se extrae el ZIP; se rechazan nombres con path traversal, entradas
+  peligrosas, macros, fórmulas, vínculos externos y dimensiones de hoja que oculten filas;
+- límites de paquete/filas y errores sin valores del archivo; `openpyxl` se abre en modo de solo
+  lectura, sin conservar VBA ni vínculos;
+- parser sin acceso a DB y prueba de archivo inválido/ajeno sin cambios en DB; `branch_code`
+  proviene de `BranchScope`, no de filas ni del modelo.
+
+Riesgos/Pendientes:
+
+- F5.2 valida sintaxis y alcance de archivo, pero todavía no consulta si `product_id` existe ni
+  si `product_name` coincide con el producto de la sucursal. Esa consulta de solo lectura y el
+  preview de impacto corresponden a F5.3;
+- no hay confirmación, escritura transaccional ni auditoría en esta subfase.
+
+Siguiente:
+
+- F5.3 — Preview de cambios, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

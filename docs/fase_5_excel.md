@@ -1,11 +1,10 @@
-# Fase 5 — Contrato de la plantilla de precios (F5.1)
+# Fase 5 — Plantilla y parser de precios (F5.1–F5.2)
 
 La plantilla versionada es [`price_import.example.xlsx`](../examples/price_import.example.xlsx).
 Contiene solo datos ficticios. Cada archivo de trabajo pertenece a **una instalación y una
 sucursal**. Se copia con un nombre terminado en `.assistant-prices.xlsx`, que Git ignora, y se
-reemplazan el código de sucursal y todas las filas de ejemplo antes de usarlo. La carga todavía
-no está implementada: F5.1 define únicamente el contrato; F5.2 incorporará el parser y las
-validaciones, seguidas por preview, confirmación y transacción en las subfases previstas.
+reemplazan el código de sucursal y todas las filas de ejemplo antes de usarlo. F5.2 valida el
+archivo en memoria; preview, confirmación y transacción pertenecen a las subfases siguientes.
 
 ## Estructura exacta
 
@@ -40,9 +39,17 @@ La hoja contiene `sucursal-demo`, los IDs ficticios `900001` y `900002`, nombres
 “ejemplo”, dos unidades y precios inventados. Estos IDs no afirman existir en ninguna base. Los
 datos de muestra deben sustituirse por datos aprobados de la sucursal correspondiente.
 
-El archivo es input no confiable. El parser futuro debe comprobar extensión, tamaño, estructura
-del paquete, hoja, cabecera, versión, tipos, límites, duplicados y que el código de `E3` coincide
-con el alcance backend **antes** de cualquier escritura. Debe rechazar macros, fórmulas, vínculos
-externos y contenido de otras sucursales; la validación visual de Excel no sustituye estas
-comprobaciones. La importación seguirá el flujo validar → preview → confirmar → transacción →
-auditoría. Ningún texto de la hoja se convierte en instrucciones para OpenAI.
+El archivo es input no confiable. `parse_price_import(content, filename=..., branch_scope=...)`
+acepta bytes de un `.xlsx` sin abrir rutas ni escribir archivos. Usa `openpyxl` en modo de solo
+lectura; el límite es 2 MiB para el archivo, 10 MiB descomprimidos, 128 entradas ZIP y 1000 filas
+de datos. Rechaza nombres y entradas con path traversal, macros, fórmulas, vínculos externos,
+hojas o cabeceras distintas, versiones no reconocidas y códigos de sucursal ajenos al alcance
+inyectado por backend. Valida tipos, precios de `0.00` a `9999999999.99`, fecha real no futura,
+unidad, nombres, IDs positivos de hasta 64 bits y duplicados `(product_id, unit)`. Los errores de
+filas indican número, columna y código sin incluir valores del archivo. Si hay cualquier error,
+el resultado contiene cero filas válidas. No existe escritura a DB en el parser.
+
+La existencia de `product_id` y la coincidencia de `product_name` con la base de la sucursal
+configurada requieren consulta de solo lectura durante el preview de F5.3. La importación futura
+seguirá validar → preview → confirmar → transacción → auditoría. Ningún texto de la hoja se
+convierte en instrucciones para OpenAI.
