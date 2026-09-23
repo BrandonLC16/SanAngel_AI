@@ -52,13 +52,18 @@ RAG: el TSV acotado y la búsqueda determinista cubren el alcance actual.
 
 F5.1 está `✅ COMPLETADO`: define la [plantilla Excel de precios](docs/fase_5_excel.md) por
 instalación. El ejemplo versionado contiene solo datos ficticios, un `branch_code` de archivo, ID
-y nombre de producto, unidad, precio en MXN y fecha de verificación. Todavía no existe un
-importador. F5.2 incorpora un parser de solo lectura que valida `.xlsx`, tamaño, paquete,
+y nombre de producto, unidad, precio en MXN y fecha de verificación. F5.2 incorporó un parser
+de solo lectura que valida `.xlsx`, tamaño, paquete,
 sucursal configurada, cabeceras, tipos, duplicados y rangos, y devuelve errores por fila sin
 escribir en la base. F5.3 añade un preview de solo lectura: coteja ID y nombre del producto
 dentro de la sucursal configurada y presenta altas, cambios, precios iguales y errores mediante
-datos mínimos aptos para revisión administrativa. Todavía no hay endpoint de administración ni
-escritura de precios desde Excel.
+datos mínimos aptos para revisión administrativa. Todavía no hay endpoint de administración.
+
+F5.4 incorpora un servicio interno de importación transaccional. Exige un preview revisado y
+confirmación explícita, vuelve a validar archivo y catálogo bajo una transacción, y crea o
+actualiza únicamente precios de la sucursal configurada. Ante un error revierte toda la carga.
+Devuelve un recibo con huella del archivo y conteos; la auditoría persistente corresponde a F5.5.
+El servicio no está conectado a un endpoint ni al chatbot.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en

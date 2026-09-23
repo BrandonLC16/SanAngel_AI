@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F5.3 — Preview de cambios (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.3 completada
+**Subfase activa:** ninguna; F5.4 — Importación transaccional (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.4 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2080,34 +2080,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F5.4 — Importación transaccional
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-23
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] confirmación.
+- [x] confirmación.
 
-- [ ] transacción.
+- [x] transacción.
 
-- [ ] upserts controlados.
+- [x] upserts controlados.
 
-- [ ] `branch_id` inyectado por backend, nunca tomado como autoridad desde una celda.
+- [x] `branch_id` inyectado por backend, nunca tomado como autoridad desde una celda.
 
-- [ ] rollback.
+- [x] rollback.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] todo-o-nada ante error.
+- [x] todo-o-nada ante error.
 
 
 ### Seguridad
 
-- [ ] auditabilidad.
+- [x] auditabilidad mediante recibo con SHA-256, sucursal y conteos; registro duradero en F5.5.
 
-- [ ] Decimal para dinero.
+- [x] Decimal para dinero.
 
 
 ### Prompt para Codex
@@ -4289,16 +4291,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F5.3 — Preview de cambios (`✅ COMPLETADO`).
-**Última subfase completada:** F5.3 — Preview de cambios.
-**Siguiente subfase recomendada:** F5.4 — Importación transaccional, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F5.4 — Importación transaccional (`✅ COMPLETADO`).
+**Última subfase completada:** F5.4 — Importación transaccional.
+**Siguiente subfase recomendada:** F5.5 — Auditoría y reporte, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F5.3 completada por solicitud explícita; F5.4 sigue pendiente y no se inició.
+F5.4 completada por solicitud explícita; F5.5 sigue pendiente y no se inició.
 
 ---
 
@@ -7094,6 +7096,63 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F5.4 — Importación transaccional, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F5.4 Importación transaccional
+
+Fase: Fase 5 — Importación segura de Excel, `🟨 EN_PROGRESO`.
+Subfase: F5.4 — Importación transaccional.
+Estado: ✅ COMPLETADO.
+
+Cambios:
+
+- añadido servicio interno de preparación y confirmación explícita, ligado a nombre, SHA-256
+  del archivo, sucursal y preview revisado;
+- importación en una transacción SQLite con revalidación bajo bloqueo de escritura, alta de
+  precios ausentes, actualización de importes distintos y omisión de filas iguales;
+- recibo mínimo con huella, sucursal y conteos; documentación y pruebas de reversión completa.
+
+Archivos:
+
+- `backend/app/services/price_import_transaction.py`;
+- `backend/tests/test_price_import_transaction.py`;
+- `docs/fase_5_excel.md`;
+- `README.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_price_import_transaction.py -q` ->
+  10 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m pytest` -> 400 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 101 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- `confirmed` exige el booleano `True`; el archivo y el preview se comparan de nuevo antes de
+  escribir y se rechaza contenido alterado o desactualizado;
+- repositorios acotados por `BranchScope` inyectan `branch_id`; no se acepta sucursal de celda,
+  cliente o modelo y se conserva el precio ajeno en las pruebas;
+- `PriceData` recibe `Decimal`; un fallo en la segunda escritura revierte también la primera;
+  errores de DB usan mensaje seguro sin SQL ni valores del archivo;
+- el recibo ofrece trazabilidad mínima sin conservar el XLSX.
+
+Riesgos/Pendientes:
+
+- F5.5 debe persistir el registro de quién/cuándo/archivo lógico, resumen y errores; el recibo
+  de F5.4 todavía no es un audit log duradero;
+- no hay endpoint ni panel administrativo; su futura exposición requiere autenticación,
+  autorización y mantener el objeto preparado bajo control backend;
+- `BEGIN IMMEDIATE` corresponde al MVP con SQLite; se deberá revisar la estrategia de bloqueo
+  al migrar a otra base.
+
+Siguiente:
+
+- F5.5 — Auditoría y reporte, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

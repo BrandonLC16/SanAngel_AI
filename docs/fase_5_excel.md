@@ -1,11 +1,11 @@
-# Fase 5 — Plantilla, parser y preview de precios (F5.1–F5.3)
+# Fase 5 — Plantilla e importación de precios (F5.1–F5.4)
 
 La plantilla versionada es [`price_import.example.xlsx`](../examples/price_import.example.xlsx).
 Contiene solo datos ficticios. Cada archivo de trabajo pertenece a **una instalación y una
 sucursal**. Se copia con un nombre terminado en `.assistant-prices.xlsx`, que Git ignora, y se
 reemplazan el código de sucursal y todas las filas de ejemplo antes de usarlo. F5.2 valida el
-archivo en memoria y F5.3 prepara el preview. Confirmación y transacción pertenecen a las
-subfases siguientes.
+archivo en memoria, F5.3 prepara el preview y F5.4 incorpora confirmación y escritura
+transaccional. Auditoría persistente y reporte corresponden a F5.5.
 
 ## Estructura exacta
 
@@ -27,12 +27,12 @@ subfases siguientes.
 | D | `price_mxn` | Número de Excel en pesos mexicanos **por la unidad de C**, de `0.00` a `9999999999.99`, con máximo dos decimales. Sin símbolo, texto, separadores escritos a mano ni fórmulas. |
 | E | `verified_on` | Fecha de Excel sin hora, mostrada como `yyyy-mm-dd`. Fecha en que el negocio confirmó ese precio; no programa su aplicación futura. |
 
-La pareja `(product_id, unit)` debe aparecer una sola vez por archivo. Un precio importado será
-el precio **actual** después de la confirmación y escritura transaccional de fases posteriores;
+La pareja `(product_id, unit)` debe aparecer una sola vez por archivo. Un precio importado es
+el precio **actual** después de la confirmación y escritura transaccional de F5.4;
 `verified_on` no cambia `created_at` ni `updated_at` de la base por sí solo. El backend debe
 resolver `product_id` dentro de la sucursal configurada y comprobar que `product_name` coincide
 antes de proponer cualquier actualización. La representación en Excel es numérica; el parser
-deberá convertir el importe a `Decimal` sin pasar un `float` a `PriceData`.
+convierte el importe a `Decimal` sin pasar un `float` a `PriceData`.
 
 ## Ejemplo y seguridad
 
@@ -69,5 +69,30 @@ ni escritura y rechaza sesiones con cambios pendientes. La futura interfaz admin
 deberá autenticar y autorizar a quien vea este resultado. F5.3 no agrega endpoint público ni
 persiste un preview; F5.4 deberá volver a validar antes de cualquier escritura.
 
-La importación futura seguirá validar → preview → confirmar → transacción → auditoría. Ningún
-texto de la hoja se convierte en instrucciones para OpenAI.
+## Confirmación e importación (F5.4)
+
+`PriceImportTransactionService(session_factory, branch_scope=...)` usa únicamente el alcance de
+sucursal inyectado por el backend. `prepare(content, filename=...)` genera un
+`PreparedPriceImport` con el preview, nombre lógico del archivo y SHA-256 de sus bytes, sin
+persistirlo. El administrador debe revisar `prepared.preview.to_review_data()` mediante una
+interfaz autenticada futura. Solo entonces el backend llama a
+`confirm(content, filename=..., prepared=prepared, confirmed=True)`; un valor distinto del
+booleano `True` o un archivo/nombre/sucursal diferente se rechaza antes de consultar la DB. El
+objeto `PreparedPriceImport` es estado interno del backend y no debe construirse desde datos del
+cliente o del modelo.
+
+`confirm` abre una transacción SQLite con bloqueo de escritura, vuelve a parsear y revisar el
+catálogo y compara el impacto actual con el preview aprobado. Si el archivo o los precios
+cambiaron, o aparece cualquier error, rechaza la operación. Después crea solo precios ausentes,
+actualiza solo importes diferentes y omite los iguales. Los repositorios derivan `branch_id` de
+la sucursal configurada; jamás de una celda. Los importes pasan como `Decimal` por `PriceData`.
+La transacción confirma todo al final o revierte todos los cambios ante un fallo, incluso si ya
+se había escrito una fila. Un fallo de DB se expone mediante un error seguro sin SQL ni valores
+del archivo.
+
+El recibo exitoso incluye código de sucursal, huella SHA-256 y conteos de altas, cambios y filas
+iguales. Sirve como base de trazabilidad, sin guardar el XLSX ni datos personales. F5.5 deberá
+añadir el registro duradero de quién/cuándo/archivo lógico y los reportes. El servicio todavía
+no se expone por HTTP; la futura ruta administrativa tendrá que exigir autenticación y
+autorización, conservar el objeto preparado solo en backend y realizar la confirmación explícita.
+Ningún texto de la hoja se convierte en instrucciones para OpenAI.
