@@ -72,8 +72,9 @@ leerlo completo.
 
 F6.1 define los [contratos estrictos de cuatro tools](docs/fase_6_tools.md) para Responses API:
 precio, datos de sucursal, FAQ y propuesta de ayuda humana. La allowlist y los argumentos se
-validan en backend antes de asociar la sucursal configurada. Los handlers y la ejecución de tool
-calls corresponden a subfases posteriores; el modelo todavía no puede invocar estos servicios.
+validan en backend antes de asociar la sucursal configurada. F6.2 implementa handlers locales
+de solo lectura con resultados tipados y alcance de sucursal; se pueden probar sin modelo.
+La ejecución centralizada de tool calls pertenece a F6.3 y todavía no está conectada al modelo.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en

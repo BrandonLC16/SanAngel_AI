@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F6.1 — Schemas de tools (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.1 completada
+**Subfase activa:** ninguna; F6.2 — Implementaciones de tools (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.2 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2275,32 +2275,35 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F6.2 — Implementaciones de tools
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Inicio:** 2026-09-23.
+**Cierre:** 2026-09-23; pasó por `🧪 VALIDACION`.
 
 
 ### Alcance
 
-- [ ] adaptar servicios comerciales/FAQ.
+- [x] adaptar servicios comerciales/FAQ.
 
-- [ ] resultados tipados.
+- [x] resultados tipados.
 
-- [ ] no encontrado.
+- [x] no encontrado.
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] `BranchScope` obligatorio para handlers comerciales/FAQ.
+- [x] `BranchScope` obligatorio para handlers comerciales/FAQ.
 
 
 ### Criterios de aceptación
 
-- [ ] tools funcionan sin modelo.
+- [x] tools funcionan sin modelo.
 
 
 ### Seguridad
 
-- [ ] solo mínimo privilegio.
+- [x] solo mínimo privilegio.
 
-- [ ] pruebas demuestran que argumentos del modelo no cambian sucursal.
+- [x] pruebas demuestran que argumentos del modelo no cambian sucursal.
 
 
 ### Prompt para Codex
@@ -4299,16 +4302,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F6.1 — Schemas de tools (`✅ COMPLETADO`).
-**Última subfase completada:** F6.1 — Schemas de tools.
-**Siguiente subfase recomendada:** F6.2 — Implementaciones de tools, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F6.2 — Implementaciones de tools (`✅ COMPLETADO`).
+**Última subfase completada:** F6.2 — Implementaciones de tools.
+**Siguiente subfase recomendada:** F6.3 — Dispatcher allowlist, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.1 completada y validada; F6.2 sigue pendiente y no se inició.
+F6.2 completada el 2026-09-23 tras 93 pruebas relacionadas y 459 pruebas de la suite completa;
+F6.3 sigue pendiente y no se inició.
 
 ---
 
@@ -7343,6 +7347,58 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.2 — Implementaciones de tools, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F6.2 Implementaciones de tools
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `🟨 EN_PROGRESO`.
+Subfase: F6.2 — Implementaciones de tools, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- implementados cuatro handlers explícitos que consumen `ValidatedToolCall`, exigen el
+  `BranchScope` backend y reutilizan los servicios comerciales y la política FAQ;
+- precio inexistente, inactivo, ajeno o sin precio se expresa mediante el mismo resultado tipado
+  `ProductPriceNotFoundResult`; la FAQ conserva respuestas marcadas como fuente no confiable y
+  fallbacks fijos para búsquedas desconocidas o ambiguas;
+- `customer_requested` ahora produce una propuesta conceptual de ayuda humana sin ejecución;
+- añadidos tests locales de resultados, no encontrado, alcance entre sucursales y llamadas
+  incompatibles; actualizados README y documentación de tools.
+
+Archivos: `backend/app/services/tool_handlers.py`,
+`backend/app/services/faq_response_policy.py`, `backend/tests/test_tool_handlers.py`,
+`docs/fase_6_tools.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_tool_handlers.py`: 8 passed;
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_tool_handlers.py backend/tests/test_tool_contracts.py backend/tests/test_commercial_query_service.py backend/tests/test_faq_response_policy.py backend/tests/test_faq_service.py`: 93 passed;
+- `.\.venv\Scripts\python.exe -m pytest`: 459 passed;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 109 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace (avisos de conversión LF/CRLF).
+
+Seguridad:
+
+- handlers de solo lectura y métodos explícitos; sin SQL libre, escritura, contacto a personal
+  ni acceso a proveedor externo;
+- argumentos de modelo no incluyen sucursal; el handler rechaza un `ValidatedToolCall` vinculado
+  a otra sucursal antes de leer DB o FAQ;
+- productos ajenos no revelan precio ni existencia diferenciada; un archivo FAQ ajeno se rechaza
+  entero y el contenido recuperado sigue etiquetado como no confiable.
+
+Riesgos/Pendientes:
+
+- los handlers aún no están conectados a OpenAI ni al flujo WhatsApp; la selección centralizada y
+  la serialización segura del resultado corresponden a F6.3;
+- la propuesta de ayuda humana no implica transferencia realizada.
+
+Siguiente:
+
+- F6.3 — Dispatcher allowlist, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

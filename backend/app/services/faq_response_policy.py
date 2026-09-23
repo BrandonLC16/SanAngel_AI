@@ -17,6 +17,7 @@ AMBIGUOUS_FALLBACK = (
 
 
 class HumanHelpReason(StrEnum):
+    CUSTOMER_REQUESTED = "customer_requested"
     FAQ_UNKNOWN = "faq_unknown"
     FAQ_AMBIGUOUS = "faq_ambiguous"
 
