@@ -70,6 +70,11 @@ F5.6 cierra la Fase 5 con pruebas de cargas maliciosas y revisión de seguridad 
 La futura interfaz administrativa aún debe autenticar al personal y limitar el upload antes de
 leerlo completo.
 
+F6.1 define los [contratos estrictos de cuatro tools](docs/fase_6_tools.md) para Responses API:
+precio, datos de sucursal, FAQ y propuesta de ayuda humana. La allowlist y los argumentos se
+validan en backend antes de asociar la sucursal configurada. Los handlers y la ejecución de tool
+calls corresponden a subfases posteriores; el modelo todavía no puede invocar estos servicios.
+
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en
 `.assistant-prices.xlsx`, sustituye `branch_code` y elimina o reemplaza las dos filas ficticias.

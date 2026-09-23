@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-23
-**Fase activa:** ninguna; Fase 5 — Importación segura de Excel (`✅ COMPLETADO`)
-**Subfase activa:** ninguna; F5.6 — Cierre Fase 5 (`✅ COMPLETADO`)
-**Estado global:** ✅ COMPLETADO — Fase 5 cerrada; Fase 6 pendiente
+**Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`)
+**Subfase activa:** ninguna; F6.1 — Schemas de tools (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.1 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2217,41 +2217,44 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que el modelo solicite operaciones de solo lectura específicas sin acceso libre a SQL.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-09-23
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F6.1 — Schemas de tools
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-23
+**Fecha de finalización:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] get_product_price.
+- [x] get_product_price.
 
-- [ ] get_branch_info.
+- [x] get_branch_info.
 
-- [ ] search_faq.
+- [x] search_faq.
 
-- [ ] request_human_help.
+- [x] request_human_help.
 
-- [ ] schemas estrictos.
+- [x] schemas estrictos.
 
-- [ ] ningún schema expone `branch_id` o `branch_code` al modelo.
+- [x] ningún schema expone `branch_id` o `branch_code` al modelo.
 
 
 ### Criterios de aceptación
 
-- [ ] argumentos claramente validados.
+- [x] argumentos claramente validados.
 
 
 ### Seguridad
 
-- [ ] allowlist cerrada.
+- [x] allowlist cerrada.
 
-- [ ] alcance de sucursal inyectado después de validar la tool.
+- [x] alcance de sucursal inyectado después de validar la tool.
 
 
 ### Prompt para Codex
@@ -4295,17 +4298,17 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** ninguna; Fase 5 — Importación segura de Excel (`✅ COMPLETADO`).
-**Subfase activa:** ninguna; F5.6 — Cierre Fase 5 (`✅ COMPLETADO`).
-**Última subfase completada:** F5.6 — Cierre Fase 5.
-**Siguiente subfase recomendada:** F6.1 — Schemas de tools, `⬜ PENDIENTE`; no iniciada.
+**Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F6.1 — Schemas de tools (`✅ COMPLETADO`).
+**Última subfase completada:** F6.1 — Schemas de tools.
+**Siguiente subfase recomendada:** F6.2 — Implementaciones de tools, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F5.6 y Fase 5 completadas para el servicio interno; F6.1 sigue pendiente y no se inició.
+F6.1 completada y validada; F6.2 sigue pendiente y no se inició.
 
 ---
 
@@ -7282,6 +7285,64 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.1 — Schemas de tools, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F6.1 Schemas de tools
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `🟨 EN_PROGRESO`.
+Subfase: F6.1 — Schemas de tools, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- definidos cuatro schemas de función para Responses API con `strict: true`, propiedades
+  requeridas y `additionalProperties: false`: precio, sucursal, FAQ y propuesta de ayuda humana;
+- añadida validación backend de allowlist, JSON acotado, tipos, rangos, unidad, texto, razones
+  cerradas, claves duplicadas y campos extra; la sucursal se vincula desde configuración backend
+  solo después de validar nombre y argumentos;
+- documentado el contrato y su límite: todavía no hay handlers ni ejecución de tool calls.
+
+Archivos:
+
+- `backend/app/services/tool_contracts.py`;
+- `backend/tests/test_tool_contracts.py`;
+- `docs/fase_6_tools.md`;
+- `README.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\pytest.exe backend/tests/test_tool_contracts.py -q` -> 36 pruebas aprobadas;
+- `.venv\Scripts\pytest.exe` -> 451 pruebas aprobadas sin red;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 107 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- ninguna tool expone `branch_id` o `branch_code`; `run_sql`, escrituras y nombres no registrados
+  se rechazan antes del parseo y no pueden ampliar la allowlist;
+- los modelos Pydantic son estrictos e inmutables; la validación rechaza claves repetidas, JSON
+  no estándar, argumentos grandes o con campos extra y no devuelve texto recibido en errores;
+- `BranchScope` se deriva de `AssistantSettings` proporcionado por backend después de validar la
+  llamada; pruebas con dos instalaciones confirman que los mismos argumentos no cambian alcance;
+- las definiciones siguen la [documentación oficial de OpenAI para strict mode](https://developers.openai.com/api/docs/guides/function-calling#strict-mode)
+  y el [subconjunto admitido de JSON Schema](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas).
+
+Riesgos/Pendientes:
+
+- F6.2 deberá implementar handlers de solo lectura que consuman `ValidatedToolCall` y mantener
+  el alcance backend; F6.1 no ejecuta ninguna tool ni contacta personal;
+- el código `customer_requested` de ayuda humana deberá mapearse a una propuesta permitida en
+  F6.2; no representa un traspaso ejecutado;
+- algunas restricciones de patrón/rango del schema no son admitidas en modelos ajustados: la
+  integración futura debe verificar el modelo configurado y conservar la validación backend.
+
+Siguiente:
+
+- F6.2 — Implementaciones de tools, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 
