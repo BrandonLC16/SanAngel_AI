@@ -75,8 +75,10 @@ precio, datos de sucursal, FAQ y propuesta de ayuda humana. La allowlist y los a
 validan en backend antes de asociar la sucursal configurada. F6.2 implementa handlers locales
 de solo lectura con resultados tipados y alcance de sucursal; se pueden probar sin modelo.
 F6.3 añade un dispatcher con mapa cerrado, validación backend y timeout de espera acotado.
-Rechaza `execute_sql` y otros nombres no autorizados antes de abrir la base. La ejecución aún no
-está conectada al modelo; el loop de Responses API corresponde a F6.4.
+Rechaza `execute_sql` y otros nombres no autorizados antes de abrir la base. F6.4 agrega un
+método interno de Responses API que ejecuta tool calls validadas, devuelve sus resultados al
+modelo y obtiene una respuesta final, con límites de rondas y pruebas mockeadas. El endpoint
+interno de chat y WhatsApp aún no componen ese método con el dispatcher.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en

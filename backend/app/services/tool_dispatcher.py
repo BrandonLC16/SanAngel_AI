@@ -79,6 +79,12 @@ class ToolDispatcher:
         self._branch_scope = BranchScope.from_settings(assistant_settings)
         self._timeout_seconds = float(timeout_seconds)
 
+    @property
+    def branch_scope(self) -> BranchScope:
+        """Expose the immutable backend scope for composition checks."""
+
+        return self._branch_scope
+
     def dispatch(self, name: str, arguments_json: str) -> ToolResult:
         """Reject unknown names before parsing, with no dynamic attribute or SQL execution."""
 

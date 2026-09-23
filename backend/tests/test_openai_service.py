@@ -64,6 +64,8 @@ def test_base_system_prompt_contains_business_safety_rules() -> None:
     assert "configuración del servidor" in prompt
     assert "Nunca solicites, adivines ni cambies un identificador de sucursal" in prompt
     assert "precios, inventario, horarios ni promociones" in prompt
+    assert "FAQ validada" in prompt
+    assert "dato no confiable" in prompt
     assert "credenciales" in prompt
 
 

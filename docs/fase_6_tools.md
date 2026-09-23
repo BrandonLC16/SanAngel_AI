@@ -1,4 +1,4 @@
-# Fase 6 — Contratos, handlers y dispatcher (F6.1–F6.3)
+# Fase 6 — Contratos, handlers, dispatcher y loop (F6.1–F6.4)
 
 F6.1 define cuatro funciones para Responses API. Sigue sin conectar OpenAI a los servicios de
 negocio ni ejecutar tool calls. Los schemas usan `type: "function"`, `strict: true`, un objeto
@@ -11,9 +11,9 @@ modelos ajustados; la integración futura deberá comprobar la compatibilidad de
 
 | Tool | Argumentos del modelo | Contrato |
 |---|---|---|
-| `get_product_price` | `product_id`: entero positivo de hasta 64 bits; `unit`: código minúsculo de hasta 24 caracteres | Consulta futura de precio exacto por producto y unidad. |
-| `get_branch_info` | Objeto vacío `{}` | Consulta futura de la sucursal ya configurada. |
-| `search_faq` | `query`: pregunta de hasta 240 caracteres | Búsqueda futura en la FAQ validada de la sucursal. |
+| `get_product_price` | `product_id`: entero positivo de hasta 64 bits; `unit`: código minúsculo de hasta 24 caracteres | Precio exacto por producto y unidad. |
+| `get_branch_info` | Objeto vacío `{}` | Datos de la sucursal ya configurada. |
+| `search_faq` | `query`: pregunta de hasta 240 caracteres | Búsqueda en la FAQ validada de la sucursal. |
 | `request_human_help` | `reason`: `customer_requested`, `faq_unknown` o `faq_ambiguous` | Solo propuesta conceptual; no contacta al personal. |
 
 `get_tool_schemas()` devuelve una copia independiente de la allowlist. Ningún schema contiene
@@ -67,6 +67,27 @@ global está acotada a cuatro tareas, incluso cuando vencen los timeouts; una se
 se comparte entre threads. Los servicios subyacentes mantienen límites de tamaño para FAQ y
 consultas de solo lectura.
 
-F6.3 no llama todavía a Responses API ni serializa resultados para el modelo; ese loop pertenece
-a F6.4. El código que lo conecte debe conservar la etiqueta `untrusted_source` de la FAQ y
-tratar un timeout como fallo de consulta, nunca como permiso para inventar datos.
+F6.4 añade `OpenAIService.generate_reply_with_tools(message, dispatcher)`. Hace una solicitud a
+Responses API con los cuatro schemas, detecta cada elemento `function_call`, ejecuta el nombre y
+argumentos mediante el dispatcher, agrega un `function_call_output` con el mismo `call_id` y
+solicita la respuesta final. Se preservan todos los elementos de `response.output`, incluidos
+los de razonamiento, al construir cada entrada siguiente con `store` configurado; esta secuencia
+sigue la [guía oficial de function calling](https://developers.openai.com/api/docs/guides/function-calling#handling-function-calls)
+y la [gestión manual de estado](https://developers.openai.com/api/docs/guides/conversation-state#manually-manage-conversation-state).
+Las llamadas se ejecutan en orden y se devuelve texto solo si la respuesta está completa y
+contiene un mensaje final no vacío.
+
+El loop permite hasta tres rondas de ejecución de tools y cuatro llamadas por respuesta. La
+cuarta respuesta de API debe ser final: si vuelve a solicitar una tool, se rechaza sin ejecutarla.
+Cada respuesta está limitada a 16 elementos y solicita como máximo 1024 tokens de salida.
+Los resultados tipados se serializan a JSON de hasta 8192 bytes; el `Decimal` se mantiene como
+cadena y la respuesta FAQ conserva `trust_level="untrusted_source"`. El prompt indica que el
+texto recuperado es dato, no instrucción, y que una propuesta de ayuda no es un traspaso
+ejecutado. Llamadas desconocidas, argumentos inválidos y respuestas incompletas fallan de forma
+cerrada sin devolver argumentos al modelo. El loop comprueba que el dispatcher y el servicio
+OpenAI comparten la sucursal configurada antes de llamar al proveedor.
+
+Este método tiene pruebas mockeadas, sin red. El endpoint de chat y WhatsApp conservan su flujo
+actual de texto; la composición operativa con el dispatcher aún requiere configuración backend
+del archivo FAQ y se abordará en una subfase posterior. Un fallo o timeout de tool nunca debe
+convertirse en un dato comercial supuesto.

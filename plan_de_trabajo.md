@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F6.3 — Dispatcher allowlist (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.3 completada
+**Subfase activa:** ninguna; F6.4 — Loop Responses API + tool calls (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.4 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2372,34 +2372,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F6.4 — Loop Responses API + tool calls
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Inicio:** 2026-09-23.
+**Cierre:** 2026-09-23; pasó por `🧪 VALIDACION`.
 
 
 ### Alcance
 
-- [ ] detectar tool call.
+- [x] detectar tool call.
 
-- [ ] ejecutar.
+- [x] ejecutar.
 
-- [ ] devolver resultado.
+- [x] devolver resultado.
 
-- [ ] respuesta final.
+- [x] respuesta final.
 
-- [ ] límite de iteraciones.
+- [x] límite de iteraciones.
 
-- [ ] tests mockeados.
+- [x] tests mockeados.
 
 
 ### Criterios de aceptación
 
-- [ ] flujo determinista y acotado.
+- [x] flujo determinista y acotado.
 
 
 ### Seguridad
 
-- [ ] evitar loop infinito.
+- [x] evitar loop infinito.
 
-- [ ] no confiar en args modelo.
+- [x] no confiar en args modelo.
 
 
 ### Prompt para Codex
@@ -4304,17 +4306,18 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F6.3 — Dispatcher allowlist (`✅ COMPLETADO`).
-**Última subfase completada:** F6.3 — Dispatcher allowlist.
-**Siguiente subfase recomendada:** F6.4 — Loop Responses API + tool calls, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F6.4 — Loop Responses API + tool calls (`✅ COMPLETADO`).
+**Última subfase completada:** F6.4 — Loop Responses API + tool calls.
+**Siguiente subfase recomendada:** F6.5 — Desambiguación de producto con sucursal fija,
+`⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.3 completada el 2026-09-23 tras 21 pruebas nuevas y 480 pruebas de la suite completa;
-F6.4 sigue pendiente y no se inició.
+F6.4 completada el 2026-09-23 tras 22 pruebas nuevas y 502 pruebas de la suite completa;
+F6.5 sigue pendiente y no se inició.
 
 ---
 
@@ -7455,6 +7458,68 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.4 — Loop Responses API + tool calls, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F6.4 Loop Responses API + tool calls
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `🟨 EN_PROGRESO`.
+Subfase: F6.4 — Loop Responses API + tool calls, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- `OpenAIService.generate_reply_with_tools` detecta elementos `function_call`, ejecuta hasta
+  cuatro llamadas por respuesta mediante `ToolDispatcher`, devuelve JSON tipado con el `call_id`
+  correspondiente y solicita la respuesta final;
+- preserva todos los elementos de salida, incluidos los de razonamiento, en las solicitudes
+  siguientes; conserva `store` configurable y los errores de proveedor existentes;
+- limita la ejecución a tres rondas de tools, cuatro solicitudes a Responses API, 16 elementos
+  por respuesta, 1024 tokens de salida por solicitud y 8192 bytes por resultado de tool;
+- comprueba la coincidencia del alcance entre servicio y dispatcher, ajusta el prompt para datos
+  comerciales obtenidos por tools y etiqueta la FAQ como contenido no confiable;
+- añadidas 22 pruebas mockeadas de respuesta final, llamadas múltiples, serialización, límite de
+  rondas, argumentos inválidos y respuestas malformadas; actualizados README y documentación.
+
+Archivos: `backend/app/services/openai_service.py`,
+`backend/app/services/tool_dispatcher.py`, `backend/app/prompts/base_system_prompt.txt`,
+`backend/tests/test_openai_tool_loop.py`, `backend/tests/test_openai_service.py`,
+`docs/fase_6_tools.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_openai_tool_loop.py backend/tests/test_openai_service.py backend/tests/test_tool_dispatcher.py`: 53 passed antes de la última prueba de borde;
+- primera ejecución de `.\.venv\Scripts\python.exe -m pytest`: 500 passed, 1 failed por un
+  salto de línea en una frase del prompt; corregido y repetido;
+- primera ejecución de `.\.venv\Scripts\ruff.exe format --check .`: fallo de formato en el test
+  actualizado; corregido con `.\.venv\Scripts\ruff.exe format backend/tests/test_openai_service.py`;
+- `.\.venv\Scripts\python.exe -m pytest`: 502 passed en la validación final;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 112 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace (avisos de conversión LF/CRLF).
+
+Seguridad:
+
+- nombres y argumentos del modelo pasan por la allowlist y validación de F6.1/F6.3; llamadas
+  desconocidas, argumentos extra y sucursal distinta fallan antes de ejecutar un handler;
+- respuestas incompletas, IDs repetidos, tipos inesperados y más llamadas que el límite se
+  rechazan; el loop no puede continuar indefinidamente;
+- la FAQ conserva `trust_level="untrusted_source"` en el JSON devuelto al modelo; el prompt
+  prohíbe obedecer instrucciones recuperadas y no presenta ayuda humana como ejecutada;
+- tests con cliente mockeado y guardia de red; no se usaron credenciales reales.
+
+Riesgos/Pendientes:
+
+- el método aún no está compuesto con el endpoint interno ni con WhatsApp; falta configurar la
+  fuente FAQ de la instalación al integrarlo;
+- una respuesta final del modelo puede contener una afirmación comercial no respaldada aunque
+  no invoque tools; se debe tratar como riesgo en la integración y pruebas de seguridad futuras;
+- el timeout del dispatcher limita la espera, pero no interrumpe una lectura ya iniciada.
+
+Siguiente:
+
+- F6.5 — Desambiguación de producto con sucursal fija, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 
