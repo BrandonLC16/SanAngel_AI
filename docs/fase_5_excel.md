@@ -1,11 +1,11 @@
-# Fase 5 — Plantilla e importación de precios (F5.1–F5.4)
+# Fase 5 — Plantilla e importación de precios (F5.1–F5.5)
 
 La plantilla versionada es [`price_import.example.xlsx`](../examples/price_import.example.xlsx).
 Contiene solo datos ficticios. Cada archivo de trabajo pertenece a **una instalación y una
 sucursal**. Se copia con un nombre terminado en `.assistant-prices.xlsx`, que Git ignora, y se
 reemplazan el código de sucursal y todas las filas de ejemplo antes de usarlo. F5.2 valida el
 archivo en memoria, F5.3 prepara el preview y F5.4 incorpora confirmación y escritura
-transaccional. Auditoría persistente y reporte corresponden a F5.5.
+transaccional. F5.5 registra cada intento de confirmación con un reporte acotado.
 
 ## Estructura exacta
 
@@ -76,7 +76,7 @@ sucursal inyectado por el backend. `prepare(content, filename=...)` genera un
 `PreparedPriceImport` con el preview, nombre lógico del archivo y SHA-256 de sus bytes, sin
 persistirlo. El administrador debe revisar `prepared.preview.to_review_data()` mediante una
 interfaz autenticada futura. Solo entonces el backend llama a
-`confirm(content, filename=..., prepared=prepared, confirmed=True)`; un valor distinto del
+`confirm(content, filename=..., prepared=prepared, confirmed=True, actor=actor)`; un valor distinto del
 booleano `True` o un archivo/nombre/sucursal diferente se rechaza antes de consultar la DB. El
 objeto `PreparedPriceImport` es estado interno del backend y no debe construirse desde datos del
 cliente o del modelo.
@@ -90,9 +90,30 @@ La transacción confirma todo al final o revierte todos los cambios ante un fall
 se había escrito una fila. Un fallo de DB se expone mediante un error seguro sin SQL ni valores
 del archivo.
 
-El recibo exitoso incluye código de sucursal, huella SHA-256 y conteos de altas, cambios y filas
-iguales. Sirve como base de trazabilidad, sin guardar el XLSX ni datos personales. F5.5 deberá
-añadir el registro duradero de quién/cuándo/archivo lógico y los reportes. El servicio todavía
-no se expone por HTTP; la futura ruta administrativa tendrá que exigir autenticación y
-autorización, conservar el objeto preparado solo en backend y realizar la confirmación explícita.
-Ningún texto de la hoja se convierte en instrucciones para OpenAI.
+El recibo exitoso incluye ID de auditoría e intento, código de sucursal, huella SHA-256 y conteos
+de altas, cambios y filas iguales. El servicio todavía no se expone por HTTP; la futura ruta
+administrativa tendrá que exigir autenticación y autorización, conservar el objeto preparado solo
+en backend y realizar la confirmación explícita. Ningún texto de la hoja se convierte en
+instrucciones para OpenAI.
+
+## Auditoría y reporte (F5.5)
+
+`confirm` exige `ImportActor` con un identificador opaco del personal, construido desde una
+identidad autenticada por el backend. No debe derivarse de celdas, del nombre del archivo, del
+cliente ni del modelo. Cada intento con actor válido recibe un UUID de intento. El registro guarda
+sucursal configurada, actor, fecha/hora UTC, estado (`success`, `rejected` o `failed`) y huella
+SHA-256 del archivo como identificador lógico cuando los bytes caben en el límite de 2 MiB. Para
+un archivo demasiado grande o contenido que no sea `bytes`, la huella queda ausente. No guarda
+ruta, nombre, bytes del XLSX ni contenido de celdas. Un preview abandonado no crea un intento.
+
+El registro de éxito se escribe en la misma transacción que los precios: si falla la auditoría,
+se revierten los precios. Tras rechazos de confirmación, validación o preview obsoleto, o tras un
+fallo de DB, se intenta registrar el resultado por separado después del rollback. Si tampoco se
+puede auditar, se devuelve un error seguro y no se afirma que la importación se confirmó.
+
+`get_report(audit_id)` y `list_reports(limit=...)` consultan solo la sucursal configurada. El
+reporte incluye conteos de altas, cambios, filas iguales y errores. Los errores contienen solo
+fila, campo y código; se conservan como máximo 200 detalles y el total permanece en el resumen.
+No se guardan valores inválidos ni mensajes de proveedor/SQL. La futura interfaz administrativa
+debe restringir estos reportes a personal autorizado y definir retención/borrado del historial
+antes de producción. El servicio procesa bytes en memoria y no crea copias persistentes del Excel.

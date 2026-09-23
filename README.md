@@ -62,8 +62,10 @@ datos mínimos aptos para revisión administrativa. Todavía no hay endpoint de 
 F5.4 incorpora un servicio interno de importación transaccional. Exige un preview revisado y
 confirmación explícita, vuelve a validar archivo y catálogo bajo una transacción, y crea o
 actualiza únicamente precios de la sucursal configurada. Ante un error revierte toda la carga.
-Devuelve un recibo con huella del archivo y conteos; la auditoría persistente corresponde a F5.5.
-El servicio no está conectado a un endpoint ni al chatbot.
+F5.5 añade auditoría persistente a cada intento de confirmación: actor opaco, fecha UTC, huella
+SHA-256 del archivo como identificador lógico, sucursal, resultado, conteos y errores seguros.
+El recibo enlaza al reporte, que se consulta con alcance de sucursal. El Excel no se guarda en la
+base ni en disco. El servicio no está conectado a un endpoint ni al chatbot.
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en

@@ -17,6 +17,9 @@ unicidad de nombre por sucursal e índice para la consulta determinista del cat�
 `20260922_0004` crea `prices` para F3.4 con `NUMERIC(12,2)`, unidad validada, importe no negativo,
 unicidad por sucursal-producto-unidad y una clave foránea compuesta que impide mezclar un producto
 con la sucursal de otra instalación.
+`20260923_0005` agrega `price_import_audits` para F5.5: actor opaco, hora UTC, huella lógica
+SHA-256, resultado, conteos y códigos de error. La tabla no almacena el nombre, ruta ni bytes
+del Excel. Los registros se consultan siempre por la sucursal configurada.
 
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`

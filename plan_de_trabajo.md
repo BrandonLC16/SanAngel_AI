@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-23
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F5.4 — Importación transaccional (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.4 completada
+**Subfase activa:** ninguna; F5.5 — Auditoría y reporte (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 5; F5.5 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2130,26 +2130,28 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F5.5 — Auditoría y reporte
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-23
+**Fecha de cierre:** 2026-09-23
 
 
 ### Alcance
 
-- [ ] registro de quién/cuándo/archivo lógico.
+- [x] registro de quién/cuándo/archivo lógico.
 
-- [ ] resumen.
+- [x] resumen.
 
-- [ ] errores.
+- [x] errores.
 
 
 ### Criterios de aceptación
 
-- [ ] importación trazable.
+- [x] importación trazable.
 
 
 ### Seguridad
 
-- [ ] no conservar archivo más de lo necesario.
+- [x] no conservar archivo más de lo necesario.
 
 
 ### Prompt para Codex
@@ -4291,16 +4293,16 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 5 — Importación segura de Excel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F5.4 — Importación transaccional (`✅ COMPLETADO`).
-**Última subfase completada:** F5.4 — Importación transaccional.
-**Siguiente subfase recomendada:** F5.5 — Auditoría y reporte, `⬜ PENDIENTE`; no iniciada.
+**Subfase activa:** ninguna; F5.5 — Auditoría y reporte (`✅ COMPLETADO`).
+**Última subfase completada:** F5.5 — Auditoría y reporte.
+**Siguiente subfase recomendada:** F5.6 — Cierre Fase 5, `⬜ PENDIENTE`; no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F5.4 completada por solicitud explícita; F5.5 sigue pendiente y no se inició.
+F5.5 completada y validada; F5.6 sigue pendiente y no se inició.
 
 ---
 
@@ -7153,6 +7155,71 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F5.5 — Auditoría y reporte, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-23 — F5.5 Auditoría y reporte
+
+Fase: Fase 5 — Importación segura de Excel, `🟨 EN_PROGRESO`.
+Subfase: F5.5 — Auditoría y reporte.
+Estado: ✅ COMPLETADO.
+
+Cambios:
+
+- añadida migración y modelo de auditoría con ID de intento, actor opaco, hora UTC, sucursal,
+  SHA-256 del archivo lógico, estado, conteos y códigos de error;
+- registro de éxito atómico con la importación de precios; rechazos y fallos registrados después
+  del rollback, con error seguro si la auditoría tampoco está disponible;
+- recibo enlazado al reporte y consultas de reportes acotadas por sucursal; documentación y
+  pruebas de trazabilidad, privacidad y reversión.
+
+Archivos:
+
+- `backend/app/db/models/price_import_audit.py`;
+- `backend/app/db/models/__init__.py`;
+- `backend/app/repositories/price_import_audit_repository.py`;
+- `backend/app/services/price_import_transaction.py`;
+- `backend/tests/test_migrations.py`;
+- `backend/tests/test_price_import_transaction.py`;
+- `migrations/versions/20260923_0005_price_import_audits.py`;
+- `migrations/env.py`;
+- `migrations/README.md`;
+- `docs/fase_5_excel.md`;
+- `README.md`;
+- `plan_de_trabajo.md`.
+
+Validación:
+
+- `.venv\Scripts\pytest.exe backend/tests/test_price_import_transaction.py backend/tests/test_migrations.py -q`
+  -> 26 pruebas aprobadas;
+- `.venv\Scripts\pytest.exe` -> 409 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` -> sin hallazgos;
+- `.venv\Scripts\ruff.exe format --check .` -> 104 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check` -> dependencias consistentes;
+- `git diff --check` -> sin errores; advertencias informativas LF/CRLF.
+
+Seguridad:
+
+- la tabla no tiene columnas de nombre, ruta, bytes del Excel ni valores de celdas; el servicio
+  no crea una copia persistente del archivo y solo calcula SHA-256 si el contenido cabe en 2 MiB;
+- los errores guardados contienen únicamente fila, campo y código, con límite de 200 detalles;
+  el reporte conserva el conteo total y filtra siempre por sucursal configurada;
+- una falla de auditoría revierte los precios; se probaron fallo de DB, acceso entre sucursales y
+  ausencia de detalles internos en el error público;
+- `ImportActor` exige un identificador opaco; la futura integración administrativa debe crearlo
+  desde una identidad autenticada, nunca desde Excel, cliente o modelo.
+
+Riesgos/Pendientes:
+
+- todavía no hay ruta ni panel administrativo; la exposición de reportes requiere autenticación
+  y autorización backend;
+- los previews abandonados no generan registro; se registran intentos de `confirm` con actor
+  válido. La retención y el borrado del historial de auditoría deben definirse antes de producción;
+- `BEGIN IMMEDIATE` sigue siendo la estrategia del MVP SQLite y deberá revisarse si cambia la DB.
+
+Siguiente:
+
+- F5.6 — Cierre Fase 5, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 
