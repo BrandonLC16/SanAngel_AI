@@ -130,6 +130,7 @@ tokens reales en archivos versionados, comandos compartidos, logs o documentaci�
 En cada una de las siete instalaciones configura valores propios para:
 
 - `ASSISTANT_BRANCH_CODE`;
+- `CONVERSATION_IDENTITY_KEY` para la identidad de conversaciones de F7.2;
 - `DATABASE_URL`;
 - `GREEN_API_INSTANCE_ID`, `GREEN_API_TOKEN_INSTANCE` y `GREEN_API_WEBHOOK_TOKEN`.
 
@@ -148,6 +149,9 @@ Copia el resultado directamente a `GREEN_API_WEBHOOK_TOKEN` y al `webhookUrlToke
 No lo reutilices como token de instancia ni lo compartas. Un valor anterior de menos de 32
 caracteres debe rotarse antes del próximo arranque.
 
+Genera otro valor independiente con el mismo comando para `CONVERSATION_IDENTITY_KEY`. Consérvalo
+estable por instalación para que el mismo remitente conserve su conversación.
+
 ## Configuración
 
 `backend.app.core.config` es el único punto de lectura de variables de entorno. Las credenciales
@@ -156,6 +160,7 @@ se representan con `SecretStr` y no aparecen en `repr`, serializaciones ni error
 Variables relevantes:
 
 - `ASSISTANT_BRANCH_CODE`: código inmutable de la única sucursal atendida por esta instalación;
+- `CONVERSATION_IDENTITY_KEY`: secreto backend-only para derivar la identidad externa opaca;
 - `OPENAI_API_KEY`: clave backend-only para la prueba real del chatbot;
 - `OPENAI_MODEL`: modelo configurable, `gpt-5.6` por defecto;
 - `OPENAI_STORE_RESPONSES`: `false` por defecto;
@@ -399,10 +404,17 @@ y hora, sin texto. El recibo guarda el identificador del evento y su estado, sin
 webhook. Las claves foráneas y restricciones impiden asociar un mensaje a una conversación de
 otra sucursal o duplicar un recibo dentro de la misma sucursal.
 
-Estas tablas todavía no se usan en el procesamiento del webhook. F7.2 definirá cómo derivar la
-clave opaca desde la identidad recibida por backend; F7.3 conectará los recibos con la
-idempotencia persistente. Antes de guardar contenido conversacional o habilitar producción se
-necesita la política de retención y borrado de F7.4.
+F7.2 agrega `ConversationIdentityService`: a partir del `sender_id` normalizado del webhook,
+calcula una clave HMAC-SHA256 con `CONVERSATION_IDENTITY_KEY` y resuelve la conversación bajo
+`ASSISTANT_BRANCH_CODE`. El texto del cliente y el modelo no pueden elegir sucursal. El contexto
+devuelto contiene únicamente IDs internos y el código de sucursal; los logs registran sucursal y
+estado, sin número, clave opaca ni texto. Configure una clave independiente, aleatoria, URL-safe de
+32 a 256 caracteres por instalación y manténgala estable: rotarla sin migrar claves existentes
+inicia una identidad de conversación nueva para cada remitente.
+
+El servicio de F7.2 aún no está conectado al procesamiento del webhook: esa integración y los
+recibos persistentes quedan para F7.3. Antes de guardar contenido conversacional o habilitar
+producción se necesita la política de retención y borrado de F7.4.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

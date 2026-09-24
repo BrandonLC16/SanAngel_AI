@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F7.1 — Esquema conversations/messages/events (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.1 completada
+**Subfase activa:** ninguna; F7.2 — Identidad externa y sucursal inmutable de la instalación (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.2 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2613,32 +2613,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F7.2 — Identidad externa y sucursal inmutable de la instalación
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] external_user_id.
+- [x] external_user_id.
 
-- [ ] branch context derivado de la instalación.
+- [x] branch context derivado de la instalación.
 
-- [ ] impedir que mensajes actualicen la sucursal.
+- [x] impedir que mensajes actualicen la sucursal.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] '¿y el rib eye?' conserva sucursal cuando corresponde.
+- [x] '¿y el rib eye?' conserva sucursal cuando corresponde.
 
-- [ ] toda conversación del número pertenece a la sucursal configurada.
+- [x] toda conversación del número pertenece a la sucursal configurada.
 
 
 ### Seguridad
 
-- [ ] identificador redactado en logs.
+- [x] identificador redactado en logs.
 
-- [ ] no persistir una sucursal proporcionada por el cliente o el modelo.
+- [x] no persistir una sucursal proporcionada por el cliente o el modelo.
 
 
 ### Prompt para Codex
@@ -4316,9 +4318,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F7.1 — Esquema conversations/messages/events (`✅ COMPLETADO`).
-**Última subfase completada:** F7.1 — Esquema conversations/messages/events.
-**Siguiente subfase recomendada:** F7.2 — Identidad externa y sucursal inmutable de la instalación, `⬜ PENDIENTE`;
+**Subfase activa:** ninguna; F7.2 — Identidad externa y sucursal inmutable de la instalación (`✅ COMPLETADO`).
+**Última subfase completada:** F7.2 — Identidad externa y sucursal inmutable de la instalación.
+**Siguiente subfase recomendada:** F7.3 — Idempotencia persistente, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4327,7 +4329,8 @@ no iniciada.
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
 F7.1 completada el 2026-09-24 tras crear el esquema mínimo de WhatsApp y validar la migración
-desde cero y sobre revisiones previas; 530 pruebas de la suite completa. F7.2 sigue pendiente.
+desde cero y sobre revisiones previas. F7.2 completada el 2026-09-24 tras resolver la identidad
+externa con HMAC y sucursal de configuración; 539 pruebas de la suite completa. F7.3 sigue pendiente.
 
 ---
 
@@ -7746,6 +7749,58 @@ Siguiente:
 
 - F7.2 — Identidad externa y sucursal inmutable de la instalación, `⬜ PENDIENTE`; recomendada,
   no iniciada.
+
+---
+
+## 2026-09-24 — F7.2 Identidad externa y sucursal inmutable de la instalación
+
+Fase: Fase 7 — Conversaciones WhatsApp + idempotencia persistente, `🟨 EN_PROGRESO`.
+Subfase: F7.2 — Identidad externa y sucursal inmutable de la instalación, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- configuración backend `CONVERSATION_IDENTITY_KEY` obligatoria para el servicio de identidad,
+  independiente de los tokens de proveedor y oculta en representaciones;
+- `ConversationIdentityService` deriva con HMAC-SHA256 una clave opaca del `sender_id` normalizado,
+  obtiene la sucursal únicamente de `ASSISTANT_BRANCH_CODE` y reutiliza la conversación para el
+  mismo remitente sin guardar número ni texto;
+- repositorio limitado a la sucursal resuelta, pruebas de seguimiento «¿y el rib eye?», intentos
+  de cambio de sucursal por mensaje, aislamiento entre sucursales, fallos cerrados y logs sin ID;
+- README y `.env.example` documentan la configuración y la estabilidad necesaria de la clave.
+
+Archivos: `.env.example`, `README.md`, `backend/app/core/config.py`,
+`backend/app/repositories/conversation_repository.py`,
+`backend/app/services/conversation_identity_service.py`,
+`backend/tests/test_conversation_identity_service.py`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.\\.venv\\Scripts\\python.exe -m pytest backend/tests/test_conversation_identity_service.py backend/tests/test_conversation_schema.py backend/tests/test_config.py -q` → 64 passed;
+- `.\\.venv\\Scripts\\python.exe -m pytest -q` → 539 passed;
+- `.\\.venv\\Scripts\\ruff.exe check .` → sin errores;
+- `.\\.venv\\Scripts\\ruff.exe format --check .` → 121 archivos conformes;
+- `.\\.venv\\Scripts\\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; Git mostró avisos de normalización LF/CRLF.
+
+Seguridad:
+
+- la sucursal sale solo de configuración validada y el mensaje no admite un campo de sucursal;
+- la BD guarda HMAC de identidad y la sucursal configurada, nunca el número ni el texto;
+- el log registra solo código de sucursal y estado `created`/`existing`; la prueba verifica que
+  no aparecen el número, texto ni secreto;
+- sucursal ausente o inactiva rechazada; sin acceso cruzado entre sucursales.
+
+Riesgos/Pendientes:
+
+- el servicio de identidad aún no está conectado al procesamiento del webhook y la idempotencia
+  sigue en memoria; la integración transaccional y carreras concurrentes corresponden a F7.3;
+- rotar `CONVERSATION_IDENTITY_KEY` sin migrar los HMAC existentes cambia el mapeo de remitentes;
+  conservar la clave estable por instalación hasta definir un procedimiento de rotación.
+
+Siguiente:
+
+- F7.3 — Idempotencia persistente, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

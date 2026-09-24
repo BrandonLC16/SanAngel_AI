@@ -162,6 +162,19 @@ class AssistantSettings(BaseSettings):
         return validate_branch_code(value)
 
 
+class ConversationIdentitySettings(AssistantSettings):
+    """Backend-only inputs for stable, opaque WhatsApp conversation identity."""
+
+    conversation_identity_key: SecretStr = Field(repr=False)
+
+    @field_validator("conversation_identity_key")
+    @classmethod
+    def validate_conversation_identity_key(cls, value: SecretStr) -> SecretStr:
+        if re.fullmatch(r"[A-Za-z0-9_-]{32,256}", value.get_secret_value()) is None:
+            raise ValueError("CONVERSATION_IDENTITY_KEY has an invalid format")
+        return value
+
+
 class Settings(HttpSettings):
     """Validated complete application configuration loaded from the environment."""
 
@@ -295,6 +308,13 @@ def get_assistant_settings() -> AssistantSettings:
     """Return the immutable branch identity for this application process."""
 
     return AssistantSettings()
+
+
+@lru_cache
+def get_conversation_identity_settings() -> ConversationIdentitySettings:
+    """Load a fixed branch and an independent identity key for this process."""
+
+    return ConversationIdentitySettings()
 
 
 @lru_cache
