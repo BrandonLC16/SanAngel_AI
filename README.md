@@ -212,7 +212,8 @@ La revisión base crea `alembic_version`, la revisión F3.2 crea `branches`, la 
 sucursal. Cada precio actual pertenece a la misma sucursal que su producto, usa `NUMERIC(12,2)`,
 incluye unidad y timestamps, y es único por sucursal, producto y unidad. Los cambios de schema
 deben realizarse mediante migraciones; la revisión F5.5 agrega `price_import_audits` con
-metadatos mínimos del intento, sin conservar el Excel. El código de aplicación no ejecuta
+metadatos mínimos del intento, sin conservar el Excel. Fase 7 agrega el esquema mínimo de
+WhatsApp y los agregados FAQ sin texto. El código de aplicación no ejecuta
 `Base.metadata.create_all()`.
 
 El engine y el `sessionmaker` se construyen de forma lazy. Las sesiones no hacen commit
@@ -220,11 +221,12 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las cinco revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las siete revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
-en pruebas o tras un procedimiento de recuperación aprobado.
+en pruebas o tras un procedimiento de recuperación aprobado. F7.6 también prueba un backup y
+restore aislado con datos de las cuatro tablas de Fase 7.
 
 ### Respaldo previo a una migración productiva
 
@@ -247,7 +249,8 @@ ejecutar `python -m alembic upgrade head`. Después comprobar `current`, `check`
 datos representativas antes de reanudar escrituras. Ante un fallo productivo, detener escrituras
 y recuperar el respaldo verificado mediante el procedimiento operativo; no usar `downgrade` como
 sustituto del respaldo. La automatización de respaldos y restauraciones periódicas pertenece a la
-preparación para producción.
+preparación para producción. La [guía de cierre de Fase 7](docs/fase_7_cierre.md) detalla el
+ensayo de recuperación y la conciliación antes de reanudar webhooks.
 
 ## Catálogo de productos
 

@@ -24,12 +24,15 @@ del Excel. Los registros se consultan siempre por la sucursal configurada.
 La conversación solo admite el canal WhatsApp y una clave opaca de remitente; los mensajes
 guardan dirección y hora, sin texto. Los recibos guardan únicamente el ID externo y el estado.
 Una clave foránea compuesta impide asociar mensajes con conversaciones de otra sucursal.
-Esta revisión crea el esquema; el webhook aún usa la idempotencia temporal y no escribe aquí.
+F7.3 usa `whatsapp_event_receipts` en el webhook real para idempotencia persistente; la identidad
+de conversación se resuelve desde la configuración de sucursal, sin guardar el texto del mensaje.
+`20260924_0007` agrega `unresolved_questions`: HMAC de pregunta FAQ normalizada, motivo,
+contador y fechas por sucursal, sin texto ni remitente.
 
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
 crea uno sin sobrescribir otro y comprueba su integridad. Revisar el
-procedimiento completo de protección y recuperación en el README principal. Las pruebas recorren
+procedimiento completo de protección y recuperación en la [guía de cierre de Fase 7](../docs/fase_7_cierre.md). Las pruebas recorren
 `upgrade` y `downgrade` solo sobre bases temporales. Un `downgrade` productivo puede borrar tablas
 y datos; no sustituye la restauración de un respaldo.
 

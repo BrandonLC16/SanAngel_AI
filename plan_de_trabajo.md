@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-24
-**Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F7.5 — Preguntas no resueltas (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.5 completada
+**Fase activa:** ninguna; Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`✅ COMPLETADO`)
+**Subfase activa:** ninguna; F7.6 — Cierre Fase 7 (`✅ COMPLETADO`)
+**Estado global:** ✅ COMPLETADO — Fase 7; Fase 8 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2559,8 +2559,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Guardar el contexto mínimo necesario para conversaciones, deduplicar eventos y registrar preguntas no resueltas.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 **Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 **Documento guía:** `plan_de_trabajo.md`
 
@@ -2795,28 +2796,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F7.6 — Cierre Fase 7
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] migraciones desde cero.
+- [x] migraciones desde cero.
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] docs.
+- [x] docs.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 7 completa.
+- [x] Fase 7 completa.
 
 
 ### Seguridad
 
-- [ ] backup/restore planificado.
+- [x] backup/restore planificado.
 
 
 ### Prompt para Codex
@@ -4323,11 +4326,11 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F7.5 — Preguntas no resueltas (`✅ COMPLETADO`).
-**Última subfase completada:** F7.5 — Preguntas no resueltas.
-**Siguiente subfase recomendada:** F7.6 — Cierre Fase 7, `⬜ PENDIENTE`;
-no iniciada.
+**Fase activa:** ninguna; Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`✅ COMPLETADO`).
+**Subfase activa:** ninguna; F7.6 — Cierre Fase 7 (`✅ COMPLETADO`).
+**Última subfase completada:** F7.6 — Cierre Fase 7.
+**Siguiente subfase recomendada:** F8.1 — Autenticación backend, `⬜ PENDIENTE`;
+Fase 8 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4341,6 +4344,8 @@ transaccionales por sucursal y protección ante carreras. F7.4 completada el 202
 purga, borrado individual y política técnica de privacidad; 557 pruebas de la suite completa.
 F7.5 completada el 2026-09-24 con agregados FAQ sin texto, conteo atómico por sucursal,
 consulta interna acotada y purga a 30 días; 564 pruebas de la suite completa.
+F7.6 y Fase 7 cerradas el 2026-09-24 tras probar migraciones desde cero y desde la revisión
+F7.1, restaurar un respaldo aislado y documentar el plan operativo; 566 pruebas de la suite completa.
 
 ---
 
@@ -7984,6 +7989,56 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F7.6 — Cierre Fase 7, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F7.6 Cierre Fase 7
+
+Fase: Fase 7 — Conversaciones WhatsApp + idempotencia persistente, `✅ COMPLETADO`.
+Subfase: F7.6 — Cierre Fase 7, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- revisión final de F7.1–F7.5 y declaración del alcance comprobado en la guía de cierre;
+- Alembic registra explícitamente `UnresolvedQuestion`; una prueba migra desde cero y restaura
+  en otra ruta un respaldo con datos de las cuatro tablas F7, y otra conserva filas existentes
+  al migrar desde `20260924_0006` hasta `20260924_0007`;
+- README y guía de migraciones actualizados a siete revisiones e idempotencia persistente;
+- plan de backup/restore por instalación, verificación aislada, protección de respaldos y
+  conciliación de recibos antes de reanudar webhooks.
+
+Archivos: `backend/tests/test_fase_7_recovery.py`, `backend/tests/test_migrations.py`,
+`migrations/env.py`, `migrations/README.md`, `docs/fase_7_cierre.md`,
+`docs/fase_7_privacidad.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest -q` → 566 passed; incluye migración desde cero,
+  actualización desde F7.1 y restore aislado;
+- `.venv\Scripts\python.exe -m ruff check .` → sin errores;
+- `.venv\Scripts\python.exe -m ruff format --check .` → 133 archivos conformes;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; avisos de normalización LF/CRLF.
+
+Seguridad:
+
+- el restore de prueba usa solo rutas temporales y no sobrescribe la base original;
+- la guía exige respaldo nuevo y protegido por instalación, conservar la clave de identidad por
+  separado, verificar integridad, claves foráneas, revisión y sucursal antes de reanudar;
+- recibos posteriores al punto de respaldo y estados `claimed` requieren conciliación para no
+  duplicar respuestas; no se usa `downgrade` como recuperación.
+
+Riesgos/Pendientes:
+
+- el restore comprobado es local y aislado; automatización, protección externa, RPO/RTO y ensayos
+  operativos de producción permanecen pendientes para F10.7;
+- el flujo WhatsApp actual no llena `messages` ni invoca el dispatcher FAQ para agregar preguntas
+  no resueltas automáticamente; no se presenta la Fase 7 como preparación para producción.
+
+Siguiente:
+
+- F8.1 — Autenticación backend, `⬜ PENDIENTE`; Fase 8 no iniciada.
 
 ---
 

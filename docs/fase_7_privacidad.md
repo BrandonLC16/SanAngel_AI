@@ -73,3 +73,5 @@ interna autorizada cuando exista, sin ampliar el alcance de esta fase.
 SQLite puede conservar bytes antiguos en páginas libres, WAL o respaldos después de un `DELETE`.
 La purga es borrado lógico de filas; la sanitización física, la retención de backups y el borrado
 de copias externas necesitan un procedimiento operacional separado antes de producción.
+La [guía de cierre de Fase 7](fase_7_cierre.md) define el ensayo de backup/restore por instalación
+y la conciliación necesaria antes de reanudar el webhook tras una restauración.

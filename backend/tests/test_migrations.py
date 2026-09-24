@@ -11,8 +11,12 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.app.core.config import get_database_settings
 from backend.app.db.models.branch import Branch
+from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.message import Message
 from backend.app.db.models.price import Price
 from backend.app.db.models.product import Product
+from backend.app.db.models.unresolved_question import UnresolvedQuestion
+from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -33,7 +37,7 @@ def alembic_config() -> Config:
     return Config(str(REPOSITORY_ROOT / "alembic.ini"))
 
 
-def test_migration_history_has_reproducible_conversation_revision() -> None:
+def test_migration_history_has_reproducible_fase_7_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
@@ -259,6 +263,63 @@ def test_upgrade_head_creates_all_registered_schema(
             "uq_price_import_audits_attempt_id"
         }
         assert {index["name"] for index in audit_indexes} == {"ix_price_import_audits_branch_time"}
+    finally:
+        get_database_settings.cache_clear()
+
+
+def test_upgrade_existing_fase_7_data_to_head_preserves_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    database_url = sqlite_url(tmp_path / "existing-fase-7.db")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_database_settings.cache_clear()
+    config = alembic_config()
+
+    try:
+        command.upgrade(config, CONVERSATION_REVISION)
+        engine = create_database_engine(database_url)
+        try:
+            with create_database_session_factory(engine).begin() as session:
+                branch = Branch(
+                    code="sucursal-uno",
+                    name="Sucursal uno",
+                    address="Dirección de prueba",
+                    business_hours="Lunes a viernes",
+                )
+                session.add(branch)
+                session.flush()
+                conversation = Conversation(branch_id=branch.id, external_user_key="a" * 64)
+                session.add(conversation)
+                session.flush()
+                session.add_all(
+                    (
+                        Message(
+                            branch_id=branch.id,
+                            conversation_id=conversation.id,
+                            direction="inbound",
+                        ),
+                        WhatsAppEventReceipt(
+                            branch_id=branch.id,
+                            provider_message_id="existing-event",
+                            status="claimed",
+                        ),
+                    )
+                )
+        finally:
+            engine.dispose()
+
+        command.upgrade(config, "head")
+        command.check(config)
+        engine = create_database_engine(database_url)
+        try:
+            with create_database_session_factory(engine)() as session:
+                assert session.scalar(select(Branch.code)) == "sucursal-uno"
+                assert session.scalar(select(Conversation.external_user_key)) == "a" * 64
+                assert session.scalar(select(Message.direction)) == "inbound"
+                assert session.scalar(select(WhatsAppEventReceipt.status)) == "claimed"
+                assert session.scalars(select(UnresolvedQuestion)).all() == []
+        finally:
+            engine.dispose()
     finally:
         get_database_settings.cache_clear()
 
