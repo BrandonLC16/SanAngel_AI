@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-24
-**Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F6.6 — Pruebas de seguridad de tools (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.6 completada
+**Fase activa:** ninguna; Fase 6 — OpenAI tool calling para datos exactos (`✅ COMPLETADO`)
+**Subfase activa:** ninguna; F6.7 — Cierre Fase 6 (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fases 1–6 completadas; Fase 7 no iniciada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2217,8 +2217,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que el modelo solicite operaciones de solo lectura específicas sin acceso libre a SQL.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 **Fecha de inicio:** 2026-09-23
+**Fecha de cierre:** 2026-09-24
 
 **Documento guía:** `plan_de_trabajo.md`
 
@@ -2514,26 +2515,28 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F6.7 — Cierre Fase 6
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] docs.
+- [x] docs.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 6 completa.
+- [x] Fase 6 completa.
 
 
 ### Seguridad
 
-- [ ] revisar costos/loops.
+- [x] revisar costos/loops.
 
 
 ### Prompt para Codex
@@ -4309,10 +4312,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F6.6 — Pruebas de seguridad de tools (`✅ COMPLETADO`).
-**Última subfase completada:** F6.6 — Pruebas de seguridad de tools.
-**Siguiente subfase recomendada:** F6.7 — Cierre Fase 6, `⬜ PENDIENTE`;
+**Fase activa:** ninguna; Fase 6 — OpenAI tool calling para datos exactos (`✅ COMPLETADO`).
+**Subfase activa:** ninguna; F6.7 — Cierre Fase 6 (`✅ COMPLETADO`).
+**Última subfase completada:** F6.7 — Cierre Fase 6.
+**Siguiente subfase recomendada:** F7.1 — Esquema conversations/messages/events, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4320,8 +4323,8 @@ no iniciada.
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.6 completada el 2026-09-24 tras pruebas adversariales del loop y dispatcher, auditoría mínima
-de tools y 517 pruebas de la suite completa; F6.7 sigue pendiente y no se inició.
+F6.7 completada el 2026-09-24 tras revisión de tests, documentación, costos y loops, con 519
+pruebas de la suite completa; Fase 7 sigue pendiente y no se inició.
 
 ---
 
@@ -7631,6 +7634,57 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.7 — Cierre Fase 6, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F6.7 Cierre Fase 6
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `✅ COMPLETADO`.
+Subfase: F6.7 — Cierre Fase 6, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- revisados los criterios de F6.1–F6.6 y los límites de ejecución del loop; una prueba nueva
+  confirma el máximo agregado de cuatro solicitudes Responses y doce ejecuciones de tools;
+  otra rechaza más de 16 elementos de respuesta antes de ejecutar tools;
+- guía de Fase 6 y README actualizados con el alcance interno, costos y trabajo operativo pendiente;
+- F6.7 y Fase 6 cerradas en el checkpoint sin iniciar Fase 7.
+
+Archivos: `backend/tests/test_openai_tool_loop.py`, `docs/fase_6_tools.md`, `README.md`,
+`plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `git status --short` inicial: limpio; final: solo los cuatro archivos anteriores modificados;
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_openai_tool_loop.py backend/tests/test_tool_dispatcher.py backend/tests/test_tool_contracts.py backend/tests/test_tool_handlers.py backend/tests/test_commercial_query_service.py backend/tests/test_faq_adversarial.py`: 136 passed;
+- `.\.venv\Scripts\python.exe -m pytest`: 519 passed;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 113 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace; avisos de conversión LF/CRLF.
+
+Seguridad:
+
+- la cuarta respuesta no ejecuta más tools, aun si pide otras cuatro; cada solicitud mantiene
+  `max_output_tokens=1024` y `parallel_tool_calls=False`;
+- los topes de rondas, llamadas, tamaño de resultados, concurrencia, timeout y reintentos limitan
+  trabajo y exposición; las pruebas siguen mockeadas y bloquean red externa;
+- se contrastó el flujo y el costo de schemas/contexto con la documentación oficial de OpenAI.
+
+Riesgos/Pendientes:
+
+- no existe todavía un presupuesto monetario por conversación ni medición de tokens de entrada;
+  los schemas y el contexto reenviado generan costo aunque la salida tenga un tope;
+- el SDK puede reintentar según configuración; el máximo de 4 solicitudes es del loop lógico,
+  no un máximo de intentos HTTP;
+- el loop de tools no está integrado al canal WhatsApp ni al endpoint interno; antes de habilitarlo
+  para clientes se requieren fuente FAQ por instalación, métricas/alertas de gasto y revisión de
+  respuestas finales no respaldadas.
+
+Siguiente:
+
+- F7.1 — Esquema conversations/messages/events, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

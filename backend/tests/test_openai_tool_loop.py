@@ -208,6 +208,36 @@ def test_repeated_calls_stop_after_fixed_number_of_rounds(tmp_path: Path) -> Non
     assert factory.call_count == MAX_TOOL_ROUNDS
 
 
+def test_full_tool_budget_stops_before_more_calls_and_caps_each_response(tmp_path: Path) -> None:
+    responses = [
+        FakeResponse(
+            [
+                make_call(
+                    "request_human_help",
+                    '{"reason":"faq_unknown"}',
+                    f"call_{round_index}_{call_index}",
+                )
+                for call_index in range(4)
+            ]
+        )
+        for round_index in range(4)
+    ]
+    service, api = make_service(responses)
+    factory = Mock(side_effect=lambda: Session())
+
+    with pytest.raises(AIProviderResponseError, match="round limit"):
+        asyncio.run(
+            service.generate_reply_with_tools(
+                "Pregunta", make_dispatcher(tmp_path, factory=factory)
+            )
+        )
+
+    assert len(api.calls) == 4
+    assert factory.call_count == 12
+    assert all(call["max_output_tokens"] == 1024 for call in api.calls)
+    assert all(call["parallel_tool_calls"] is False for call in api.calls)
+
+
 def test_final_answer_is_allowed_on_last_response(tmp_path: Path) -> None:
     responses = [
         FakeResponse([make_call("request_human_help", '{"reason":"faq_unknown"}', f"call_{index}")])
@@ -328,6 +358,7 @@ def test_injected_faq_cannot_expand_tools_or_exfiltrate_backend_secret(
         FakeResponse(
             [make_call("request_human_help", "{}", call_id=f"call_{i}") for i in range(5)]
         ),
+        FakeResponse([SimpleNamespace(type="reasoning") for _ in range(17)]),
     ),
 )
 def test_malformed_or_excessive_provider_output_fails_before_any_tool(

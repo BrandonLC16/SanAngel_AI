@@ -1,4 +1,4 @@
-# Fase 6 — Tools y desambiguación de producto (F6.1–F6.6)
+# Fase 6 — Tools y desambiguación de producto (F6.1–F6.7)
 
 F6.1 define cuatro funciones para Responses API. Sigue sin conectar OpenAI a los servicios de
 negocio ni ejecutar tool calls. Los schemas usan `type: "function"`, `strict: true`, un objeto
@@ -126,3 +126,27 @@ Estas pruebas demuestran el límite de privilegios del backend con un proveedor 
 demuestran que un modelo real nunca redacte una afirmación comercial no respaldada en su texto
 final. Antes de conectar este loop al canal del cliente, la integración debe tratar ese riesgo
 por separado y comprobar el comportamiento con casos representativos.
+
+## F6.7 — Cierre y revisión de costos
+
+Las pruebas de cierre comprueban el presupuesto agregado del loop: hasta cuatro solicitudes
+`responses.create`, doce ejecuciones de tools (cuatro por cada una de tres rondas) y ninguna
+ejecución en la cuarta respuesta si vuelve a pedir una tool. Cada solicitud fija
+`max_output_tokens=1024` y `parallel_tool_calls=False`; cada resultado de tool se limita a 8192
+bytes. Una respuesta con más de 16 elementos o más de cuatro llamadas a función se rechaza antes
+de ejecutar sus tools. El dispatcher usa cuatro workers como máximo y timeout de espera de 3 segundos
+por defecto, configurable hasta 30. El mensaje inicial tiene límite configurable de caracteres.
+
+Estos límites acotan el trabajo de aplicación, pero no establecen un presupuesto monetario. La
+[documentación oficial de OpenAI sobre function calling](https://developers.openai.com/api/docs/guides/function-calling#token-usage)
+indica que los schemas de tools consumen tokens de entrada; el loop también reenvía el contexto
+anterior en cada solicitud. El [conteo de tokens](https://developers.openai.com/api/docs/guides/token-counting)
+incluye estructura y contenido que una estimación por caracteres no refleja. Además, el SDK puede
+reintentar solicitudes según `OPENAI_MAX_RETRIES` (2 por defecto, hasta 5) y el timeout de OpenAI
+se configura aparte (30 segundos por defecto, hasta 120). Se requieren métricas, alertas y un
+presupuesto operativo antes de habilitar este flujo para clientes.
+
+F6.1–F6.7 cierran el núcleo interno de tools de solo lectura y sus pruebas offline. El endpoint
+interno y WhatsApp siguen usando el flujo de texto previo; la composición operativa con el
+dispatcher, la fuente FAQ por instalación y la validación de respuestas finales quedan pendientes
+para trabajo posterior explícito. Esta fase no declara una integración de tools en producción.

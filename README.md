@@ -78,7 +78,12 @@ F6.3 añade un dispatcher con mapa cerrado, validación backend y timeout de esp
 Rechaza `execute_sql` y otros nombres no autorizados antes de abrir la base. F6.4 agrega un
 método interno de Responses API que ejecuta tool calls validadas, devuelve sus resultados al
 modelo y obtiene una respuesta final, con límites de rondas y pruebas mockeadas. El endpoint
-interno de chat y WhatsApp aún no componen ese método con el dispatcher.
+interno de chat y WhatsApp aún no componen ese método con el dispatcher. F6.5 añade
+desambiguación determinista de productos con sucursal fija; F6.6 prueba entradas adversariales y
+auditoría mínima de tools. F6.7 cierra la fase con una revisión del límite agregado de llamadas,
+tokens, timeouts y reintentos. Los topes de aplicación no sustituyen métricas ni presupuesto de
+gasto para una futura integración operativa; los detalles están en
+[`docs/fase_6_tools.md`](docs/fase_6_tools.md).
 
 Para preparar un archivo local de la sucursal, copia
 [`price_import.example.xlsx`](examples/price_import.example.xlsx) con un nombre terminado en
