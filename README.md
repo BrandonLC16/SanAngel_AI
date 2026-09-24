@@ -423,6 +423,13 @@ F7.4 define una política técnica de [retención, borrado y redacción](docs/fa
 purga limitada a la sucursal configurada. Las reservas `claimed` no se borran automáticamente y
 se informan para revisión. La purga diaria debe programarse por instalación antes de producción.
 
+F7.5 agrega agregados de preguntas FAQ no resueltas por sucursal: normaliza la consulta y guarda
+solo un HMAC, motivo, contador y fechas. `UnresolvedQuestionService.list_most_frequent()` permite
+consultarlos desde un futuro panel autorizado. La purga de 30 días también los incluye. El
+registro se conecta al fallback determinístico de `search_faq` cuando el dispatcher recibe
+`unresolved_settings`; el canal WhatsApp actual aún usa el chat simple y no produce estos
+agregados automáticamente. Véase la [política de privacidad](docs/fase_7_privacidad.md).
+
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
 reintentos automáticos. Este mecanismo tampoco es una cola durable: una caída después del ACK

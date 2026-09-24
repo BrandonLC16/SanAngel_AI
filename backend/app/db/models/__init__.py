@@ -6,6 +6,7 @@ from backend.app.db.models.message import Message
 from backend.app.db.models.price import Price
 from backend.app.db.models.price_import_audit import PriceImportAudit
 from backend.app.db.models.product import Product
+from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "Price",
     "PriceImportAudit",
     "Product",
+    "UnresolvedQuestion",
     "WhatsAppEventReceipt",
 ]

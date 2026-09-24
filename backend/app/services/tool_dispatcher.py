@@ -9,21 +9,24 @@ from threading import BoundedSemaphore
 from time import monotonic
 from types import MappingProxyType
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import AssistantSettings
-from backend.app.core.exceptions import ToolExecutionTimeoutError
+from backend.app.core.config import AssistantSettings, ConversationIdentitySettings
+from backend.app.core.exceptions import ServiceUnavailableError, ToolExecutionTimeoutError
 from backend.app.core.logging import tool_audit_logger
 from backend.app.schemas.commercial import BranchInfo, ProductPriceInfo
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.faq_response_policy import FAQAnswer, FAQFallback, HumanHelpProposal
 from backend.app.services.tool_contracts import (
+    SearchFAQArguments,
     ToolCallValidationError,
     ToolName,
     ValidatedToolCall,
     validate_tool_call,
 )
 from backend.app.services.tool_handlers import ProductPriceNotFoundResult, ToolHandlers
+from backend.app.services.unresolved_question_service import UnresolvedQuestionService
 
 DEFAULT_TOOL_TIMEOUT_SECONDS = 3.0
 MAX_TOOL_TIMEOUT_SECONDS = 30.0
@@ -65,6 +68,7 @@ class ToolDispatcher:
         faq_source_path: Path,
         assistant_settings: AssistantSettings,
         timeout_seconds: float = DEFAULT_TOOL_TIMEOUT_SECONDS,
+        unresolved_settings: ConversationIdentitySettings | None = None,
     ) -> None:
         if not isinstance(assistant_settings, AssistantSettings):
             raise ToolCallValidationError("trusted branch configuration is required")
@@ -79,6 +83,12 @@ class ToolDispatcher:
         self._assistant_settings = assistant_settings
         self._branch_scope = BranchScope.from_settings(assistant_settings)
         self._timeout_seconds = float(timeout_seconds)
+        if unresolved_settings is not None and (
+            not isinstance(unresolved_settings, ConversationIdentitySettings)
+            or unresolved_settings.assistant_branch_code != self._branch_scope.branch_code
+        ):
+            raise ToolCallValidationError("unresolved question scope must match assistant")
+        self._unresolved_settings = unresolved_settings
 
     @property
     def branch_scope(self) -> BranchScope:
@@ -111,6 +121,19 @@ class ToolDispatcher:
             except FutureTimeoutError:
                 future.cancel()
                 raise ToolExecutionTimeoutError() from None
+            if (
+                isinstance(result, FAQFallback)
+                and isinstance(call.arguments, SearchFAQArguments)
+                and self._unresolved_settings is not None
+            ):
+                try:
+                    with self._session_factory() as session:
+                        UnresolvedQuestionService(
+                            session, settings=self._unresolved_settings
+                        ).record_faq_fallback(call.arguments.query, result)
+                        session.commit()
+                except SQLAlchemyError:
+                    raise ServiceUnavailableError("unresolved question recording failed") from None
         except ToolCallValidationError:
             tool_audit_logger.info("tool=%s status=rejected", audit_name)
             raise

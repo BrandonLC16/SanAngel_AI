@@ -43,7 +43,8 @@ def main(argv: list[str] | None = None) -> int:
     action = "Purgados" if args.apply else "Candidatos"
     print(
         f"{action}: conversaciones={result.conversations}, mensajes={result.messages}, "
-        f"recibos_completados={result.completed_receipts}; "
+        f"recibos_completados={result.completed_receipts}, "
+        f"preguntas_no_resueltas={result.unresolved_questions}; "
         f"reservas_para_revision={result.claimed_for_review}."
     )
     return 0

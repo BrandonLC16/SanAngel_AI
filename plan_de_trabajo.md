@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F7.4 — Política de retención y redacción (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.4 completada
+**Subfase activa:** ninguna; F7.5 — Preguntas no resueltas (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.5 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2751,28 +2751,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F7.5 — Preguntas no resueltas
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Inicio:** 2026-09-24
+**Cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] entidad/contador.
+- [x] entidad/contador.
 
-- [ ] normalización.
+- [x] normalización.
 
-- [ ] registro.
+- [x] registro.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] panel futuro puede consultarlas.
+- [x] panel futuro puede consultarlas.
 
 
 ### Seguridad
 
-- [ ] no guardar PII innecesaria.
+- [x] no guardar PII innecesaria.
 
 
 ### Prompt para Codex
@@ -4322,9 +4324,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F7.4 — Política de retención y redacción (`✅ COMPLETADO`).
-**Última subfase completada:** F7.4 — Política de retención y redacción.
-**Siguiente subfase recomendada:** F7.5 — Preguntas no resueltas, `⬜ PENDIENTE`;
+**Subfase activa:** ninguna; F7.5 — Preguntas no resueltas (`✅ COMPLETADO`).
+**Última subfase completada:** F7.5 — Preguntas no resueltas.
+**Siguiente subfase recomendada:** F7.6 — Cierre Fase 7, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4337,7 +4339,8 @@ desde cero y sobre revisiones previas. F7.2 completada el 2026-09-24 tras resolv
 externa con HMAC y sucursal de configuración. F7.3 completada el 2026-09-24 con recibos
 transaccionales por sucursal y protección ante carreras. F7.4 completada el 2026-09-24 con
 purga, borrado individual y política técnica de privacidad; 557 pruebas de la suite completa.
-F7.5 sigue pendiente.
+F7.5 completada el 2026-09-24 con agregados FAQ sin texto, conteo atómico por sucursal,
+consulta interna acotada y purga a 30 días; 564 pruebas de la suite completa.
 
 ---
 
@@ -7928,6 +7931,59 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F7.5 — Preguntas no resueltas, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F7.5 Preguntas no resueltas
+
+Fase: Fase 7 — Conversaciones WhatsApp + idempotencia persistente, `🟨 EN_PROGRESO`.
+Subfase: F7.5 — Preguntas no resueltas, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- entidad y migración `unresolved_questions` con índice único por sucursal, motivo y HMAC de
+  pregunta normalizada; incremento atómico de ocurrencias con `UPSERT`;
+- registro únicamente de fallbacks determinísticos de FAQ cuando el dispatcher recibe la
+  configuración de identidad; consulta interna acotada para un panel autorizado futuro;
+- purga de agregados 30 días después de su última aparición, más política de privacidad y README;
+- pruebas de normalización, minimización de datos, aislamiento entre sucursales, concurrencia,
+  dispatcher, retención y migraciones.
+
+Archivos: `backend/app/db/models/unresolved_question.py`, `backend/app/db/models/__init__.py`,
+`migrations/versions/20260924_0007_unresolved_questions.py`,
+`backend/app/services/unresolved_question_service.py`, `backend/app/services/tool_dispatcher.py`,
+`backend/app/services/whatsapp_privacy_service.py`, `backend/app/cli/purge_whatsapp_metadata.py`,
+`backend/tests/test_unresolved_question_service.py`, `backend/tests/test_migrations.py`,
+`docs/fase_7_privacidad.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_unresolved_question_service.py backend/tests/test_whatsapp_privacy_service.py backend/tests/test_tool_dispatcher.py backend/tests/test_migrations.py -q` → 53 passed;
+- `.venv\Scripts\python.exe -m pytest -q` → 564 passed;
+- `.venv\Scripts\python.exe -m ruff check .` → sin errores;
+- `.venv\Scripts\python.exe -m ruff format --check .` → 131 archivos conformes;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; avisos de normalización LF/CRLF.
+
+Seguridad:
+
+- no se guarda texto, remitente ni ID de conversación en el agregado; el HMAC usa dominio
+  separado y la clave backend `CONVERSATION_IDENTITY_KEY`;
+- registro y consulta derivan sucursal de configuración; el dispatcher rechaza configuración de
+  registro de otra sucursal; logs de tools mantienen solo nombre y estado;
+- preguntas con correo/teléfono no aparecen en filas ni logs; purga por sucursal y sin texto.
+
+Riesgos/Pendientes:
+
+- el canal WhatsApp actual usa chat simple, sin dispatcher FAQ, así que todavía no genera estos
+  agregados automáticamente; no se infiere falta de respuesta de texto libre del modelo;
+- rotar la clave HMAC interrumpe la agrupación con agregados anteriores; la purga diaria requiere
+  programación operacional y el plazo de 30 días debe revisarse antes de producción.
+
+Siguiente:
+
+- F7.6 — Cierre Fase 7, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

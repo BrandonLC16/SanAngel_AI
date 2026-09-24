@@ -12,6 +12,7 @@ from backend.app.core.config import AssistantSettings, ConversationIdentitySetti
 from backend.app.core.exceptions import BranchNotConfiguredError, ServiceUnavailableError
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.message import Message
+from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.services.branch_scope import BranchScope
@@ -21,6 +22,7 @@ CONVERSATION_RETENTION_DAYS = 30
 MESSAGE_RETENTION_DAYS = 30
 COMPLETED_RECEIPT_RETENTION_DAYS = 30
 CLAIM_REVIEW_AFTER_DAYS = 1
+UNRESOLVED_QUESTION_RETENTION_DAYS = 30
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ class PurgeResult:
     messages: int
     completed_receipts: int
     claimed_for_review: int
+    unresolved_questions: int = 0
 
 
 class WhatsAppPrivacyService:
@@ -51,6 +54,7 @@ class WhatsAppPrivacyService:
         message_cutoff = instant - timedelta(days=MESSAGE_RETENTION_DAYS)
         receipt_cutoff = instant - timedelta(days=COMPLETED_RECEIPT_RETENTION_DAYS)
         review_cutoff = instant - timedelta(days=CLAIM_REVIEW_AFTER_DAYS)
+        unresolved_cutoff = instant - timedelta(days=UNRESOLVED_QUESTION_RETENTION_DAYS)
         try:
             with self._session_factory.begin() as session:
                 branch_id = self._branch_id(session)
@@ -74,6 +78,10 @@ class WhatsAppPrivacyService:
                     WhatsAppEventReceipt.status == "completed",
                     WhatsAppEventReceipt.completed_at < receipt_cutoff,
                 )
+                old_unresolved = (
+                    UnresolvedQuestion.branch_id == branch_id,
+                    UnresolvedQuestion.last_seen_at < unresolved_cutoff,
+                )
                 claimed_for_review = session.scalar(
                     select(func.count())
                     .select_from(WhatsAppEventReceipt)
@@ -91,6 +99,9 @@ class WhatsAppPrivacyService:
                     completed_receipts = session.execute(
                         delete(WhatsAppEventReceipt).where(*old_receipts)
                     ).rowcount
+                    unresolved_questions = session.execute(
+                        delete(UnresolvedQuestion).where(*old_unresolved)
+                    ).rowcount
                 else:
                     messages = session.scalar(
                         select(func.count()).select_from(Message).where(*old_messages)
@@ -101,6 +112,9 @@ class WhatsAppPrivacyService:
                     completed_receipts = session.scalar(
                         select(func.count()).select_from(WhatsAppEventReceipt).where(*old_receipts)
                     )
+                    unresolved_questions = session.scalar(
+                        select(func.count()).select_from(UnresolvedQuestion).where(*old_unresolved)
+                    )
         except SQLAlchemyError:
             raise ServiceUnavailableError("WhatsApp metadata purge failed") from None
         result = PurgeResult(
@@ -108,16 +122,18 @@ class WhatsAppPrivacyService:
             messages or 0,
             completed_receipts or 0,
             claimed_for_review or 0,
+            unresolved_questions or 0,
         )
         logger.info(
             "whatsapp_metadata_purge branch_code=%s applied=%s conversations=%d messages=%d "
-            "completed_receipts=%d claimed_for_review=%d",
+            "completed_receipts=%d claimed_for_review=%d unresolved_questions=%d",
             self._scope.branch_code,
             apply,
             result.conversations,
             result.messages,
             result.completed_receipts,
             result.claimed_for_review,
+            result.unresolved_questions,
         )
         return result
 

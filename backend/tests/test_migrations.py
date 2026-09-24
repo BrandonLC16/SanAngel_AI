@@ -22,6 +22,7 @@ PRODUCT_REVISION = "20260922_0003"
 PRICE_REVISION = "20260922_0004"
 AUDIT_REVISION = "20260923_0005"
 CONVERSATION_REVISION = "20260924_0006"
+UNRESOLVED_REVISION = "20260924_0007"
 
 
 def sqlite_url(path: Path) -> str:
@@ -36,9 +37,10 @@ def test_migration_history_has_reproducible_conversation_revision() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [CONVERSATION_REVISION]
-    assert len(revisions) == 6
+    assert scripts.get_heads() == [UNRESOLVED_REVISION]
+    assert len(revisions) == 7
     assert [revision.revision for revision in revisions] == [
+        UNRESOLVED_REVISION,
         CONVERSATION_REVISION,
         AUDIT_REVISION,
         PRICE_REVISION,
@@ -46,12 +48,13 @@ def test_migration_history_has_reproducible_conversation_revision() -> None:
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == AUDIT_REVISION
-    assert revisions[1].down_revision == PRICE_REVISION
-    assert revisions[2].down_revision == PRODUCT_REVISION
-    assert revisions[3].down_revision == BRANCH_REVISION
-    assert revisions[4].down_revision == INITIAL_REVISION
-    assert revisions[5].down_revision is None
+    assert revisions[0].down_revision == CONVERSATION_REVISION
+    assert revisions[1].down_revision == AUDIT_REVISION
+    assert revisions[2].down_revision == PRICE_REVISION
+    assert revisions[3].down_revision == PRODUCT_REVISION
+    assert revisions[4].down_revision == BRANCH_REVISION
+    assert revisions[5].down_revision == INITIAL_REVISION
+    assert revisions[6].down_revision is None
 
 
 def test_upgrade_head_creates_all_registered_schema(
@@ -92,11 +95,16 @@ def test_upgrade_head_creates_all_registered_schema(
                 audit_checks = inspector.get_check_constraints("price_import_audits")
                 audit_uniques = inspector.get_unique_constraints("price_import_audits")
                 audit_indexes = inspector.get_indexes("price_import_audits")
+                unresolved_columns = {
+                    column["name"] for column in inspector.get_columns("unresolved_questions")
+                }
+                unresolved_checks = inspector.get_check_constraints("unresolved_questions")
+                unresolved_uniques = inspector.get_unique_constraints("unresolved_questions")
         finally:
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == CONVERSATION_REVISION
+        assert current_revision == UNRESOLVED_REVISION
         assert table_names == [
             "alembic_version",
             "branches",
@@ -105,8 +113,26 @@ def test_upgrade_head_creates_all_registered_schema(
             "price_import_audits",
             "prices",
             "products",
+            "unresolved_questions",
             "whatsapp_event_receipts",
         ]
+        assert unresolved_columns == {
+            "id",
+            "branch_id",
+            "reason",
+            "question_key",
+            "occurrences",
+            "first_seen_at",
+            "last_seen_at",
+        }
+        assert {item["name"] for item in unresolved_checks} == {
+            "ck_unresolved_questions_reason",
+            "ck_unresolved_questions_key",
+            "ck_unresolved_questions_occurrences",
+        }
+        assert {item["name"] for item in unresolved_uniques} == {
+            "uq_unresolved_questions_branch_reason_key"
+        }
         assert branch_columns == {
             "id",
             "code",
@@ -287,7 +313,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            CONVERSATION_REVISION,
+            UNRESOLVED_REVISION,
             [
                 "alembic_version",
                 "branches",
@@ -296,6 +322,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "price_import_audits",
                 "prices",
                 "products",
+                "unresolved_questions",
                 "whatsapp_event_receipts",
             ],
         )
@@ -331,7 +358,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == CONVERSATION_REVISION
+        assert snapshot()[0] == UNRESOLVED_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -345,7 +372,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            CONVERSATION_REVISION,
+            UNRESOLVED_REVISION,
             [
                 "alembic_version",
                 "branches",
@@ -354,6 +381,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "price_import_audits",
                 "prices",
                 "products",
+                "unresolved_questions",
                 "whatsapp_event_receipts",
             ],
         )
