@@ -21,6 +21,7 @@ BRANCH_REVISION = "20260922_0002"
 PRODUCT_REVISION = "20260922_0003"
 PRICE_REVISION = "20260922_0004"
 AUDIT_REVISION = "20260923_0005"
+CONVERSATION_REVISION = "20260924_0006"
 
 
 def sqlite_url(path: Path) -> str:
@@ -31,27 +32,29 @@ def alembic_config() -> Config:
     return Config(str(REPOSITORY_ROOT / "alembic.ini"))
 
 
-def test_migration_history_has_reproducible_audit_revision() -> None:
+def test_migration_history_has_reproducible_conversation_revision() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [AUDIT_REVISION]
-    assert len(revisions) == 5
+    assert scripts.get_heads() == [CONVERSATION_REVISION]
+    assert len(revisions) == 6
     assert [revision.revision for revision in revisions] == [
+        CONVERSATION_REVISION,
         AUDIT_REVISION,
         PRICE_REVISION,
         PRODUCT_REVISION,
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == PRICE_REVISION
-    assert revisions[1].down_revision == PRODUCT_REVISION
-    assert revisions[2].down_revision == BRANCH_REVISION
-    assert revisions[3].down_revision == INITIAL_REVISION
-    assert revisions[4].down_revision is None
+    assert revisions[0].down_revision == AUDIT_REVISION
+    assert revisions[1].down_revision == PRICE_REVISION
+    assert revisions[2].down_revision == PRODUCT_REVISION
+    assert revisions[3].down_revision == BRANCH_REVISION
+    assert revisions[4].down_revision == INITIAL_REVISION
+    assert revisions[5].down_revision is None
 
 
-def test_upgrade_head_creates_branch_product_price_and_audit_schema(
+def test_upgrade_head_creates_all_registered_schema(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -93,13 +96,16 @@ def test_upgrade_head_creates_branch_product_price_and_audit_schema(
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == AUDIT_REVISION
+        assert current_revision == CONVERSATION_REVISION
         assert table_names == [
             "alembic_version",
             "branches",
+            "conversations",
+            "messages",
             "price_import_audits",
             "prices",
             "products",
+            "whatsapp_event_receipts",
         ]
         assert branch_columns == {
             "id",
@@ -281,8 +287,17 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            AUDIT_REVISION,
-            ["alembic_version", "branches", "price_import_audits", "prices", "products"],
+            CONVERSATION_REVISION,
+            [
+                "alembic_version",
+                "branches",
+                "conversations",
+                "messages",
+                "price_import_audits",
+                "prices",
+                "products",
+                "whatsapp_event_receipts",
+            ],
         )
 
         engine = create_database_engine(database_url)
@@ -316,7 +331,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == AUDIT_REVISION
+        assert snapshot()[0] == CONVERSATION_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -330,8 +345,17 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            AUDIT_REVISION,
-            ["alembic_version", "branches", "price_import_audits", "prices", "products"],
+            CONVERSATION_REVISION,
+            [
+                "alembic_version",
+                "branches",
+                "conversations",
+                "messages",
+                "price_import_audits",
+                "prices",
+                "products",
+                "whatsapp_event_receipts",
+            ],
         )
     finally:
         get_database_settings.cache_clear()
@@ -480,5 +504,52 @@ def test_downgrade_audit_revision_preserves_price_schema(
 
         assert revision == PRICE_REVISION
         assert tables == ["alembic_version", "branches", "prices", "products"]
+    finally:
+        get_database_settings.cache_clear()
+
+
+def test_downgrade_conversation_revision_preserves_earlier_data(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_url = sqlite_url(tmp_path / "conversation-downgrade.db")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_database_settings.cache_clear()
+
+    try:
+        config = alembic_config()
+        command.upgrade(config, "head")
+        engine = create_database_engine(database_url)
+        try:
+            with create_database_session_factory(engine).begin() as session:
+                session.add(
+                    Branch(
+                        code="sucursal-uno",
+                        name="Sucursal uno",
+                        address="Dirección ficticia",
+                        business_hours="Lunes a viernes",
+                    )
+                )
+        finally:
+            engine.dispose()
+
+        command.downgrade(config, AUDIT_REVISION)
+        engine = create_database_engine(database_url)
+        try:
+            with engine.connect() as connection:
+                assert (
+                    MigrationContext.configure(connection).get_current_revision() == AUDIT_REVISION
+                )
+                assert inspect(connection).get_table_names() == [
+                    "alembic_version",
+                    "branches",
+                    "price_import_audits",
+                    "prices",
+                    "products",
+                ]
+            with create_database_session_factory(engine)() as session:
+                assert session.scalar(select(Branch.code)) == "sucursal-uno"
+        finally:
+            engine.dispose()
     finally:
         get_database_settings.cache_clear()

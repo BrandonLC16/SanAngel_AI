@@ -1,8 +1,19 @@
 """Application-owned ORM models."""
 
 from backend.app.db.models.branch import Branch
+from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.message import Message
 from backend.app.db.models.price import Price
 from backend.app.db.models.price_import_audit import PriceImportAudit
 from backend.app.db.models.product import Product
+from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 
-__all__ = ["Branch", "Price", "PriceImportAudit", "Product"]
+__all__ = [
+    "Branch",
+    "Conversation",
+    "Message",
+    "Price",
+    "PriceImportAudit",
+    "Product",
+    "WhatsAppEventReceipt",
+]

@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-24
-**Fase activa:** ninguna; Fase 6 — OpenAI tool calling para datos exactos (`✅ COMPLETADO`)
-**Subfase activa:** ninguna; F6.7 — Cierre Fase 6 (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fases 1–6 completadas; Fase 7 no iniciada
+**Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`)
+**Subfase activa:** ninguna; F7.1 — Esquema conversations/messages/events (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.1 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2559,37 +2559,40 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Guardar el contexto mínimo necesario para conversaciones, deduplicar eventos y registrar preguntas no resueltas.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-09-24
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F7.1 — Esquema conversations/messages/events
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] Conversation.
+- [x] Conversation.
 
-- [ ] Message mínimo.
+- [x] Message mínimo.
 
-- [ ] WhatsAppEventReceipt.
+- [x] WhatsAppEventReceipt.
 
-- [ ] migraciones.
+- [x] migraciones.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] modelo soporta canal WhatsApp.
+- [x] modelo soporta canal WhatsApp.
 
 
 ### Seguridad
 
-- [ ] minimización de datos.
+- [x] minimización de datos.
 
 
 ### Prompt para Codex
@@ -4312,10 +4315,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** ninguna; Fase 6 — OpenAI tool calling para datos exactos (`✅ COMPLETADO`).
-**Subfase activa:** ninguna; F6.7 — Cierre Fase 6 (`✅ COMPLETADO`).
-**Última subfase completada:** F6.7 — Cierre Fase 6.
-**Siguiente subfase recomendada:** F7.1 — Esquema conversations/messages/events, `⬜ PENDIENTE`;
+**Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F7.1 — Esquema conversations/messages/events (`✅ COMPLETADO`).
+**Última subfase completada:** F7.1 — Esquema conversations/messages/events.
+**Siguiente subfase recomendada:** F7.2 — Identidad externa y sucursal inmutable de la instalación, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4323,8 +4326,8 @@ no iniciada.
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.7 completada el 2026-09-24 tras revisión de tests, documentación, costos y loops, con 519
-pruebas de la suite completa; Fase 7 sigue pendiente y no se inició.
+F7.1 completada el 2026-09-24 tras crear el esquema mínimo de WhatsApp y validar la migración
+desde cero y sobre revisiones previas; 530 pruebas de la suite completa. F7.2 sigue pendiente.
 
 ---
 
@@ -7685,6 +7688,64 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F7.1 — Esquema conversations/messages/events, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F7.1 Esquema conversations/messages/events
+
+Fase: Fase 7 — Conversaciones WhatsApp + idempotencia persistente, `🟨 EN_PROGRESO`.
+Subfase: F7.1 — Esquema conversations/messages/events, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- modelos `Conversation`, `Message` y `WhatsAppEventReceipt` para el canal WhatsApp, con sucursal
+  obligatoria, unicidad por sucursal, restricciones de formato/estado y clave foránea compuesta
+  que impide asociar un mensaje a una conversación de otra sucursal;
+- revisión Alembic `20260924_0006` reproducible y reversible; modelos registrados para
+  autocomprobación de metadatos;
+- pruebas de esquema, migraciones, rollback, unicidad y accesos cruzados; README y guía de
+  migraciones actualizados.
+
+Archivos: `backend/app/db/models/conversation.py`, `backend/app/db/models/message.py`,
+`backend/app/db/models/whatsapp_event_receipt.py`, `backend/app/db/models/__init__.py`,
+`migrations/versions/20260924_0006_whatsapp_conversation_schema.py`, `migrations/env.py`,
+`backend/tests/test_conversation_schema.py`, `backend/tests/test_migrations.py`, `README.md`,
+`migrations/README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `git status --short` inicial: limpio; final: solo los once archivos anteriores modificados o
+  creados;
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_conversation_schema.py backend/tests/test_migrations.py`: 19 passed;
+- `.\.venv\Scripts\python.exe -m pytest`: 530 passed;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 118 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace; avisos de conversión LF/CRLF.
+
+Seguridad:
+
+- `Conversation` guarda una clave opaca de 64 caracteres y no guarda el chat ID/número; `Message`
+  solo dirección y hora, sin contenido; el recibo no guarda raw webhook body;
+- checks y FKs de SQLite impiden canal diferente, estado inválido, duplicado dentro de la
+  sucursal, sucursal inexistente y asociación cruzada de mensajes;
+- las pruebas usan bases temporales, no red ni secretos reales. La derivación segura de la clave
+  opaca desde `external_user_id` queda expresamente para F7.2.
+
+Riesgos/Pendientes:
+
+- el webhook todavía no usa estas tablas; F7.3 debe conectar la deduplicación persistente y
+  resolver las carreras transaccionales. La idempotencia actual sigue siendo temporal;
+- `Message` no conserva texto ni resumen; antes de guardar contexto hay que definir retención,
+  borrado y redacción en F7.4. El ID externo del recibo debe tratarse como dato identificable;
+- antes de aplicar la migración a una instalación con datos se requiere respaldo SQLite
+  verificado, según el procedimiento del README.
+
+Siguiente:
+
+- F7.2 — Identidad externa y sucursal inmutable de la instalación, `⬜ PENDIENTE`; recomendada,
+  no iniciada.
 
 ---
 

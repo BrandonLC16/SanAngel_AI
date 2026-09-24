@@ -392,6 +392,18 @@ Esta idempotencia no es apta para producción: se pierde al reiniciar, no se com
 procesos y puede volver a aceptar IDs desalojados. Debe sustituirse por almacenamiento persistente
 y coordinado antes del despliegue.
 
+F7.1 agrega las tablas `conversations`, `messages` y `whatsapp_event_receipts` mediante Alembic.
+La conversación queda ligada a una sucursal y al canal `whatsapp`; su identidad externa es una
+clave opaca de 64 caracteres, sin guardar el número de WhatsApp. El mensaje guarda solo dirección
+y hora, sin texto. El recibo guarda el identificador del evento y su estado, sin payload del
+webhook. Las claves foráneas y restricciones impiden asociar un mensaje a una conversación de
+otra sucursal o duplicar un recibo dentro de la misma sucursal.
+
+Estas tablas todavía no se usan en el procesamiento del webhook. F7.2 definirá cómo derivar la
+clave opaca desde la identidad recibida por backend; F7.3 conectará los recibos con la
+idempotencia persistente. Antes de guardar contenido conversacional o habilitar producción se
+necesita la política de retención y borrado de F7.4.
+
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
 reintentos automáticos. Este mecanismo tampoco es una cola durable: una caída después del ACK

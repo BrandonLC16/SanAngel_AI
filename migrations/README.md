@@ -20,6 +20,11 @@ con la sucursal de otra instalación.
 `20260923_0005` agrega `price_import_audits` para F5.5: actor opaco, hora UTC, huella lógica
 SHA-256, resultado, conteos y códigos de error. La tabla no almacena el nombre, ruta ni bytes
 del Excel. Los registros se consultan siempre por la sucursal configurada.
+`20260924_0006` agrega `conversations`, `messages` y `whatsapp_event_receipts` para F7.1.
+La conversación solo admite el canal WhatsApp y una clave opaca de remitente; los mensajes
+guardan dirección y hora, sin texto. Los recibos guardan únicamente el ID externo y el estado.
+Una clave foránea compuesta impide asociar mensajes con conversaciones de otra sucursal.
+Esta revisión crea el esquema; el webhook aún usa la idempotencia temporal y no escribe aquí.
 
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
