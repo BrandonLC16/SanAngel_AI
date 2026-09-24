@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F7.3 — Idempotencia persistente (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.3 completada
+**Subfase activa:** ninguna; F7.4 — Política de retención y redacción (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.4 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2705,30 +2705,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F7.4 — Política de retención y redacción
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] definir qué guardar.
+- [x] definir qué guardar.
 
-- [ ] retention.
+- [x] retention.
 
-- [ ] borrado.
+- [x] borrado.
 
-- [ ] redacción.
+- [x] redacción.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] privacidad documentada.
+- [x] privacidad documentada.
 
 
 ### Seguridad
 
-- [ ] no almacenar más de lo necesario.
+- [x] no almacenar más de lo necesario.
 
 
 ### Prompt para Codex
@@ -4320,9 +4322,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F7.3 — Idempotencia persistente (`✅ COMPLETADO`).
-**Última subfase completada:** F7.3 — Idempotencia persistente.
-**Siguiente subfase recomendada:** F7.4 — Política de retención y redacción, `⬜ PENDIENTE`;
+**Subfase activa:** ninguna; F7.4 — Política de retención y redacción (`✅ COMPLETADO`).
+**Última subfase completada:** F7.4 — Política de retención y redacción.
+**Siguiente subfase recomendada:** F7.5 — Preguntas no resueltas, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4333,8 +4335,9 @@ comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 F7.1 completada el 2026-09-24 tras crear el esquema mínimo de WhatsApp y validar la migración
 desde cero y sobre revisiones previas. F7.2 completada el 2026-09-24 tras resolver la identidad
 externa con HMAC y sucursal de configuración. F7.3 completada el 2026-09-24 con recibos
-transaccionales por sucursal y protección ante carreras; 549 pruebas de la suite completa.
-F7.4 sigue pendiente.
+transaccionales por sucursal y protección ante carreras. F7.4 completada el 2026-09-24 con
+purga, borrado individual y política técnica de privacidad; 557 pruebas de la suite completa.
+F7.5 sigue pendiente.
 
 ---
 
@@ -7867,6 +7870,64 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F7.4 — Política de retención y redacción, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F7.4 Política de retención y redacción
+
+Fase: Fase 7 — Conversaciones WhatsApp + idempotencia persistente, `🟨 EN_PROGRESO`.
+Subfase: F7.4 — Política de retención y redacción, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- política técnica documentada para las tres tablas de WhatsApp: campos mínimos, omisión de
+  identificadores y texto en logs, retención de 30 días y excepciones de seguridad;
+- servicio con vista previa y purga transaccional por sucursal, borrado individual de conversación
+  y metadatos de mensajes por identidad HMAC, y conteo de reservas `claimed` para revisión;
+- comando local de purga con vista previa por defecto y `--apply` para el borrado; la purga puede
+  continuar aunque falte la clave HMAC, mientras el borrado individual la exige;
+- la resolución de cada mensaje entrante actualiza `Conversation.updated_at` para que el plazo
+  de inactividad refleje la actividad real; pruebas de plazos, aislamiento, redacción y CLI.
+
+Archivos: `README.md`, `docs/fase_2_whatsapp.md`, `docs/fase_7_privacidad.md`,
+`backend/app/cli/purge_whatsapp_metadata.py`,
+`backend/app/repositories/conversation_repository.py`,
+`backend/app/services/conversation_identity_service.py`,
+`backend/app/services/whatsapp_privacy_service.py`,
+`backend/tests/test_whatsapp_privacy_service.py`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.\\.venv\\Scripts\\python.exe -m pytest backend/tests/test_whatsapp_privacy_service.py backend/tests/test_conversation_identity_service.py backend/tests/test_persistent_idempotency_store.py -q` → 27 passed;
+- `.\\.venv\\Scripts\\python.exe -m pytest -q` → 557 passed;
+- `.\\.venv\\Scripts\\ruff.exe check .` → sin errores;
+- `.\\.venv\\Scripts\\ruff.exe format --check .` → 127 archivos conformes;
+- `.\\.venv\\Scripts\\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; Git avisó sobre normalización LF/CRLF.
+
+Seguridad:
+
+- la purga y el borrado individual usan únicamente `ASSISTANT_BRANCH_CODE`, nunca una sucursal
+  de input; las pruebas mantienen intactos los datos de otra sucursal;
+- no se escriben números, texto, HMAC ni IDs de proveedor en los logs/resultado del comando;
+- recibos `claimed` no se borran automáticamente para evitar una segunda respuesta tras un
+  envío ambiguo; se informa solo su conteo cuando llevan más de un día;
+- el esquema sigue sin contenido conversacional; el recibo conserva solo ID/estado/horas hasta
+  su vencimiento.
+
+Riesgos/Pendientes:
+
+- programar `--apply` diariamente por instalación antes de producción; aquí se entrega el
+  comando pero no se cambia ningún planificador ni base real;
+- una reentrega después de 30 días puede volver a procesarse; el plazo debe revisarse con datos
+  operativos y el responsable de privacidad;
+- `claimed` necesita conciliación manual; `DELETE` no sanea páginas libres, WAL, respaldos ni
+  copias externas, que requieren un procedimiento operacional separado.
+
+Siguiente:
+
+- F7.5 — Preguntas no resueltas, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

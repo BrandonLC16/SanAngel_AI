@@ -417,8 +417,11 @@ estado, sin número, clave opaca ni texto. Configure una clave independiente, al
 32 a 256 caracteres por instalación y manténgala estable: rotarla sin migrar claves existentes
 inicia una identidad de conversación nueva para cada remitente.
 
-Antes de guardar contenido conversacional o habilitar producción se necesita la política de
-retención y borrado de F7.4.
+F7.4 define una política técnica de [retención, borrado y redacción](docs/fase_7_privacidad.md):
+30 días para conversaciones inactivas, metadatos de mensajes y recibos completados. El comando
+`python -m backend.app.cli.purge_whatsapp_metadata` muestra candidatos; `--apply` ejecuta la
+purga limitada a la sucursal configurada. Las reservas `claimed` no se borran automáticamente y
+se informan para revisión. La purga diaria debe programarse por instalación antes de producción.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

@@ -1,6 +1,8 @@
 """Conversation persistence constrained to one backend-resolved branch."""
 
-from sqlalchemy import select
+from datetime import UTC, datetime
+
+from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,15 @@ class ConversationRepository:
                 external_user_key=external_user_key,
             )
             .on_conflict_do_nothing(index_elements=["branch_id", "channel", "external_user_key"])
+        )
+        self._session.execute(
+            update(Conversation)
+            .where(
+                Conversation.branch_id == self._branch.id,
+                Conversation.channel == "whatsapp",
+                Conversation.external_user_key == external_user_key,
+            )
+            .values(updated_at=datetime.now(UTC))
         )
         conversation = self._session.scalar(
             select(Conversation).where(

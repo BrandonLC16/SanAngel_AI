@@ -204,6 +204,9 @@ bloquea el reenvío automático. Hace falta conciliación manual para esas reser
 de base de datos no puede abarcar el envío HTTP. La identidad de conversación se persiste bajo
 la sucursal configurada antes de consultar al chatbot.
 
+La política técnica de retención y borrado de estos metadatos se documenta en
+[`docs/fase_7_privacidad.md`](fase_7_privacidad.md).
+
 ## 9. Cliente saliente
 
 GreenAPI define `SendMessage` como:
