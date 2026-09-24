@@ -9,6 +9,30 @@ class ApplicationError(Exception):
         super().__init__(internal_detail or self.error_code)
 
 
+class AdminAuthenticationError(ApplicationError):
+    error_code = "admin_authentication_failed"
+    public_message = "Credenciales o sesión no válidas."
+    status_code = 401
+
+
+class AdminRateLimitError(ApplicationError):
+    error_code = "admin_login_limited"
+    public_message = "Demasiados intentos. Inténtalo más tarde."
+    status_code = 429
+
+
+class AdminCsrfError(ApplicationError):
+    error_code = "admin_csrf_invalid"
+    public_message = "La solicitud no es válida."
+    status_code = 403
+
+
+class AdminTransportError(ApplicationError):
+    error_code = "admin_https_required"
+    public_message = "Se requiere una conexión segura."
+    status_code = 403
+
+
 class ServiceUnavailableError(ApplicationError):
     """Raised when an application dependency is temporarily unavailable."""
 

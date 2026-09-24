@@ -8,6 +8,7 @@ from backend.app.api.errors import (
     request_validation_error_handler,
 )
 from backend.app.api.middleware import request_context_middleware, safe_exception_middleware
+from backend.app.api.routes.admin_auth import router as admin_auth_router
 from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.whatsapp import router as whatsapp_router
@@ -31,13 +32,14 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
         allow_origins=list(http_settings.cors_allowed_origins),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", REQUEST_ID_HEADER],
+        allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
         expose_headers=[REQUEST_ID_HEADER],
     )
     application.middleware("http")(request_context_middleware)
     application.include_router(health_router)
     application.include_router(chat_router)
     application.include_router(whatsapp_router)
+    application.include_router(admin_auth_router)
     return application
 
 

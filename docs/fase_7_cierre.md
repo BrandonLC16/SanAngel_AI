@@ -10,7 +10,8 @@
 | F7.4 | Retención, purga y borrado individual documentados y probados. |
 | F7.5 | Agregados FAQ sin texto, contador atómico y consulta interna por sucursal. |
 
-Las siete revisiones Alembic llegan a `20260924_0007`. Las pruebas crean una base vacía,
+Al cerrar Fase 7, siete revisiones Alembic llegaban a `20260924_0007`. F8.1 añadió la revisión
+`20260924_0008`; la prueba de recuperación usa la cabecera actual. Las pruebas crean una base vacía,
 ejecutan `upgrade head` y `check`, preservan datos existentes al pasar de `20260924_0006` a la
 revisión final, prueban el recorrido de migraciones y restauran en otra ruta
 un respaldo con datos representativos de las cuatro tablas de Fase 7. La prueba de recuperación

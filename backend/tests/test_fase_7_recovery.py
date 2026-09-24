@@ -19,7 +19,7 @@ from backend.app.db.session import create_database_engine, create_database_sessi
 from scripts.backup_sqlite import backup_sqlite
 
 ROOT = Path(__file__).resolve().parents[2]
-HEAD = "20260924_0007"
+HEAD = "20260924_0008"
 
 
 def test_fase_7_migration_from_zero_survives_isolated_backup_restore(

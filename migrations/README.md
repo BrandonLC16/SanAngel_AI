@@ -28,6 +28,9 @@ F7.3 usa `whatsapp_event_receipts` en el webhook real para idempotencia persiste
 de conversación se resuelve desde la configuración de sucursal, sin guardar el texto del mensaje.
 `20260924_0007` agrega `unresolved_questions`: HMAC de pregunta FAQ normalizada, motivo,
 contador y fechas por sucursal, sin texto ni remitente.
+`20260924_0008` agrega `admin_users`, `admin_sessions` y `admin_login_throttles` para F8.1.
+Solo se almacena Argon2id de contraseña, hash de token de sesión y HMAC de buckets de login;
+las sesiones y credenciales pertenecen a la sucursal configurada.
 
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`

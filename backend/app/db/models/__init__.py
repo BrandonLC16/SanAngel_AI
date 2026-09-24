@@ -1,5 +1,6 @@
 """Application-owned ORM models."""
 
+from backend.app.db.models.admin_user import AdminLoginThrottle, AdminSession, AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.message import Message
@@ -10,6 +11,9 @@ from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 
 __all__ = [
+    "AdminLoginThrottle",
+    "AdminSession",
+    "AdminUser",
     "Branch",
     "Conversation",
     "Message",

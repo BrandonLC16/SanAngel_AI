@@ -4,6 +4,11 @@ from alembic import context
 
 from backend.app.core.config import get_database_settings
 from backend.app.db.base import Base
+from backend.app.db.models.admin_user import (  # noqa: F401
+    AdminLoginThrottle,
+    AdminSession,
+    AdminUser,
+)
 from backend.app.db.models.branch import Branch  # noqa: F401
 from backend.app.db.models.conversation import Conversation  # noqa: F401
 from backend.app.db.models.message import Message  # noqa: F401

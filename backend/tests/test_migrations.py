@@ -27,6 +27,7 @@ PRICE_REVISION = "20260922_0004"
 AUDIT_REVISION = "20260923_0005"
 CONVERSATION_REVISION = "20260924_0006"
 UNRESOLVED_REVISION = "20260924_0007"
+ADMIN_AUTH_REVISION = "20260924_0008"
 
 
 def sqlite_url(path: Path) -> str:
@@ -37,13 +38,14 @@ def alembic_config() -> Config:
     return Config(str(REPOSITORY_ROOT / "alembic.ini"))
 
 
-def test_migration_history_has_reproducible_fase_7_head() -> None:
+def test_migration_history_has_reproducible_admin_auth_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [UNRESOLVED_REVISION]
-    assert len(revisions) == 7
+    assert scripts.get_heads() == [ADMIN_AUTH_REVISION]
+    assert len(revisions) == 8
     assert [revision.revision for revision in revisions] == [
+        ADMIN_AUTH_REVISION,
         UNRESOLVED_REVISION,
         CONVERSATION_REVISION,
         AUDIT_REVISION,
@@ -52,13 +54,14 @@ def test_migration_history_has_reproducible_fase_7_head() -> None:
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == CONVERSATION_REVISION
-    assert revisions[1].down_revision == AUDIT_REVISION
-    assert revisions[2].down_revision == PRICE_REVISION
-    assert revisions[3].down_revision == PRODUCT_REVISION
-    assert revisions[4].down_revision == BRANCH_REVISION
-    assert revisions[5].down_revision == INITIAL_REVISION
-    assert revisions[6].down_revision is None
+    assert revisions[0].down_revision == UNRESOLVED_REVISION
+    assert revisions[1].down_revision == CONVERSATION_REVISION
+    assert revisions[2].down_revision == AUDIT_REVISION
+    assert revisions[3].down_revision == PRICE_REVISION
+    assert revisions[4].down_revision == PRODUCT_REVISION
+    assert revisions[5].down_revision == BRANCH_REVISION
+    assert revisions[6].down_revision == INITIAL_REVISION
+    assert revisions[7].down_revision is None
 
 
 def test_upgrade_head_creates_all_registered_schema(
@@ -104,12 +107,20 @@ def test_upgrade_head_creates_all_registered_schema(
                 }
                 unresolved_checks = inspector.get_check_constraints("unresolved_questions")
                 unresolved_uniques = inspector.get_unique_constraints("unresolved_questions")
+                admin_user_columns = {
+                    column["name"] for column in inspector.get_columns("admin_users")
+                }
+                admin_user_checks = inspector.get_check_constraints("admin_users")
+                admin_session_foreign_keys = inspector.get_foreign_keys("admin_sessions")
         finally:
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == UNRESOLVED_REVISION
+        assert current_revision == ADMIN_AUTH_REVISION
         assert table_names == [
+            "admin_login_throttles",
+            "admin_sessions",
+            "admin_users",
             "alembic_version",
             "branches",
             "conversations",
@@ -120,6 +131,26 @@ def test_upgrade_head_creates_all_registered_schema(
             "unresolved_questions",
             "whatsapp_event_receipts",
         ]
+        assert admin_user_columns == {
+            "id",
+            "branch_id",
+            "username",
+            "password_hash",
+            "is_active",
+            "created_at",
+        }
+        assert {item["name"] for item in admin_user_checks} == {
+            "ck_admin_users_username_length",
+            "ck_admin_users_argon2id",
+        }
+        assert {
+            (
+                item["name"],
+                tuple(item["constrained_columns"]),
+                tuple(item["referred_columns"]),
+            )
+            for item in admin_session_foreign_keys
+        } == {("fk_admin_sessions_user_branch", ("user_id", "branch_id"), ("id", "branch_id"))}
         assert unresolved_columns == {
             "id",
             "branch_id",
@@ -374,8 +405,11 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            UNRESOLVED_REVISION,
+            ADMIN_AUTH_REVISION,
             [
+                "admin_login_throttles",
+                "admin_sessions",
+                "admin_users",
                 "alembic_version",
                 "branches",
                 "conversations",
@@ -419,7 +453,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == UNRESOLVED_REVISION
+        assert snapshot()[0] == ADMIN_AUTH_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -433,8 +467,11 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            UNRESOLVED_REVISION,
+            ADMIN_AUTH_REVISION,
             [
+                "admin_login_throttles",
+                "admin_sessions",
+                "admin_users",
                 "alembic_version",
                 "branches",
                 "conversations",

@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-24
-**Fase activa:** ninguna; Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`✅ COMPLETADO`)
-**Subfase activa:** ninguna; F7.6 — Cierre Fase 7 (`✅ COMPLETADO`)
-**Estado global:** ✅ COMPLETADO — Fase 7; Fase 8 pendiente
+**Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
+**Subfase activa:** ninguna; F8.1 — Autenticación backend (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 8; F8.1 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2842,39 +2842,43 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Crear una interfaz de PC para administrar datos, revisar conversaciones y operar el sistema sin exponer secretos.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-09-24
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F8.1 — Autenticación backend
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de validación:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] modelo AdminUser.
+- [x] modelo AdminUser.
 
-- [ ] hash password mantenido.
+- [x] hash password mantenido.
 
-- [ ] login/logout.
+- [x] login/logout.
 
-- [ ] sesión/token.
+- [x] sesión/token.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] password nunca plano.
+- [x] password nunca plano.
 
 
 ### Seguridad
 
-- [ ] rate limiting login.
+- [x] rate limiting login.
 
-- [ ] cookies/JWT correctamente configurados.
+- [x] cookie de sesión opaca configurada y validada; no se usa JWT.
 
 
 ### Prompt para Codex
@@ -4326,11 +4330,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** ninguna; Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`✅ COMPLETADO`).
-**Subfase activa:** ninguna; F7.6 — Cierre Fase 7 (`✅ COMPLETADO`).
-**Última subfase completada:** F7.6 — Cierre Fase 7.
-**Siguiente subfase recomendada:** F8.1 — Autenticación backend, `⬜ PENDIENTE`;
-Fase 8 no iniciada.
+**Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F8.1 — Autenticación backend (`✅ COMPLETADO`).
+**Última subfase completada:** F8.1 — Autenticación backend.
+**Siguiente subfase recomendada:** F8.2 — RBAC y endpoints admin (`⬜ PENDIENTE`).
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4346,6 +4349,8 @@ F7.5 completada el 2026-09-24 con agregados FAQ sin texto, conteo atómico por s
 consulta interna acotada y purga a 30 días; 564 pruebas de la suite completa.
 F7.6 y Fase 7 cerradas el 2026-09-24 tras probar migraciones desde cero y desde la revisión
 F7.1, restaurar un respaldo aislado y documentar el plan operativo; 566 pruebas de la suite completa.
+F8.1 completada el 2026-09-24 tras incorporar credenciales Argon2id, sesión opaca revocable,
+cookie segura, CSRF y limitación persistente de login por cuenta y origen directo; 575 pruebas.
 
 ---
 
@@ -8039,6 +8044,59 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F8.1 — Autenticación backend, `⬜ PENDIENTE`; Fase 8 no iniciada.
+
+---
+
+## 2026-09-24 — F8.1 Autenticación backend
+
+Fase: Fase 8 — Panel administrativo seguro, `🟨 EN_PROGRESO`.
+Subfase: F8.1 — Autenticación backend, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- modelos `AdminUser`, `AdminSession` y `AdminLoginThrottle` con migración Alembic 0008;
+- aprovisionamiento local con contraseña interactiva y hash Argon2id, con rehash al iniciar sesión;
+- login, consulta de sesión y logout con token opaco revocable, cookie segura y CSRF;
+- limitación persistente y atómica de intentos por cuenta y origen directo;
+- documentación, configuración y pruebas de aislamiento por sucursal, concurrencia y privacidad.
+
+Archivos: `.env.example`, `pyproject.toml`, `backend/app/core/config.py`,
+`backend/app/core/exceptions.py`, `backend/app/db/models/__init__.py`,
+`backend/app/db/models/admin_user.py`, `backend/app/services/admin_auth_service.py`,
+`backend/app/schemas/admin_auth.py`, `backend/app/api/routes/admin_auth.py`,
+`backend/app/cli/create_admin_user.py`, `backend/app/main.py`, `migrations/env.py`,
+`migrations/versions/20260924_0008_admin_auth.py`, `backend/tests/test_admin_auth.py`,
+`backend/tests/test_migrations.py`, `backend/tests/test_fase_7_recovery.py`,
+`migrations/README.md`, `docs/fase_7_cierre.md`, `docs/fase_8_auth.md`, `README.md`,
+`plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_admin_auth.py backend/tests/test_migrations.py backend/tests/test_fase_7_recovery.py -q` → 20 passed;
+- `.venv\Scripts\python.exe -m pytest -q` → 575 passed;
+- `.venv\Scripts\python.exe -m ruff check .` → sin errores;
+- `.venv\Scripts\python.exe -m ruff format --check .` → 141 archivos conformes;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; avisos de normalización LF/CRLF.
+
+Seguridad:
+
+- contraseña solo como hash Argon2id en SQLite; token de sesión solo como SHA-256;
+- cookie `__Host-admin_session` con `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, sin
+  `Domain`; rutas de autenticación exigen HTTPS;
+- logout exige CSRF y revoca la sesión; contadores de login usan HMAC, no guardan usuario ni IP;
+- las búsquedas de usuario y sesión usan sucursal de configuración, nunca la petición;
+- pruebas de rechazo entre sucursales, concurrencia, expiración, no exposición en logs y sin red.
+
+Riesgos/Pendientes:
+
+- el despliegue debe configurar TLS y proxies confiables para que el esquema ASGI y el origen
+  directo del cliente sean correctos; probar capacidad Argon2 y monitoreo de intentos;
+- RBAC y endpoints administrativos quedan para F8.2; cada futura escritura autenticada debe
+  validar CSRF en backend.
+
+Siguiente: F8.2 — RBAC y endpoints admin, `⬜ PENDIENTE`; no iniciada.
 
 ---
 

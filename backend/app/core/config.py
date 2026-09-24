@@ -175,6 +175,19 @@ class ConversationIdentitySettings(AssistantSettings):
         return value
 
 
+class AdminAuthSettings(AssistantSettings):
+    """Backend-only secret for scoped login throttling and CSRF tokens."""
+
+    admin_auth_key: SecretStr = Field(repr=False)
+
+    @field_validator("admin_auth_key")
+    @classmethod
+    def validate_admin_auth_key(cls, value: SecretStr) -> SecretStr:
+        if re.fullmatch(r"[A-Za-z0-9_-]{32,256}", value.get_secret_value()) is None:
+            raise ValueError("ADMIN_AUTH_KEY has an invalid format")
+        return value
+
+
 class Settings(HttpSettings):
     """Validated complete application configuration loaded from the environment."""
 
@@ -315,6 +328,13 @@ def get_conversation_identity_settings() -> ConversationIdentitySettings:
     """Load a fixed branch and an independent identity key for this process."""
 
     return ConversationIdentitySettings()
+
+
+@lru_cache
+def get_admin_auth_settings() -> AdminAuthSettings:
+    """Load admin authentication only for its private route or provisioning CLI."""
+
+    return AdminAuthSettings()
 
 
 @lru_cache

@@ -161,6 +161,7 @@ Variables relevantes:
 
 - `ASSISTANT_BRANCH_CODE`: código inmutable de la única sucursal atendida por esta instalación;
 - `CONVERSATION_IDENTITY_KEY`: secreto backend-only para derivar la identidad externa opaca;
+- `ADMIN_AUTH_KEY`: secreto backend-only independiente para CSRF y límite de login del personal;
 - `OPENAI_API_KEY`: clave backend-only para la prueba real del chatbot;
 - `OPENAI_MODEL`: modelo configurable, `gpt-5.6` por defecto;
 - `OPENAI_STORE_RESPONSES`: `false` por defecto;
@@ -221,7 +222,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las siete revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las ocho revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
@@ -432,6 +433,12 @@ consultarlos desde un futuro panel autorizado. La purga de 30 días también los
 registro se conecta al fallback determinístico de `search_faq` cuando el dispatcher recibe
 `unresolved_settings`; el canal WhatsApp actual aún usa el chat simple y no produce estos
 agregados automáticamente. Véase la [política de privacidad](docs/fase_7_privacidad.md).
+
+F8.1 agrega autenticación backend para el personal. La contraseña se almacena solo como hash
+Argon2id; el login establece una sesión opaca y revocable en una cookie HTTPS segura, y el logout
+exige CSRF. Los intentos de login tienen límites persistentes por cuenta y origen directo. El
+usuario se crea solo desde una CLI local, sin ruta de registro público. Consulta la
+[guía de autenticación](docs/fase_8_auth.md) para configuración, endpoints y límites.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
