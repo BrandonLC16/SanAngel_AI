@@ -35,8 +35,8 @@ no confiar en `X-Forwarded-Proto` de clientes arbitrarios.
 
 | Ruta | Entrada | Resultado |
 |---|---|---|
-| `POST /login` | JSON `username`, `password` | Cookie de sesión y JSON con `username`, vencimiento y token CSRF. Error 401 genérico o 429. |
-| `GET /session` | Cookie | Sesión activa y token CSRF; 401 si expiró o fue revocada. |
+| `POST /login` | JSON `username`, `password` | Cookie de sesión y JSON con `username`, rol, vencimiento y token CSRF. Error 401 genérico o 429. |
+| `GET /session` | Cookie | Sesión activa, rol y token CSRF; 401 si expiró o fue revocada. |
 | `POST /logout` | Cookie y cabecera `X-CSRF-Token` | Revoca la sesión en SQLite y elimina la cookie; 403 si falta CSRF. |
 
 La cookie `__Host-admin_session` tiene `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, sin
@@ -69,7 +69,7 @@ y las claves de throttling; la sesión opaca sigue válida hasta su vencimiento 
 
 ## Límites
 
-F8.1 no agrega roles, RBAC, CRUD administrativo ni frontend. Estos pertenecen a subfases
-posteriores. Antes de producción faltan configuración TLS/proxy estable, protección operacional
+F8.1 no agregó roles, RBAC, CRUD administrativo ni frontend. F8.2 incorpora roles y endpoints
+de autorización descritos en [su guía](fase_8_rbac.md). Antes de producción faltan configuración TLS/proxy estable, protección operacional
 de la base y secreto, evaluación de capacidad Argon2, MFA/alertas según riesgo y monitoreo de
 intentos de login. Las pruebas usan SQLite temporal y clientes HTTPS locales, sin red externa.

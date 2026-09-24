@@ -31,6 +31,9 @@ contador y fechas por sucursal, sin texto ni remitente.
 `20260924_0008` agrega `admin_users`, `admin_sessions` y `admin_login_throttles` para F8.1.
 Solo se almacena Argon2id de contraseña, hash de token de sesión y HMAC de buckets de login;
 las sesiones y credenciales pertenecen a la sucursal configurada.
+`20260924_0009` agrega el rol restringido a `viewer`, `editor` u `owner` y
+`admin_role_audits` para cambios de rol. Las cuentas existentes reciben `viewer` por defecto y
+la migración conserva las filas previas.
 
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`

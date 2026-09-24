@@ -15,6 +15,18 @@ class AdminAuthenticationError(ApplicationError):
     status_code = 401
 
 
+class AdminAuthorizationError(ApplicationError):
+    error_code = "admin_forbidden"
+    public_message = "No tienes permiso para esta operación."
+    status_code = 403
+
+
+class AdminUserNotFoundError(ApplicationError):
+    error_code = "admin_user_not_found"
+    public_message = "No se encontró el usuario."
+    status_code = 404
+
+
 class AdminRateLimitError(ApplicationError):
     error_code = "admin_login_limited"
     public_message = "Demasiados intentos. Inténtalo más tarde."

@@ -8,6 +8,7 @@ from backend.app.api.errors import (
     request_validation_error_handler,
 )
 from backend.app.api.middleware import request_context_middleware, safe_exception_middleware
+from backend.app.api.routes.admin import router as admin_router
 from backend.app.api.routes.admin_auth import router as admin_auth_router
 from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
@@ -40,6 +41,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     application.include_router(chat_router)
     application.include_router(whatsapp_router)
     application.include_router(admin_auth_router)
+    application.include_router(admin_router)
     return application
 
 

@@ -28,10 +28,11 @@ def _response_data(session: AdminSessionInfo) -> AdminSessionResponse:
         username=session.username,
         expires_at=session.expires_at,
         csrf_token=session.csrf_token,
+        role=session.role,
     )
 
 
-def _require_https(request: Request) -> None:
+def require_admin_https(request: Request) -> None:
     if request.url.scheme != "https":
         raise AdminTransportError()
 
@@ -43,7 +44,7 @@ async def login(
     response: Response,
     service: Annotated[AdminAuthService, Depends(get_admin_auth_service)],
 ) -> AdminSessionResponse:
-    _require_https(request)
+    require_admin_https(request)
     peer = request.client.host if request.client is not None else "unknown"
     result = await asyncio.to_thread(
         service.login, payload.username, payload.password.get_secret_value(), peer=peer
@@ -67,7 +68,7 @@ async def session_info(
     response: Response,
     service: Annotated[AdminAuthService, Depends(get_admin_auth_service)],
 ) -> AdminSessionResponse:
-    _require_https(request)
+    require_admin_https(request)
     session = await asyncio.to_thread(service.get_session, request.cookies.get(COOKIE_NAME))
     response.headers["Cache-Control"] = "no-store"
     return _response_data(session)
@@ -79,7 +80,7 @@ async def logout(
     service: Annotated[AdminAuthService, Depends(get_admin_auth_service)],
     csrf_token: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
 ) -> Response:
-    _require_https(request)
+    require_admin_https(request)
     await asyncio.to_thread(service.logout, request.cookies.get(COOKIE_NAME), csrf_token)
     response = Response(status_code=204, headers={"Cache-Control": "no-store"})
     response.delete_cookie(COOKIE_NAME, path="/", secure=True, httponly=True, samesite="strict")

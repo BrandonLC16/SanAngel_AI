@@ -14,16 +14,24 @@ from argon2.exceptions import HashingError, InvalidHashError, VerificationError
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, aliased, sessionmaker
 
+from backend.app.core.admin_roles import AdminPermission, AdminRole, permits
 from backend.app.core.config import AdminAuthSettings
 from backend.app.core.exceptions import (
     AdminAuthenticationError,
+    AdminAuthorizationError,
     AdminCsrfError,
     AdminRateLimitError,
+    AdminUserNotFoundError,
     ServiceUnavailableError,
 )
-from backend.app.db.models.admin_user import AdminLoginThrottle, AdminSession, AdminUser
+from backend.app.db.models.admin_user import (
+    AdminLoginThrottle,
+    AdminRoleAudit,
+    AdminSession,
+    AdminUser,
+)
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.branch_service import BranchService
@@ -48,6 +56,17 @@ class AdminSessionInfo:
     username: str
     expires_at: datetime
     csrf_token: str = field(repr=False)
+    user_id: int
+    branch_id: int
+    role: AdminRole
+
+
+@dataclass(frozen=True, slots=True)
+class AdminUserSummary:
+    id: int
+    username: str
+    role: AdminRole
+    is_active: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,11 +83,15 @@ class AdminAuthService:
         self._scope = BranchScope.from_settings(settings)
         self._key = settings.admin_auth_key.get_secret_value().encode("ascii")
 
-    def create_user(self, username: str, password: str) -> None:
+    def create_user(
+        self, username: str, password: str, *, role: AdminRole = AdminRole.VIEWER
+    ) -> None:
         """Local provisioning operation; there is intentionally no public registration route."""
         normalized = self._username(username)
         if not isinstance(password, str) or not 12 <= len(password) <= 1024:
             raise ValueError("password length must be between 12 and 1024")
+        if not isinstance(role, AdminRole):
+            raise ValueError("invalid admin role")
         try:
             password_hash = PASSWORD_HASHER.hash(password)
         except HashingError:
@@ -81,6 +104,7 @@ class AdminAuthService:
                         branch_id=branch_id,
                         username=normalized,
                         password_hash=password_hash,
+                        role=role.value,
                     )
                 )
         except IntegrityError:
@@ -160,7 +184,14 @@ class AdminAuthService:
                 )
             return AdminLoginResult(
                 token=token,
-                session=AdminSessionInfo(normalized, expires_at, self._csrf_token(token)),
+                session=AdminSessionInfo(
+                    username=normalized,
+                    expires_at=expires_at,
+                    csrf_token=self._csrf_token(token),
+                    user_id=user.id,
+                    branch_id=branch_id,
+                    role=AdminRole(user.role),
+                ),
             )
         except SQLAlchemyError:
             raise ServiceUnavailableError("admin login persistence failed") from None
@@ -172,7 +203,7 @@ class AdminAuthService:
             with self._sessions() as session:
                 branch_id = self._branch_id(session)
                 result = session.execute(
-                    select(AdminSession, AdminUser.username)
+                    select(AdminSession, AdminUser)
                     .join(
                         AdminUser,
                         (AdminUser.id == AdminSession.user_id)
@@ -190,14 +221,127 @@ class AdminAuthService:
             raise ServiceUnavailableError("admin session lookup failed") from None
         if result is None:
             raise AdminAuthenticationError()
-        stored, username = result
+        stored, user = result
         expires_at = stored.expires_at
         expires_at = (
             expires_at.replace(tzinfo=UTC)
             if expires_at.tzinfo is None
             else expires_at.astimezone(UTC)
         )
-        return AdminSessionInfo(username, expires_at, self._csrf_token(token))
+        return AdminSessionInfo(
+            username=user.username,
+            expires_at=expires_at,
+            csrf_token=self._csrf_token(token),
+            user_id=user.id,
+            branch_id=stored.branch_id,
+            role=AdminRole(user.role),
+        )
+
+    def list_users(self, token: str | None) -> list[AdminUserSummary]:
+        principal = self.get_session(token)
+        self._require_permission(principal, AdminPermission.USERS_READ)
+        try:
+            with self._sessions() as session:
+                current_role = session.scalar(
+                    select(AdminUser.role).where(
+                        AdminUser.id == principal.user_id,
+                        AdminUser.branch_id == principal.branch_id,
+                        AdminUser.is_active.is_(True),
+                    )
+                )
+                if current_role is None or not permits(
+                    AdminRole(current_role), AdminPermission.USERS_READ
+                ):
+                    raise AdminAuthorizationError()
+                users = session.scalars(
+                    select(AdminUser)
+                    .where(AdminUser.branch_id == principal.branch_id)
+                    .order_by(AdminUser.id)
+                ).all()
+        except SQLAlchemyError:
+            raise ServiceUnavailableError("admin user lookup failed") from None
+        return [self._user_summary(user) for user in users]
+
+    def change_role(
+        self, token: str | None, csrf_token: str | None, user_id: int, role: AdminRole
+    ) -> AdminUserSummary:
+        principal = self.get_session(token)
+        self._require_permission(principal, AdminPermission.USERS_ROLE_WRITE)
+        if not isinstance(csrf_token, str) or not hmac.compare_digest(
+            csrf_token, principal.csrf_token
+        ):
+            raise AdminCsrfError()
+        if not isinstance(role, AdminRole) or not isinstance(user_id, int) or user_id < 1:
+            raise AdminAuthorizationError()
+        if user_id == principal.user_id:
+            raise AdminAuthorizationError("self role change refused")
+        try:
+            with self._sessions.begin() as session:
+                current_role = session.scalar(
+                    select(AdminUser.role).where(
+                        AdminUser.id == principal.user_id,
+                        AdminUser.branch_id == principal.branch_id,
+                        AdminUser.is_active.is_(True),
+                    )
+                )
+                if current_role != AdminRole.OWNER.value:
+                    raise AdminAuthorizationError()
+                target = session.scalar(
+                    select(AdminUser).where(
+                        AdminUser.id == user_id,
+                        AdminUser.branch_id == principal.branch_id,
+                    )
+                )
+                if target is None:
+                    raise AdminUserNotFoundError()
+                if target.role == role.value:
+                    return self._user_summary(target)
+                old_role = target.role
+                actor = aliased(AdminUser)
+                actor_is_owner = (
+                    select(actor.id)
+                    .where(
+                        actor.id == principal.user_id,
+                        actor.branch_id == principal.branch_id,
+                        actor.role == AdminRole.OWNER.value,
+                        actor.is_active.is_(True),
+                    )
+                    .exists()
+                )
+                changed = session.execute(
+                    update(AdminUser)
+                    .where(
+                        AdminUser.id == user_id,
+                        AdminUser.branch_id == principal.branch_id,
+                        AdminUser.role == old_role,
+                        actor_is_owner,
+                    )
+                    .values(role=role.value)
+                )
+                if changed.rowcount != 1:
+                    raise AdminAuthorizationError("role changed during request")
+                session.add(
+                    AdminRoleAudit(
+                        branch_id=principal.branch_id,
+                        actor_user_id=principal.user_id,
+                        target_user_id=user_id,
+                        old_role=old_role,
+                        new_role=role.value,
+                    )
+                )
+                summary = AdminUserSummary(user_id, target.username, role, target.is_active)
+            return summary
+        except SQLAlchemyError:
+            raise ServiceUnavailableError("admin role update failed") from None
+
+    @staticmethod
+    def _require_permission(principal: AdminSessionInfo, permission: AdminPermission) -> None:
+        if not permits(principal.role, permission):
+            raise AdminAuthorizationError()
+
+    @staticmethod
+    def _user_summary(user: AdminUser) -> AdminUserSummary:
+        return AdminUserSummary(user.id, user.username, AdminRole(user.role), user.is_active)
 
     def logout(self, token: str | None, csrf_token: str | None) -> None:
         self.get_session(token)

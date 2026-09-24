@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from backend.app.core.admin_roles import AdminRole
+
 
 class AdminLoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -16,3 +18,22 @@ class AdminSessionResponse(BaseModel):
     username: str
     expires_at: datetime
     csrf_token: str
+    role: AdminRole
+
+
+class AdminProfileResponse(BaseModel):
+    username: str
+    role: AdminRole
+
+
+class AdminUserResponse(BaseModel):
+    id: int
+    username: str
+    role: AdminRole
+    is_active: bool
+
+
+class AdminRoleChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: AdminRole

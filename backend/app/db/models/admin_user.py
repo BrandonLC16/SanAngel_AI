@@ -24,6 +24,7 @@ class AdminUser(Base):
     __table_args__ = (
         CheckConstraint("length(username) BETWEEN 3 AND 64", name="ck_admin_users_username_length"),
         CheckConstraint("password_hash LIKE '$argon2id$%'", name="ck_admin_users_argon2id"),
+        CheckConstraint("role IN ('viewer', 'editor', 'owner')", name="ck_admin_users_role"),
         UniqueConstraint("branch_id", "username", name="uq_admin_users_branch_username"),
         UniqueConstraint("id", "branch_id", name="uq_admin_users_id_branch"),
     )
@@ -34,6 +35,9 @@ class AdminUser(Base):
     )
     username: Mapped[str] = mapped_column(String(64), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="viewer", server_default="viewer"
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="1"
     )
@@ -87,3 +91,41 @@ class AdminLoginThrottle(Base):
     bucket_key: Mapped[str] = mapped_column(String(64), nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False)
     window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AdminRoleAudit(Base):
+    """Minimal immutable receipt for an authorized change of role."""
+
+    __tablename__ = "admin_role_audits"
+    __table_args__ = (
+        CheckConstraint(
+            "old_role IN ('viewer', 'editor', 'owner')", name="ck_admin_role_audits_old"
+        ),
+        CheckConstraint(
+            "new_role IN ('viewer', 'editor', 'owner')", name="ck_admin_role_audits_new"
+        ),
+        CheckConstraint("old_role != new_role", name="ck_admin_role_audits_changed"),
+        ForeignKeyConstraint(
+            ["actor_user_id", "branch_id"],
+            ["admin_users.id", "admin_users.branch_id"],
+            name="fk_admin_role_audits_actor_branch",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["target_user_id", "branch_id"],
+            ["admin_users.id", "admin_users.branch_id"],
+            name="fk_admin_role_audits_target_branch",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_admin_role_audits_branch_time", "branch_id", "changed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    branch_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    old_role: Mapped[str] = mapped_column(String(16), nullable=False)
+    new_role: Mapped[str] = mapped_column(String(16), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )

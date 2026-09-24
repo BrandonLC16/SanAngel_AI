@@ -222,7 +222,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las ocho revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las nueve revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
@@ -439,6 +439,13 @@ Argon2id; el login establece una sesión opaca y revocable en una cookie HTTPS s
 exige CSRF. Los intentos de login tienen límites persistentes por cuenta y origen directo. El
 usuario se crea solo desde una CLI local, sin ruta de registro público. Consulta la
 [guía de autenticación](docs/fase_8_auth.md) para configuración, endpoints y límites.
+
+F8.2 agrega roles `viewer`, `editor` y `owner` persistidos por sucursal. Las rutas
+`/api/v1/admin/me`, `/users` y `/users/{id}/role` comprueban sesión, rol y sucursal en backend;
+el cambio de rol exige CSRF. Los usuarios anteriores reciben `viewer` al migrar y un propietario
+inicial debe aprovisionarse localmente con `--role owner`. Cada cambio efectivo de rol deja un
+recibo mínimo y transaccional en la base. La
+[guía de RBAC](docs/fase_8_rbac.md) detalla permisos y respuestas 401/403/404.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

@@ -11,15 +11,21 @@ from alembic import command
 from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.api.routes.admin_auth import COOKIE_NAME, get_admin_auth_service
 from backend.app.cli.create_admin_user import main as create_admin_main
+from backend.app.core.admin_roles import AdminRole
 from backend.app.core.config import AdminAuthSettings, HttpSettings, get_database_settings
 from backend.app.core.exceptions import AdminAuthenticationError, AdminRateLimitError
-from backend.app.db.models.admin_user import AdminLoginThrottle, AdminSession, AdminUser
+from backend.app.db.models.admin_user import (
+    AdminLoginThrottle,
+    AdminRoleAudit,
+    AdminSession,
+    AdminUser,
+)
 from backend.app.db.models.branch import Branch
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.main import create_app
@@ -310,3 +316,198 @@ def test_local_provisioning_prompts_without_password_argument_or_output(
         user = session.scalar(select(AdminUser).where(AdminUser.username == "operator"))
         assert user is not None
         assert user.password_hash.startswith("$argon2id$")
+        assert user.role == AdminRole.VIEWER
+
+
+def test_admin_routes_require_session_and_https(client: TestClient) -> None:
+    assert client.get("/api/v1/admin/me").status_code == 401
+    assert client.get("/api/v1/admin/users").status_code == 401
+    assert client.patch("/api/v1/admin/users/1/role", json={"role": "owner"}).status_code == 401
+    with TestClient(client.app, base_url="http://testserver") as plain_client:
+        assert plain_client.get("/api/v1/admin/me").status_code == 403
+
+
+def test_backend_roles_and_branch_scope_ignore_client_claims(
+    sessions: sessionmaker[Session], client: TestClient
+) -> None:
+    own = AdminAuthService(sessions, settings=settings())
+    foreign = AdminAuthService(sessions, settings=settings("sucursal-dos"))
+    own.create_user("owner", PASSWORD, role=AdminRole.OWNER)
+    own.create_user("editor", PASSWORD, role=AdminRole.EDITOR)
+    own.create_user("viewer", PASSWORD)
+    foreign.create_user("outsider", PASSWORD, role=AdminRole.OWNER)
+    with sessions() as session:
+        own_user_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "owner"))
+        editor_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "editor"))
+        viewer_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "viewer"))
+        foreign_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "outsider"))
+    assert all(value is not None for value in (own_user_id, editor_id, viewer_id, foreign_id))
+
+    with (
+        TestClient(client.app, base_url="https://testserver") as viewer_client,
+        TestClient(client.app, base_url="https://testserver") as editor_client,
+        TestClient(client.app, base_url="https://testserver") as owner_client,
+    ):
+        viewer_login = viewer_client.post(
+            "/api/v1/admin/auth/login", json={"username": "viewer", "password": PASSWORD}
+        )
+        editor_login = editor_client.post(
+            "/api/v1/admin/auth/login", json={"username": "editor", "password": PASSWORD}
+        )
+        owner_login = owner_client.post(
+            "/api/v1/admin/auth/login", json={"username": "owner", "password": PASSWORD}
+        )
+        assert [r.status_code for r in (viewer_login, editor_login, owner_login)] == [
+            200,
+            200,
+            200,
+        ]
+        assert viewer_client.get("/api/v1/admin/me").json() == {
+            "username": "viewer",
+            "role": "viewer",
+        }
+        assert viewer_client.get("/api/v1/admin/users").status_code == 403
+        assert (
+            viewer_client.get("/api/v1/admin/users", headers={"X-Admin-Role": "owner"}).status_code
+            == 403
+        )
+        assert editor_client.get("/api/v1/admin/users").status_code == 200
+        assert (
+            editor_client.patch(
+                f"/api/v1/admin/users/{viewer_id}/role",
+                json={"role": "owner"},
+                headers={"X-CSRF-Token": editor_login.json()["csrf_token"]},
+            ).status_code
+            == 403
+        )
+        users = owner_client.get("/api/v1/admin/users")
+        assert users.status_code == 200
+        assert {user["username"] for user in users.json()} == {"owner", "editor", "viewer"}
+        assert "password_hash" not in users.text
+        assert (
+            owner_client.patch(
+                f"/api/v1/admin/users/{foreign_id}/role",
+                json={"role": "viewer"},
+                headers={"X-CSRF-Token": owner_login.json()["csrf_token"]},
+            ).status_code
+            == 404
+        )
+        with sessions() as session:
+            foreign_user = session.get(AdminUser, foreign_id)
+            assert foreign_user is not None and foreign_user.role == AdminRole.OWNER
+        changed = owner_client.patch(
+            f"/api/v1/admin/users/{viewer_id}/role",
+            json={"role": "editor"},
+            headers={"X-CSRF-Token": owner_login.json()["csrf_token"]},
+        )
+        assert changed.status_code == 200
+        assert changed.json()["role"] == "editor"
+        assert viewer_client.get("/api/v1/admin/users").status_code == 200
+        demoted = owner_client.patch(
+            f"/api/v1/admin/users/{editor_id}/role",
+            json={"role": "viewer"},
+            headers={"X-CSRF-Token": owner_login.json()["csrf_token"]},
+        )
+        assert demoted.status_code == 200
+        assert editor_client.get("/api/v1/admin/users").status_code == 403
+        assert owner_client.get("/api/v1/admin/me").json()["role"] == "owner"
+        assert own_user_id != foreign_id
+    with sessions() as session:
+        receipts = session.scalars(select(AdminRoleAudit).order_by(AdminRoleAudit.id)).all()
+        assert [(receipt.old_role, receipt.new_role) for receipt in receipts] == [
+            ("viewer", "editor"),
+            ("editor", "viewer"),
+        ]
+        assert all(receipt.branch_id == 1 for receipt in receipts)
+        assert all(receipt.actor_user_id == own_user_id for receipt in receipts)
+        assert [receipt.target_user_id for receipt in receipts] == [viewer_id, editor_id]
+        assert PASSWORD not in repr(receipts)
+
+
+def test_role_change_requires_csrf_and_rejects_self_and_forged_branch(
+    sessions: sessionmaker[Session], client: TestClient
+) -> None:
+    service = AdminAuthService(sessions, settings=settings())
+    service.create_user("owner", PASSWORD, role=AdminRole.OWNER)
+    service.create_user("viewer", PASSWORD)
+    with sessions() as session:
+        owner_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "owner"))
+        viewer_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "viewer"))
+    assert owner_id is not None and viewer_id is not None
+    logged_in = client.post(
+        "/api/v1/admin/auth/login", json={"username": "owner", "password": PASSWORD}
+    )
+    assert logged_in.status_code == 200
+    path = f"/api/v1/admin/users/{viewer_id}/role"
+    assert client.patch(path, json={"role": "owner"}).status_code == 403
+    assert (
+        client.patch(path, json={"role": "owner"}, headers={"X-CSRF-Token": "wrong"}).status_code
+        == 403
+    )
+    csrf_header = {"X-CSRF-Token": logged_in.json()["csrf_token"]}
+    assert client.patch(path, json={"role": "superuser"}, headers=csrf_header).status_code == 422
+    assert (
+        client.patch(path, json={"role": "owner", "branch_id": 2}, headers=csrf_header).status_code
+        == 422
+    )
+    assert (
+        client.patch(
+            f"/api/v1/admin/users/{owner_id}/role",
+            json={"role": "viewer"},
+            headers=csrf_header,
+        ).status_code
+        == 403
+    )
+    assert client.patch(path, json={"role": "viewer"}, headers=csrf_header).status_code == 200
+    with sessions() as session:
+        viewer = session.scalar(select(AdminUser).where(AdminUser.id == viewer_id))
+        assert viewer is not None and viewer.role == AdminRole.VIEWER
+        assert session.scalars(select(AdminRoleAudit)).all() == []
+
+
+def test_local_cli_can_explicitly_provision_branch_owner(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ASSISTANT_BRANCH_CODE", "sucursal-uno")
+    monkeypatch.setenv("ADMIN_AUTH_KEY", AUTH_KEY)
+    monkeypatch.setattr(
+        "backend.app.cli.create_admin_user.getpass.getpass", lambda _prompt: PASSWORD
+    )
+    assert create_admin_main(["--username", "owner", "--role", "owner"]) == 0
+    with sessions() as session:
+        user = session.scalar(select(AdminUser).where(AdminUser.username == "owner"))
+        assert user is not None and user.role == AdminRole.OWNER
+
+
+def test_role_update_rolls_back_if_audit_receipt_cannot_be_written(
+    sessions: sessionmaker[Session], client: TestClient
+) -> None:
+    service = AdminAuthService(sessions, settings=settings())
+    service.create_user("owner", PASSWORD, role=AdminRole.OWNER)
+    service.create_user("viewer", PASSWORD)
+    with sessions() as session:
+        viewer_id = session.scalar(select(AdminUser.id).where(AdminUser.username == "viewer"))
+    assert viewer_id is not None
+    login = client.post(
+        "/api/v1/admin/auth/login", json={"username": "owner", "password": PASSWORD}
+    )
+    assert login.status_code == 200
+
+    def reject_audit(*_args: object) -> None:
+        raise IntegrityError("audit insert", {}, Exception("test-only failure"))
+
+    event.listen(AdminRoleAudit, "before_insert", reject_audit)
+    try:
+        response = client.patch(
+            f"/api/v1/admin/users/{viewer_id}/role",
+            json={"role": "editor"},
+            headers={"X-CSRF-Token": login.json()["csrf_token"]},
+        )
+    finally:
+        event.remove(AdminRoleAudit, "before_insert", reject_audit)
+    assert response.status_code == 503
+    assert "test-only failure" not in response.text
+    with sessions() as session:
+        viewer = session.get(AdminUser, viewer_id)
+        assert viewer is not None and viewer.role == AdminRole.VIEWER
+        assert session.scalars(select(AdminRoleAudit)).all() == []

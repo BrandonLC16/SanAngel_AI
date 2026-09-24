@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.1 — Autenticación backend (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 8; F8.1 completada
+**Subfase activa:** ninguna; F8.2 — RBAC y endpoints admin (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 8; F8.2 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2899,32 +2899,35 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.2 — RBAC y endpoints admin
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de validación:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] roles.
+- [x] roles.
 
-- [ ] dependencias autorización.
+- [x] dependencias autorización.
 
-- [ ] /api/v1/admin.
+- [x] /api/v1/admin.
 
-- [ ] tests 401/403.
+- [x] tests 401/403.
 
-- [ ] permisos por sucursal cuando un usuario no sea global.
+- [x] permisos por sucursal; todos los usuarios actuales son locales, sin rol global.
 
 
 ### Criterios de aceptación
 
-- [ ] backend bloquea privilegios.
+- [x] backend bloquea privilegios.
 
 
 ### Seguridad
 
-- [ ] no confiar en frontend.
+- [x] no confiar en frontend.
 
-- [ ] backend impide CRUD cruzado entre sucursales.
+- [x] backend impide cambios de rol cruzados entre sucursales; no hay otros CRUD admin en F8.2.
 
 
 ### Prompt para Codex
@@ -4331,9 +4334,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F8.1 — Autenticación backend (`✅ COMPLETADO`).
-**Última subfase completada:** F8.1 — Autenticación backend.
-**Siguiente subfase recomendada:** F8.2 — RBAC y endpoints admin (`⬜ PENDIENTE`).
+**Subfase activa:** ninguna; F8.2 — RBAC y endpoints admin (`✅ COMPLETADO`).
+**Última subfase completada:** F8.2 — RBAC y endpoints admin.
+**Siguiente subfase recomendada:** F8.3 — Shell frontend (`⬜ PENDIENTE`).
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4351,6 +4354,9 @@ F7.6 y Fase 7 cerradas el 2026-09-24 tras probar migraciones desde cero y desde 
 F7.1, restaurar un respaldo aislado y documentar el plan operativo; 566 pruebas de la suite completa.
 F8.1 completada el 2026-09-24 tras incorporar credenciales Argon2id, sesión opaca revocable,
 cookie segura, CSRF y limitación persistente de login por cuenta y origen directo; 575 pruebas.
+F8.2 completada el 2026-09-24 con roles locales por sucursal, autorización en dependencias
+backend, endpoints de perfil/usuarios/rol, auditoría transaccional y rechazo 401/403/404;
+581 pruebas.
 
 ---
 
@@ -8097,6 +8103,64 @@ Riesgos/Pendientes:
   validar CSRF en backend.
 
 Siguiente: F8.2 — RBAC y endpoints admin, `⬜ PENDIENTE`; no iniciada.
+
+---
+
+## 2026-09-24 — F8.2 RBAC y endpoints admin
+
+Fase: Fase 8 — Panel administrativo seguro, `🟨 EN_PROGRESO`.
+Subfase: F8.2 — RBAC y endpoints admin, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO`, `🧪 VALIDACION`, `↩️ REABIERTO` por auditoría faltante
+y otra validación completa antes del cierre.
+
+Cambios:
+
+- roles `viewer`, `editor` y `owner` locales por sucursal, con permisos cerrados en backend;
+- migración 0009 que asigna `viewer` a cuentas existentes, restringe roles y crea auditoría;
+- dependencias de sesión, permiso y CSRF para rutas `/api/v1/admin`;
+- perfil, listado de cuentas de la instalación y cambio de rol por propietario para otra cuenta;
+- CLI local permite un `owner` inicial explícito; auditoría transaccional de cambios de rol;
+- pruebas de 401/403/404, aislamiento, migración y rollback cuando falla el recibo.
+
+Archivos: `backend/app/core/admin_roles.py`, `backend/app/core/exceptions.py`,
+`backend/app/db/models/__init__.py`, `backend/app/db/models/admin_user.py`,
+`backend/app/services/admin_auth_service.py`,
+`backend/app/api/admin_authorization.py`, `backend/app/api/routes/admin.py`,
+`backend/app/api/routes/admin_auth.py`, `backend/app/schemas/admin_auth.py`,
+`backend/app/cli/create_admin_user.py`, `backend/app/main.py`, `migrations/env.py`,
+`migrations/versions/20260924_0009_admin_roles.py`, `backend/tests/test_admin_auth.py`,
+`backend/tests/test_migrations.py`, `backend/tests/test_fase_7_recovery.py`,
+`migrations/README.md`, `docs/fase_7_cierre.md`, `docs/fase_8_auth.md`,
+`docs/fase_8_rbac.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_admin_auth.py backend/tests/test_migrations.py backend/tests/test_fase_7_recovery.py -q` → 26 passed;
+- `.venv\Scripts\python.exe -m pytest -q` → 581 passed;
+- `.venv\Scripts\python.exe -m ruff check .` → sin errores;
+- `.venv\Scripts\python.exe -m ruff format --check .` → 146 archivos conformes;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; avisos de normalización LF/CRLF.
+
+Seguridad:
+
+- rol obtenido de SQLite en cada petición, sin confiar en cabeceras ni campos del frontend;
+- cambio de rol exige sesión HTTPS, permiso `owner` y CSRF; la sentencia de escritura revalida
+  al propietario activo y limita el destino a la sucursal de la sesión;
+- usuario de otra sucursal responde 404 y no cambia; un rol retirado deja de autorizar una
+  sesión previamente abierta; respuesta de lista omite hashes y tokens;
+- el cambio y su recibo mínimo se confirman en la misma transacción; un fallo de auditoría
+  revierte el rol y devuelve 503 genérico, probado sin exponer detalles;
+- no existe rol global ni parámetro de sucursal administrable desde estas rutas.
+
+Riesgos/Pendientes:
+
+- las cuentas anteriores quedan como `viewer` y se debe aprovisionar un `owner` local autorizado;
+- definir retención y acceso operativo al historial de roles antes de producción;
+- no existen aún CRUD de productos, precios, FAQ ni sucursales; cada ruta futura debe declarar
+  permiso y probar aislamiento por sucursal y CSRF antes de publicar escritura.
+
+Siguiente: F8.3 — Shell frontend, `⬜ PENDIENTE`; no iniciada.
 
 ---
 
