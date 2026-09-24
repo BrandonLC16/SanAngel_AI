@@ -57,7 +57,8 @@ de solo lectura que valida `.xlsx`, tamaño, paquete,
 sucursal configurada, cabeceras, tipos, duplicados y rangos, y devuelve errores por fila sin
 escribir en la base. F5.3 añade un preview de solo lectura: coteja ID y nombre del producto
 dentro de la sucursal configurada y presenta altas, cambios, precios iguales y errores mediante
-datos mínimos aptos para revisión administrativa. Todavía no hay endpoint de administración.
+datos mínimos aptos para revisión administrativa. El preview/import Excel aún no tiene endpoint
+de administración.
 
 F5.4 incorpora un servicio interno de importación transaccional. Exige un preview revisado y
 confirmación explícita, vuelve a validar archivo y catálogo bajo una transacción, y crea o
@@ -222,7 +223,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las nueve revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las diez revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
@@ -448,8 +449,12 @@ recibo mínimo y transaccional en la base. La
 [guía de RBAC](docs/fase_8_rbac.md) detalla permisos y respuestas 401/403/404.
 
 F8.3 añade el [shell React del panel](frontend/README.md): login, sesión, layout de escritorio,
-cliente API del mismo origen y mensajes de error. Los módulos comerciales se muestran como
-próximos; su implementación pertenece a subfases posteriores.
+cliente API del mismo origen y mensajes de error.
+
+F8.4 agrega [administración comercial](docs/fase_8_commercial.md) de la sucursal configurada,
+productos, precios exactos y FAQ mediante rutas con sesión, RBAC y CSRF. El panel ofrece los
+formularios y listas correspondientes. Cada cambio efectivo deja auditoría transaccional;
+las FAQ administradas sustituyen por pregunta a las del TSV cuando se usa la tool FAQ.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

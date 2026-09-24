@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { AdminApiError, getSession, login, logout, type AdminSession } from './api'
+import { CommercialPanel, type CommercialSection } from './CommercialPanel'
 
 type Notice = { kind: 'error' | 'info'; text: string } | null
 
@@ -34,6 +35,12 @@ export function App() {
   const [checking, setChecking] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+  const [section, setSection] = useState<'overview' | CommercialSection>('overview')
+
+  const handleExpired = useCallback(() => {
+    setSession(null)
+    setNotice({ kind: 'info', text: 'Tu sesión expiró. Inicia sesión de nuevo.' })
+  }, [])
 
   async function refreshSession() {
     setChecking(true)
@@ -176,36 +183,45 @@ export function App() {
     )
   }
 
+  const sections = {
+    overview: 'Resumen',
+    branch: 'Sucursal',
+    products: 'Productos y precios',
+    faqs: 'Preguntas frecuentes',
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand"><span className="brand-mark" aria-hidden="true">SA</span><span>SAN ÁNGEL<small>ADMINISTRACIÓN</small></span></div>
         <nav aria-label="Navegación principal">
           <p className="nav-caption">ESPACIO DE TRABAJO</p>
-          <span className="nav-item nav-active" aria-current="page"><span aria-hidden="true">◧</span>Resumen</span>
+          <button type="button" className={`nav-item ${section === 'overview' ? 'nav-active' : ''}`} aria-current={section === 'overview' ? 'page' : undefined} onClick={() => setSection('overview')}><span aria-hidden="true">◧</span>Resumen</button>
+          <button type="button" className={`nav-item ${section === 'branch' ? 'nav-active' : ''}`} aria-current={section === 'branch' ? 'page' : undefined} onClick={() => setSection('branch')}><span aria-hidden="true">◇</span>Sucursal</button>
+          <button type="button" className={`nav-item ${section === 'products' ? 'nav-active' : ''}`} aria-current={section === 'products' ? 'page' : undefined} onClick={() => setSection('products')}><span aria-hidden="true">▦</span>Productos y precios</button>
+          <button type="button" className={`nav-item ${section === 'faqs' ? 'nav-active' : ''}`} aria-current={section === 'faqs' ? 'page' : undefined} onClick={() => setSection('faqs')}><span aria-hidden="true">▤</span>FAQ</button>
           <p className="nav-caption nav-second">PRÓXIMAMENTE</p>
-          <span className="nav-item nav-disabled"><span aria-hidden="true">▦</span>Catálogo</span>
           <span className="nav-item nav-disabled"><span aria-hidden="true">◇</span>Conversaciones</span>
-          <span className="nav-item nav-disabled"><span aria-hidden="true">▤</span>Preguntas</span>
         </nav>
         <div className="sidebar-footer">Panel de operación<br /><strong>Acceso interno</strong></div>
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <div className="topbar-path">Panel <span>/</span> Resumen</div>
+          <div className="topbar-path">Panel <span>/</span> {sections[section]}</div>
           <div className="topbar-actions">
             <div className="account"><span className="avatar" aria-hidden="true">{session.username.slice(0, 1).toUpperCase()}</span><span><strong>{session.username}</strong><small>{roleNames[session.role]}</small></span></div>
             <button className="logout-button" onClick={() => void submitLogout()} disabled={busy}>Cerrar sesión</button>
           </div>
         </header>
         <main className="dashboard">
-          <div className="page-intro"><span className="section-label">VISTA GENERAL</span><h1>Bienvenido al panel</h1><p>Tu espacio de trabajo para administrar esta instalación.</p></div>
+          <div className="page-intro"><span className="section-label">{section === 'overview' ? 'VISTA GENERAL' : 'DATOS COMERCIALES'}</span><h1>{section === 'overview' ? 'Bienvenido al panel' : sections[section]}</h1><p>{section === 'overview' ? 'Tu espacio de trabajo para administrar esta instalación.' : 'La información se limita a esta instalación.'}</p></div>
           {notice && <div className={`notice notice-${notice.kind}`} role="alert">{notice.text}</div>}
-          <div className="summary-grid">
+          {section === 'overview' ? <><div className="summary-grid">
             <section className="summary-card accent-card"><span className="card-kicker">ESTADO DE ACCESO</span><div className="status-indicator"><span className="status-dot" />Sesión activa</div><p>Estás conectado como <strong>{session.username}</strong>.</p></section>
             <section className="summary-card"><span className="card-kicker">TU PERFIL</span><h2>{roleNames[session.role]}</h2><p>Los permisos de tu cuenta se verifican en el servidor.</p></section>
           </div>
-          <section className="coming-panel"><div className="coming-icon" aria-hidden="true">↗</div><div><span className="card-kicker">SIGUIENTE PASO</span><h2>Más herramientas en camino</h2><p>Las secciones comerciales y de atención se habilitarán conforme se incorporen al panel.</p></div></section>
+          <section className="coming-panel"><div className="coming-icon" aria-hidden="true">↗</div><div><span className="card-kicker">ADMINISTRACIÓN</span><h2>Datos de tu instalación</h2><p>Gestiona sucursal, catálogo, precios y preguntas frecuentes desde el menú.</p></div></section></> :
+            <CommercialPanel section={section} role={session.role} csrfToken={session.csrf_token} onExpired={handleExpired} />}
         </main>
       </div>
     </div>

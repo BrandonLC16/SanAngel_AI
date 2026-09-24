@@ -13,11 +13,21 @@ class AdminPermission(StrEnum):
     PROFILE_READ = "profile:read"
     USERS_READ = "users:read"
     USERS_ROLE_WRITE = "users:role:write"
+    COMMERCIAL_READ = "commercial:read"
+    COMMERCIAL_WRITE = "commercial:write"
+    BRANCH_WRITE = "branch:write"
 
 
 ROLE_PERMISSIONS: dict[AdminRole, frozenset[AdminPermission]] = {
-    AdminRole.VIEWER: frozenset({AdminPermission.PROFILE_READ}),
-    AdminRole.EDITOR: frozenset({AdminPermission.PROFILE_READ, AdminPermission.USERS_READ}),
+    AdminRole.VIEWER: frozenset({AdminPermission.PROFILE_READ, AdminPermission.COMMERCIAL_READ}),
+    AdminRole.EDITOR: frozenset(
+        {
+            AdminPermission.PROFILE_READ,
+            AdminPermission.USERS_READ,
+            AdminPermission.COMMERCIAL_READ,
+            AdminPermission.COMMERCIAL_WRITE,
+        }
+    ),
     AdminRole.OWNER: frozenset(AdminPermission),
 }
 

@@ -21,8 +21,23 @@ MAX_FAQ_RESULTS = 5
 class FAQService:
     """Load one validated snapshot and search it without provider or database access."""
 
-    def __init__(self, source_path: Path, *, branch_scope: BranchScope) -> None:
-        self._records = _load_faq(source_path, branch_scope)
+    def __init__(
+        self,
+        source_path: Path,
+        *,
+        branch_scope: BranchScope,
+        managed_records: tuple[FAQRecord, ...] = (),
+        overridden_questions: frozenset[str] = frozenset(),
+    ) -> None:
+        source_records = _load_faq(source_path, branch_scope)
+        self._records = (
+            tuple(
+                record
+                for record in source_records
+                if normalize_faq_question(record.question) not in overridden_questions
+            )
+            + managed_records
+        )
 
     def search_faq(self, query: str) -> tuple[FAQRecord, ...]:
         """Return ranked matches from this installation, or an empty tuple."""

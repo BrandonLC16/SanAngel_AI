@@ -3,10 +3,16 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { AdminApiError, getSession, login, logout } from './api'
+import { commercialApi } from './commercialApi'
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api')>()
   return { ...actual, getSession: vi.fn(), login: vi.fn(), logout: vi.fn() }
+})
+
+vi.mock('./commercialApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./commercialApi')>()
+  return { ...actual, commercialApi: { ...actual.commercialApi, branch: vi.fn() } }
 })
 
 const validSession = {
@@ -69,6 +75,20 @@ describe('shell del panel', () => {
     await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
     await screen.findByRole('heading', { name: 'Inicia sesión' })
     expect(logout).toHaveBeenCalledWith('test-only-csrf')
+  })
+
+  it('abre la sección de sucursal desde la navegación del panel', async () => {
+    vi.mocked(getSession).mockResolvedValue(validSession)
+    vi.mocked(commercialApi.branch).mockResolvedValue({
+      code: 'sucursal-uno', name: 'Uno', address: 'Dirección',
+      phone: null, business_hours: 'Lunes',
+    })
+    render(<App />)
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { name: 'Bienvenido al panel' })
+    await user.click(screen.getByRole('button', { name: 'Sucursal' }))
+    expect(await screen.findByText('sucursal-uno')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Guardar sucursal' })).toBeTruthy()
   })
 
   it('muestra texto de usuario sin interpretarlo como HTML', async () => {

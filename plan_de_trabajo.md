@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.3 — Shell frontend (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F8.3 cerrada; F8.4 pendiente
+**Subfase activa:** ninguna; F8.4 — CRUD comercial (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F8.4 cerrada; F8.5 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2997,36 +2997,39 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.4 — CRUD comercial
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de validación:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] sucursales.
+- [x] sucursal fija: consulta y actualización de sus datos, sin alterar código ni crear otra.
 
-- [ ] productos.
+- [x] productos.
 
-- [ ] precios.
+- [x] precios.
 
-- [ ] FAQ.
+- [x] FAQ.
 
-- [ ] validación.
+- [x] validación.
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] filtros y autorización de sucursal en backend.
+- [x] filtros y autorización de sucursal en backend.
 
 
 ### Criterios de aceptación
 
-- [ ] datos administrables.
+- [x] datos administrables por API y panel.
 
 
 ### Seguridad
 
-- [ ] audit log en cambios críticos.
+- [x] audit log transaccional en cambios críticos.
 
-- [ ] un operador de tienda no modifica otra tienda.
+- [x] un operador de tienda no modifica otra tienda.
 
 
 ### Prompt para Codex
@@ -4337,9 +4340,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F8.3 — Shell frontend (`✅ COMPLETADO`).
-**Última subfase completada:** F8.3 — Shell frontend.
-**Siguiente subfase recomendada:** F8.4 — CRUD comercial (`⬜ PENDIENTE`).
+**Subfase activa:** ninguna; F8.4 — CRUD comercial (`✅ COMPLETADO`).
+**Última subfase completada:** F8.4 — CRUD comercial.
+**Siguiente subfase recomendada:** F8.5 — UI importación Excel (`⬜ PENDIENTE`).
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4360,7 +4363,10 @@ cookie segura, CSRF y limitación persistente de login por cuenta y origen direc
 F8.2 completada el 2026-09-24 con roles locales por sucursal, autorización en dependencias
 backend, endpoints de perfil/usuarios/rol, auditoría transaccional y rechazo 401/403/404;
 581 pruebas.
-F8.3 completada el 2026-09-24 tras abrir el bundle en navegador de PC, revisar el layout y repetir pruebas, build y lint. F8.4 no se inició.
+F8.3 completada el 2026-09-24 tras abrir el bundle en navegador de PC, revisar el layout y repetir pruebas, build y lint.
+F8.4 completada el 2026-09-24 con CRUD limitado a la sucursal configurada, precios exactos,
+FAQ administradas con superposición al TSV, auditoría transaccional y panel; 588 pruebas Python
+y 15 pruebas frontend aprobadas. F8.5 no se inició.
 
 ---
 
@@ -8267,6 +8273,77 @@ Riesgos/Pendientes:
   credenciales reales, fuera del criterio visual de F8.3.
 
 Siguiente: F8.4 — CRUD comercial, `⬜ PENDIENTE`; no iniciada.
+
+---
+
+## 2026-09-24 — F8.4 CRUD comercial
+
+Fase: Fase 8 — Panel administrativo seguro, `🟨 EN_PROGRESO`.
+Subfase: F8.4 — CRUD comercial, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- rutas y servicio admin para consultar/actualizar la sucursal configurada, gestionar productos,
+  precios actuales por unidad y FAQ; el código de sucursal sigue inmutable y la baja de producto
+  o FAQ es una desactivación recuperable;
+- revisión Alembic `20260924_0010` con FAQ administradas y auditoría comercial transaccional;
+  las FAQ administradas sustituyen la pregunta equivalente del TSV en la tool existente;
+- permisos de lectura para `viewer`, escritura comercial para `editor`/`owner` y datos de sucursal
+  editables solo por `owner`; rutas de escritura con sesión HTTPS y CSRF;
+- panel React con listas y formularios para los cuatro recursos, pruebas y guías actualizadas.
+
+Archivos:
+
+- `backend/app/api/routes/admin_commercial.py`, `backend/app/services/admin_commercial_service.py`,
+  `backend/app/schemas/admin_commercial.py`, `backend/app/db/models/admin_commercial.py`,
+  `backend/app/core/admin_roles.py`, `backend/app/core/exceptions.py`, `backend/app/main.py`,
+  `backend/app/db/models/__init__.py`, `migrations/env.py`,
+  `migrations/versions/20260924_0010_admin_commercial.py`;
+- `backend/app/services/faq_service.py`, `backend/app/services/tool_handlers.py`,
+  `backend/tests/test_admin_commercial.py`, `backend/tests/test_tool_handlers.py`,
+  `backend/tests/test_migrations.py`, `backend/tests/test_fase_7_recovery.py`;
+- `frontend/src/CommercialPanel.tsx`, `frontend/src/commercialApi.ts`, `frontend/src/App.tsx`,
+  `frontend/src/styles.css`, `frontend/src/CommercialPanel.test.tsx`,
+  `frontend/src/commercialApi.test.ts`, `frontend/src/App.test.tsx`;
+- `docs/fase_8_commercial.md`, `docs/fase_7_cierre.md`, `frontend/README.md`,
+  `migrations/README.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest -q` → 588 pruebas aprobadas; una ejecución anterior
+  detectó dos pruebas FAQ con sesión de prueba sin base y se corrigió ese adaptador antes de
+  repetir la suite completa;
+- `.venv\Scripts\python.exe -m ruff check .` → aprobado;
+- `.venv\Scripts\python.exe -m ruff format --check .` → 154 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `npm --prefix frontend run test` → 15 pruebas aprobadas;
+- `npm --prefix frontend run build` → tipos y bundle correctos;
+- `npm --prefix frontend audit --audit-level=high` → 0 vulnerabilidades reportadas;
+- `git diff --check` → sin errores de whitespace (avisos LF/CRLF del entorno);
+- las pruebas de migración ejecutaron `upgrade head`, `check`, recorrido desde la revisión
+  anterior, restricciones y `downgrade` sobre SQLite temporal.
+
+Seguridad:
+
+- la sucursal se obtiene exclusivamente de configuración backend; lecturas y escrituras filtran
+  su ID, rechazan IDs ajenos y vuelven a verificar el rol activo dentro de la transacción;
+- entradas de precio, producto, sucursal y FAQ tienen esquemas cerrados; SQLAlchemy parametriza
+  las consultas; una prueba de texto con sintaxis SQL no ejecuta comandos;
+- los recibos se confirman con el cambio o lo revierten; una FK compuesta rechaza auditoría de
+  precio con producto de otra sucursal; no se guardan FAQ, dirección, teléfono ni tokens en ellos;
+- frontend usa rutas relativas, CSRF en memoria y renderizado de texto de React; la autoridad
+  permanece en backend y CORS conserva la allowlist previa.
+
+Riesgos/Pendientes:
+
+- el TSV sigue siendo necesario para la tool FAQ; un archivo ausente o inválido falla cerrado.
+  El flujo WhatsApp actual aún no invoca esa tool;
+- las listas admin no tienen paginación; revisar el límite operativo si crece el catálogo;
+- antes de migrar una base de instalación con datos se requiere respaldo verificado. Las pruebas
+  usaron solo bases temporales, sin login real ni escrituras sobre datos de una tienda.
+
+Siguiente: F8.5 — UI importación Excel, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

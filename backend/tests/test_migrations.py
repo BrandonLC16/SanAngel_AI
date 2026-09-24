@@ -10,6 +10,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.core.config import get_database_settings
+from backend.app.db.models.admin_commercial import ManagedFAQ
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.message import Message
@@ -29,6 +30,7 @@ CONVERSATION_REVISION = "20260924_0006"
 UNRESOLVED_REVISION = "20260924_0007"
 ADMIN_AUTH_REVISION = "20260924_0008"
 ADMIN_RBAC_REVISION = "20260924_0009"
+ADMIN_COMMERCIAL_REVISION = "20260924_0010"
 
 
 def sqlite_url(path: Path) -> str:
@@ -39,13 +41,14 @@ def alembic_config() -> Config:
     return Config(str(REPOSITORY_ROOT / "alembic.ini"))
 
 
-def test_migration_history_has_reproducible_admin_rbac_head() -> None:
+def test_migration_history_has_reproducible_admin_commercial_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [ADMIN_RBAC_REVISION]
-    assert len(revisions) == 9
+    assert scripts.get_heads() == [ADMIN_COMMERCIAL_REVISION]
+    assert len(revisions) == 10
     assert [revision.revision for revision in revisions] == [
+        ADMIN_COMMERCIAL_REVISION,
         ADMIN_RBAC_REVISION,
         ADMIN_AUTH_REVISION,
         UNRESOLVED_REVISION,
@@ -56,15 +59,16 @@ def test_migration_history_has_reproducible_admin_rbac_head() -> None:
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == ADMIN_AUTH_REVISION
-    assert revisions[1].down_revision == UNRESOLVED_REVISION
-    assert revisions[2].down_revision == CONVERSATION_REVISION
-    assert revisions[3].down_revision == AUDIT_REVISION
-    assert revisions[4].down_revision == PRICE_REVISION
-    assert revisions[5].down_revision == PRODUCT_REVISION
-    assert revisions[6].down_revision == BRANCH_REVISION
-    assert revisions[7].down_revision == INITIAL_REVISION
-    assert revisions[8].down_revision is None
+    assert revisions[0].down_revision == ADMIN_RBAC_REVISION
+    assert revisions[1].down_revision == ADMIN_AUTH_REVISION
+    assert revisions[2].down_revision == UNRESOLVED_REVISION
+    assert revisions[3].down_revision == CONVERSATION_REVISION
+    assert revisions[4].down_revision == AUDIT_REVISION
+    assert revisions[5].down_revision == PRICE_REVISION
+    assert revisions[6].down_revision == PRODUCT_REVISION
+    assert revisions[7].down_revision == BRANCH_REVISION
+    assert revisions[8].down_revision == INITIAL_REVISION
+    assert revisions[9].down_revision is None
 
 
 def test_admin_rbac_upgrade_defaults_existing_users_and_downgrade_restores_schema(
@@ -130,6 +134,73 @@ def test_admin_rbac_upgrade_defaults_existing_users_and_downgrade_restores_schem
         get_database_settings.cache_clear()
 
 
+def test_commercial_migration_preserves_existing_catalog_and_enforces_faq_scope(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    database_url = sqlite_url(tmp_path / "commercial-upgrade.db")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_database_settings.cache_clear()
+    config = alembic_config()
+    try:
+        command.upgrade(config, ADMIN_RBAC_REVISION)
+        engine = create_database_engine(database_url)
+        try:
+            with create_database_session_factory(engine).begin() as session:
+                session.add(
+                    Branch(
+                        code="sucursal-uno",
+                        name="Uno",
+                        address="Dirección",
+                        business_hours="Lunes",
+                    )
+                )
+        finally:
+            engine.dispose()
+        command.upgrade(config, "head")
+        engine = create_database_engine(database_url)
+        try:
+            with create_database_session_factory(engine).begin() as session:
+                branch_id = session.scalar(select(Branch.id))
+                session.add(
+                    ManagedFAQ(
+                        branch_id=branch_id,
+                        category="general",
+                        question="¿Aceptan tarjeta?",
+                        question_key="aceptan tarjeta",
+                        answer="Sí",
+                    )
+                )
+            with pytest.raises(IntegrityError):
+                with create_database_session_factory(engine).begin() as session:
+                    session.add(
+                        ManagedFAQ(
+                            branch_id=branch_id,
+                            category="general",
+                            question="Aceptan tarjeta",
+                            question_key="aceptan tarjeta",
+                            answer="Otra respuesta",
+                        )
+                    )
+            with engine.connect() as connection:
+                assert (
+                    MigrationContext.configure(connection).get_current_revision()
+                    == ADMIN_COMMERCIAL_REVISION
+                )
+                assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
+        finally:
+            engine.dispose()
+        command.downgrade(config, ADMIN_RBAC_REVISION)
+        engine = create_database_engine(database_url)
+        try:
+            with engine.connect() as connection:
+                assert "managed_faqs" not in inspect(connection).get_table_names()
+                assert connection.execute(text("SELECT name FROM branches")).scalar() == "Uno"
+        finally:
+            engine.dispose()
+    finally:
+        get_database_settings.cache_clear()
+
+
 def test_upgrade_head_creates_all_registered_schema(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -184,8 +255,9 @@ def test_upgrade_head_creates_all_registered_schema(
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == ADMIN_RBAC_REVISION
+        assert current_revision == ADMIN_COMMERCIAL_REVISION
         assert table_names == [
+            "admin_commercial_audits",
             "admin_login_throttles",
             "admin_role_audits",
             "admin_sessions",
@@ -193,6 +265,7 @@ def test_upgrade_head_creates_all_registered_schema(
             "alembic_version",
             "branches",
             "conversations",
+            "managed_faqs",
             "messages",
             "price_import_audits",
             "prices",
@@ -488,8 +561,9 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            ADMIN_RBAC_REVISION,
+            ADMIN_COMMERCIAL_REVISION,
             [
+                "admin_commercial_audits",
                 "admin_login_throttles",
                 "admin_role_audits",
                 "admin_sessions",
@@ -497,6 +571,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "alembic_version",
                 "branches",
                 "conversations",
+                "managed_faqs",
                 "messages",
                 "price_import_audits",
                 "prices",
@@ -537,7 +612,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == ADMIN_RBAC_REVISION
+        assert snapshot()[0] == ADMIN_COMMERCIAL_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -551,8 +626,9 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            ADMIN_RBAC_REVISION,
+            ADMIN_COMMERCIAL_REVISION,
             [
+                "admin_commercial_audits",
                 "admin_login_throttles",
                 "admin_role_audits",
                 "admin_sessions",
@@ -560,6 +636,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "alembic_version",
                 "branches",
                 "conversations",
+                "managed_faqs",
                 "messages",
                 "price_import_audits",
                 "prices",

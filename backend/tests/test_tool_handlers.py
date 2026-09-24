@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.core.config import AssistantSettings, get_database_settings
 from backend.app.core.exceptions import FAQSourceError
+from backend.app.db.models.admin_commercial import ManagedFAQ
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.repositories.price_repository import PriceRepository
@@ -186,6 +187,48 @@ def test_foreign_faq_source_fails_closed(
         handlers = make_handlers(session, faq_path)
         with pytest.raises(FAQSourceError):
             handlers.search_faq(make_call("search_faq", {"query": "Pregunta ajena?"}))
+
+
+def test_managed_faq_overrides_tsv_without_reading_other_branch(
+    session_factory: sessionmaker[Session], tmp_path: Path
+) -> None:
+    faq_path = write_faq(
+        tmp_path / "faq.tsv",
+        [("sucursal-uno", "¿Aceptan tarjeta?", "Respuesta anterior")],
+    )
+    with session_factory.begin() as session:
+        own = create_branch(session, "sucursal-uno", "Uno")
+        foreign = create_branch(session, "sucursal-dos", "Dos")
+        session.add_all(
+            [
+                ManagedFAQ(
+                    branch_id=own.id,
+                    category="pagos",
+                    question="¿Aceptan tarjeta?",
+                    question_key="aceptan tarjeta",
+                    answer="Respuesta administrada",
+                ),
+                ManagedFAQ(
+                    branch_id=foreign.id,
+                    category="pagos",
+                    question="¿Aceptan vales?",
+                    question_key="aceptan vales",
+                    answer="Secreto ajeno",
+                ),
+            ]
+        )
+        session.flush()
+        handlers = make_handlers(session, faq_path)
+        answer = handlers.search_faq(make_call("search_faq", {"query": "¿Aceptan tarjeta?"}))
+        foreign_answer = handlers.search_faq(make_call("search_faq", {"query": "¿Aceptan vales?"}))
+        assert isinstance(answer, FAQAnswer)
+        assert answer.text == "Respuesta administrada"
+        assert isinstance(foreign_answer, FAQFallback)
+        own_faq = session.query(ManagedFAQ).filter_by(branch_id=own.id).one()
+        own_faq.is_active = False
+        session.flush()
+        disabled = handlers.search_faq(make_call("search_faq", {"query": "¿Aceptan tarjeta?"}))
+        assert isinstance(disabled, FAQFallback)
 
 
 def test_handlers_reject_other_scope_and_wrong_tool_before_access(

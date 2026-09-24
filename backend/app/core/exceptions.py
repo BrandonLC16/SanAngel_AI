@@ -27,6 +27,18 @@ class AdminUserNotFoundError(ApplicationError):
     status_code = 404
 
 
+class AdminCommercialNotFoundError(ApplicationError):
+    error_code = "admin_commercial_not_found"
+    public_message = "No se encontró el registro."
+    status_code = 404
+
+
+class AdminCommercialConflictError(ApplicationError):
+    error_code = "admin_commercial_conflict"
+    public_message = "El registro ya existe o no puede modificarse."
+    status_code = 409
+
+
 class AdminRateLimitError(ApplicationError):
     error_code = "admin_login_limited"
     public_message = "Demasiados intentos. Inténtalo más tarde."

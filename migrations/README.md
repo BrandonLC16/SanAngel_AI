@@ -34,6 +34,10 @@ las sesiones y credenciales pertenecen a la sucursal configurada.
 `20260924_0009` agrega el rol restringido a `viewer`, `editor` u `owner` y
 `admin_role_audits` para cambios de rol. Las cuentas existentes reciben `viewer` por defecto y
 la migración conserva las filas previas.
+`20260924_0010` agrega `managed_faqs` y `admin_commercial_audits` para el CRUD comercial.
+Las FAQ tienen alcance y clave normalizada únicos por sucursal; los recibos guardan metadatos
+mínimos y, para precios, producto, unidad e importes anterior/nuevo, sin texto FAQ ni datos de
+contacto.
 
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`

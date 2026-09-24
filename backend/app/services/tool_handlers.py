@@ -5,10 +5,15 @@ from pathlib import Path
 from typing import Literal, TypeVar
 
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.exc import UnboundExecutionError
 from sqlalchemy.orm import Session
 
 from backend.app.core.exceptions import ProductNotFoundError, ProductPriceNotFoundError
+from backend.app.db.models.admin_commercial import ManagedFAQ
+from backend.app.db.models.branch import Branch
 from backend.app.schemas.commercial import BranchInfo, ProductPriceInfo
+from backend.app.schemas.faq import FAQCategory
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.commercial_query_service import CommercialQueryService
 from backend.app.services.faq_response_policy import (
@@ -19,6 +24,7 @@ from backend.app.services.faq_response_policy import (
     HumanHelpReason,
     request_human_help,
 )
+from backend.app.services.faq_scope import FAQRecord
 from backend.app.services.faq_service import FAQService
 from backend.app.services.tool_contracts import (
     GetBranchInfoArguments,
@@ -69,7 +75,31 @@ class ToolHandlers:
 
     def search_faq(self, call: ValidatedToolCall) -> FAQAnswer | FAQFallback:
         args = self._arguments(call, "search_faq", SearchFAQArguments)
-        service = FAQService(self._faq_source_path, branch_scope=self._branch_scope)
+        try:
+            self._session.get_bind(mapper=ManagedFAQ)
+        except UnboundExecutionError:
+            managed = ()
+        else:
+            managed = self._session.scalars(
+                select(ManagedFAQ)
+                .join(Branch, Branch.id == ManagedFAQ.branch_id)
+                .where(Branch.code == self._branch_scope.branch_code, Branch.is_active.is_(True))
+            ).all()
+        service = FAQService(
+            self._faq_source_path,
+            branch_scope=self._branch_scope,
+            managed_records=tuple(
+                FAQRecord(
+                    branch_code=self._branch_scope.branch_code,
+                    category=FAQCategory(row.category),
+                    question=row.question,
+                    answer=row.answer,
+                )
+                for row in managed
+                if row.is_active
+            ),
+            overridden_questions=frozenset(row.question_key for row in managed),
+        )
         return FAQResponsePolicy(service).resolve(args.query)
 
     def request_human_help(self, call: ValidatedToolCall) -> HumanHelpProposal:

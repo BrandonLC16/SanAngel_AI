@@ -1,8 +1,9 @@
 # F8.3 — Shell administrativo
 
 Shell React + TypeScript con Vite para escritorio. Incluye login, recuperación de sesión,
-layout, cierre de sesión y estados de error. Las secciones comerciales solo aparecen como
-próximas: sus CRUD pertenecen a subfases posteriores.
+layout, cierre de sesión y estados de error. F8.4 incorpora listas y formularios de la
+sucursal configurada, productos, precios y FAQ. El backend aplica RBAC, CSRF y alcance de
+sucursal; los permisos visuales del panel solo facilitan el uso.
 
 ## Preparación y validación
 
