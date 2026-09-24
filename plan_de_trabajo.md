@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.2 — RBAC y endpoints admin (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 8; F8.2 completada
+**Subfase activa:** ninguna; F8.3 — Shell frontend (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F8.3 cerrada; F8.4 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2948,32 +2948,35 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.3 — Shell frontend
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de validación:** 2026-09-24
+**Validación visual:** el bundle de producción abrió en el navegador de escritorio integrado el 2026-09-24 (914 × 694 px); se verificaron layout de dos columnas, login, aviso HTTPS, pie de página y ausencia de desbordamiento horizontal o errores de consola.
 
 
 ### Alcance
 
-- [ ] React/Next.js.
+- [x] React/Next.js.
 
-- [ ] login UI.
+- [x] login UI.
 
-- [ ] layout.
+- [x] layout.
 
-- [ ] cliente API.
+- [x] cliente API.
 
-- [ ] error states.
+- [x] error states.
 
 
 ### Criterios de aceptación
 
-- [ ] panel abre en PC.
+- [x] panel abre en PC: comprobado visualmente en navegador de escritorio con el bundle de producción.
 
 
 ### Seguridad
 
-- [ ] sin secrets.
+- [x] sin secrets.
 
-- [ ] XSS/CORS.
+- [x] XSS/CORS.
 
 
 ### Prompt para Codex
@@ -4334,9 +4337,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F8.2 — RBAC y endpoints admin (`✅ COMPLETADO`).
-**Última subfase completada:** F8.2 — RBAC y endpoints admin.
-**Siguiente subfase recomendada:** F8.3 — Shell frontend (`⬜ PENDIENTE`).
+**Subfase activa:** ninguna; F8.3 — Shell frontend (`✅ COMPLETADO`).
+**Última subfase completada:** F8.3 — Shell frontend.
+**Siguiente subfase recomendada:** F8.4 — CRUD comercial (`⬜ PENDIENTE`).
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4357,6 +4360,7 @@ cookie segura, CSRF y limitación persistente de login por cuenta y origen direc
 F8.2 completada el 2026-09-24 con roles locales por sucursal, autorización en dependencias
 backend, endpoints de perfil/usuarios/rol, auditoría transaccional y rechazo 401/403/404;
 581 pruebas.
+F8.3 completada el 2026-09-24 tras abrir el bundle en navegador de PC, revisar el layout y repetir pruebas, build y lint. F8.4 no se inició.
 
 ---
 
@@ -8161,6 +8165,108 @@ Riesgos/Pendientes:
   permiso y probar aislamiento por sucursal y CSRF antes de publicar escritura.
 
 Siguiente: F8.3 — Shell frontend, `⬜ PENDIENTE`; no iniciada.
+
+---
+
+## 2026-09-24 — F8.3 Shell frontend
+
+Fase: Fase 8 — Panel administrativo seguro, `🟨 EN_PROGRESO`.
+Subfase: F8.3 — Shell frontend, `⛔ BLOQUEADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION`; no se cerró por faltar la
+comprobación visual del criterio «panel abre en PC».
+
+Cambios:
+
+- shell React, TypeScript y Vite con pantalla de login y layout de escritorio adaptable;
+- cliente de API de origen relativo para sesión, login y logout; errores fijos y reintento;
+- pruebas de UI, cliente, CSRF, HTTP inseguro, errores y renderizado de texto no confiable;
+- instrucciones de ejecución y despliegue local en `frontend/README.md` y README raíz.
+
+Archivos:
+
+- `frontend/package.json`, `frontend/package-lock.json`, `frontend/tsconfig.json`,
+  `frontend/vite.config.js`, `frontend/index.html`;
+- `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/api.ts`,
+  `frontend/src/styles.css`, `frontend/src/App.test.tsx`,
+  `frontend/src/App.insecure.test.tsx`, `frontend/src/api.test.ts`;
+- `frontend/README.md`, `README.md`, `.gitignore`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `npm --prefix frontend run test`: 9 pruebas aprobadas;
+- `npm --prefix frontend run build`: tipos y bundle correctos;
+- `npm --prefix frontend audit --audit-level=high`: 0 vulnerabilidades reportadas;
+- `.venv\Scripts\python.exe -m pytest -q`: 581 pruebas aprobadas;
+- `.venv\Scripts\python.exe -m ruff check .`: aprobado;
+- `.venv\Scripts\python.exe -m ruff format --check .`: 147 archivos con formato correcto;
+- `.venv\Scripts\python.exe -m pip check`: dependencias coherentes;
+- `git diff --check`: aprobado;
+- servidor Vite y preview de producción: HTML, JS y CSS devolvieron HTTP 200;
+  la captura headless local no mostró el panel y no equivale a comprobación visual.
+
+Seguridad:
+
+- sin credenciales en el bundle; cookie y CSRF según contrato del backend, sin almacenamiento
+  persistente de tokens en el cliente ni URLs con secretos;
+- React muestra texto no confiable sin HTML dinámico; errores no presentan el cuerpo del servidor;
+- rutas `/api` del mismo origen, proxy TLS estricto; login deshabilitado en HTTP;
+  el backend conserva la autorización y allowlist CORS.
+
+Riesgos/Pendientes:
+
+- el navegador conectado no estuvo disponible y Chrome headless produjo captura en blanco; por
+  ello falta abrir el panel en navegador de PC y comprobar su layout real antes del cierre;
+- la revisión automática rechazó esperar el proceso de Chrome con `Start-Process -Wait` y limpiar
+  los artefactos temporales con `Remove-Item`; indicó solo «blocked by policy». Los artefactos
+  locales de QA quedan ignorados por Git;
+- el login real requiere certificados locales confiables y backend HTTPS; no se probó con
+  credenciales reales en esta subfase.
+
+Siguiente: completar la comprobación visual de F8.3 y repetir validación si se corrige algo;
+solo después recomendar F8.4 — CRUD comercial, aún `⬜ PENDIENTE`.
+
+---
+
+## 2026-09-24 — Cierre F8.3 por validación visual
+
+Fase: Fase 8 — Panel administrativo seguro, `🟨 EN_PROGRESO`.
+Subfase: F8.3 — Shell frontend, `✅ COMPLETADO`.
+Estado: `⛔ BLOQUEADO` → `🧪 VALIDACION` → `✅ COMPLETADO` tras verificar el criterio pendiente.
+
+Cambios:
+
+- se abrió el bundle de producción en navegador de escritorio (914 × 694 px) y se comprobó
+  visualmente la pantalla de acceso, el layout de dos columnas, el aviso HTTPS y el pie de página;
+- sin desbordamiento horizontal ni errores de consola; el formulario quedó deshabilitado por HTTP,
+  como exige la política de seguridad del shell;
+- se cerró el criterio «panel abre en PC» y se actualizó este checkpoint; no hubo cambios de código.
+
+Archivos:
+
+- `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `npm run test` en `frontend/`: 9 pruebas aprobadas;
+- `npm run build` en `frontend/`: tipos y bundle correctos;
+- `.venv\Scripts\python.exe -m pytest -q`: 581 pruebas aprobadas (advertencia de caché por
+  permisos del entorno aislado);
+- `.venv\Scripts\python.exe -m ruff check .`: aprobado;
+- `.venv\Scripts\python.exe -m ruff format --check .`: 147 archivos correctos;
+- `git diff --check`: aprobado.
+
+Seguridad:
+
+- revisión de `frontend/src/api.ts`, `frontend/src/App.tsx` y `frontend/vite.config.js`: rutas
+  relativas, cookies del mismo origen, token CSRF en memoria, errores fijos y validación TLS;
+- sin credenciales reales ni prueba de login en HTTP.
+
+Riesgos/Pendientes:
+
+- el login con backend real requiere HTTPS y certificados confiables; sigue sin probarse con
+  credenciales reales, fuera del criterio visual de F8.3.
+
+Siguiente: F8.4 — CRUD comercial, `⬜ PENDIENTE`; no iniciada.
 
 ---
 

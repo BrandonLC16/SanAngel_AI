@@ -32,6 +32,13 @@ build/
 dist/
 *.egg-info/
 
+# Frontend build and local tooling
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.chrome-qa*/
+frontend/.qa-login*.png
+
 # Logs
 *.log
 

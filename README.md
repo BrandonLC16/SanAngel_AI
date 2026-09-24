@@ -447,6 +447,10 @@ inicial debe aprovisionarse localmente con `--role owner`. Cada cambio efectivo 
 recibo mínimo y transaccional en la base. La
 [guía de RBAC](docs/fase_8_rbac.md) detalla permisos y respuestas 401/403/404.
 
+F8.3 añade el [shell React del panel](frontend/README.md): login, sesión, layout de escritorio,
+cliente API del mismo origen y mensajes de error. Los módulos comerciales se muestran como
+próximos; su implementación pertenece a subfases posteriores.
+
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
 reintentos automáticos. Este mecanismo tampoco es una cola durable: una caída después del ACK
