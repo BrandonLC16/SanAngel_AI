@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-09-23
+**Última actualización:** 2026-09-24
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F6.4 — Loop Responses API + tool calls (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.4 completada
+**Subfase activa:** ninguna; F6.6 — Pruebas de seguridad de tools (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 6; F6.6 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2468,30 +2468,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F6.6 — Pruebas de seguridad de tools
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] prompt injection.
+- [x] prompt injection.
 
-- [ ] tool inexistente.
+- [x] tool inexistente.
 
-- [ ] args inválidos.
+- [x] args inválidos.
 
-- [ ] SQL injection.
+- [x] SQL injection.
 
-- [ ] exfiltración.
+- [x] exfiltración.
 
 
 ### Criterios de aceptación
 
-- [ ] modelo no amplía privilegios.
+- [x] modelo no amplía privilegios.
 
 
 ### Seguridad
 
-- [ ] auditar tool name/result status sin datos excesivos.
+- [x] auditar tool name/result status sin datos excesivos.
 
 
 ### Prompt para Codex
@@ -4308,9 +4310,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 6 — OpenAI tool calling para datos exactos (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F6.5 — Desambiguación de producto con sucursal fija (`✅ COMPLETADO`).
-**Última subfase completada:** F6.5 — Desambiguación de producto con sucursal fija.
-**Siguiente subfase recomendada:** F6.6 — Pruebas de seguridad de tools, `⬜ PENDIENTE`;
+**Subfase activa:** ninguna; F6.6 — Pruebas de seguridad de tools (`✅ COMPLETADO`).
+**Última subfase completada:** F6.6 — Pruebas de seguridad de tools.
+**Siguiente subfase recomendada:** F6.7 — Cierre Fase 6, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4318,8 +4320,8 @@ no iniciada.
 **Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
 comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
-F6.5 completada el 2026-09-23 tras cinco pruebas nuevas y 507 pruebas de la suite completa;
-F6.6 sigue pendiente y no se inició.
+F6.6 completada el 2026-09-24 tras pruebas adversariales del loop y dispatcher, auditoría mínima
+de tools y 517 pruebas de la suite completa; F6.7 sigue pendiente y no se inició.
 
 ---
 
@@ -7574,6 +7576,61 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F6.6 — Pruebas de seguridad de tools, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F6.6 Pruebas de seguridad de tools
+
+Fase: Fase 6 — OpenAI tool calling para datos exactos, `🟨 EN_PROGRESO`.
+Subfase: F6.6 — Pruebas de seguridad de tools, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- pruebas adversariales offline del loop y dispatcher: prompt injection del cliente y de FAQ,
+  nombres inexistentes, argumentos inválidos, SQL como argumento y texto de búsqueda, y destino
+  de exfiltración; el modelo no puede ampliar la allowlist ni cambiar la sucursal backend;
+- auditoría mínima del dispatcher con nombre permitido o `unsupported` y estado fijo por intento;
+  no incluye argumentos, resultados ni detalles de excepciones;
+- guía de Fase 6 actualizada con cobertura y límites de las pruebas.
+
+Archivos: `backend/app/core/logging.py`, `backend/app/services/tool_dispatcher.py`,
+`backend/tests/test_openai_tool_loop.py`, `backend/tests/test_tool_dispatcher.py`,
+`docs/fase_6_tools.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `git status --short` inicial: limpio; final: solo los seis archivos anteriores modificados;
+- `.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_tool_contracts.py backend/tests/test_tool_dispatcher.py backend/tests/test_openai_tool_loop.py`: 89 passed;
+- `.\.venv\Scripts\python.exe -m pytest`: 517 passed;
+- `.\.venv\Scripts\ruff.exe check .`: sin errores;
+- `.\.venv\Scripts\ruff.exe format --check .`: 113 archivos formateados;
+- `.\.venv\Scripts\python.exe -m pip check`: sin dependencias rotas;
+- `git diff --check`: sin errores de whitespace; avisos de conversión LF/CRLF.
+
+Seguridad:
+
+- un nombre desconocido se rechaza antes de abrir sesión y se audita como `unsupported` para
+  evitar inyección en logs; los argumentos extra, SQL en `product_id`, selección de sucursal,
+  destino URL y datos personales adicionales se rechazan antes del handler;
+- texto SQL en una consulta FAQ se trata como dato y produce fallback; la respuesta FAQ maliciosa
+  conserva `trust_level="untrusted_source"` y no concede acceso a `read_env`;
+- los tests usan proveedor simulado, guardia de red y placeholders sin credenciales reales; se
+  comprueba que el marcador de secreto no llegue a las llamadas simuladas y que el log de auditoría
+  omita nombres hostiles, argumentos, texto SQL y detalles de excepciones.
+
+Riesgos/Pendientes:
+
+- las pruebas demuestran los límites de privilegios del backend; no demuestran que un modelo real
+  nunca genere una afirmación comercial no respaldada en el texto final;
+- el loop de tools aún no está conectado al canal WhatsApp ni al endpoint interno; la integración
+  necesita configurar la fuente FAQ y validar el texto final antes de ofrecerlo al cliente;
+- el estado auditado corresponde al handler; un fallo posterior al serializar su resultado no
+  cambia esa línea de auditoría.
+
+Siguiente:
+
+- F6.7 — Cierre Fase 6, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

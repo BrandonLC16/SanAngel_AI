@@ -1,4 +1,4 @@
-# Fase 6 — Tools y desambiguación de producto (F6.1–F6.5)
+# Fase 6 — Tools y desambiguación de producto (F6.1–F6.6)
 
 F6.1 define cuatro funciones para Responses API. Sigue sin conectar OpenAI a los servicios de
 negocio ni ejecutar tool calls. Los schemas usan `type: "function"`, `strict: true`, un objeto
@@ -106,3 +106,23 @@ cliente aclare el producto. Solo después de identificarlo se puede consultar el
 Este servicio es determinista y se prueba sin modelo ni red. No agrega una quinta tool a la
 allowlist de F6.1–F6.4. La extracción del término de producto y su composición con el flujo de
 WhatsApp siguen pendientes; el código actual no afirma resolver automáticamente un mensaje libre.
+
+## F6.6 — Pruebas de seguridad y auditoría mínima
+
+Las pruebas offline cubren instrucciones hostiles en el mensaje del cliente y en una respuesta
+FAQ, llamadas a tools inexistentes, argumentos extra o malformados, texto SQL en argumentos y
+destinos de exfiltración. Una solicitud del modelo no puede agregar una tool, cambiar la sucursal
+configurada, ejecutar SQL libre ni convertir `request_human_help` en una acción ejecutada.
+La FAQ conserva `trust_level="untrusted_source"` al volver al modelo.
+
+`ToolDispatcher` registra una línea por intento con únicamente `tool=<nombre permitido|unsupported>`
+y `status=<ok|not_found|fallback|proposed|rejected|timeout|error>`. Un nombre desconocido se
+registra como `unsupported` para evitar inyección en logs. No registra argumentos, resultados,
+identificadores de cliente, texto FAQ, direcciones, importes, secretos ni detalles de excepciones.
+El registro describe el resultado del handler; un fallo posterior al serializar la respuesta no
+se registra como resultado del handler.
+
+Estas pruebas demuestran el límite de privilegios del backend con un proveedor simulado. No
+demuestran que un modelo real nunca redacte una afirmación comercial no respaldada en su texto
+final. Antes de conectar este loop al canal del cliente, la integración debe tratar ese riesgo
+por separado y comprobar el comportamiento con casos representativos.

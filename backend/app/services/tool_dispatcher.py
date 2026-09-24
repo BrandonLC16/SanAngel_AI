@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import AssistantSettings
 from backend.app.core.exceptions import ToolExecutionTimeoutError
+from backend.app.core.logging import tool_audit_logger
 from backend.app.schemas.commercial import BranchInfo, ProductPriceInfo
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.faq_response_policy import FAQAnswer, FAQFallback, HumanHelpProposal
@@ -89,23 +90,47 @@ class ToolDispatcher:
         """Reject unknown names before parsing, with no dynamic attribute or SQL execution."""
 
         method = _HANDLERS.get(name) if isinstance(name, str) else None
-        if method is None:
-            raise ToolCallValidationError("unsupported tool")
-        call = validate_tool_call(name, arguments_json, assistant_settings=self._assistant_settings)
-        deadline = monotonic() + self._timeout_seconds
-        if not _WORKER_SLOTS.acquire(timeout=self._timeout_seconds):
-            raise ToolExecutionTimeoutError() from None
+        audit_name = name if method is not None else "unsupported"
         try:
-            future = _WORKERS.submit(self._execute, method, call)
-        except RuntimeError:
-            _WORKER_SLOTS.release()
-            raise ToolExecutionTimeoutError() from None
-        future.add_done_callback(_release_slot)
-        try:
-            return future.result(timeout=max(0.0, deadline - monotonic()))
-        except FutureTimeoutError:
-            future.cancel()
-            raise ToolExecutionTimeoutError() from None
+            if method is None:
+                raise ToolCallValidationError("unsupported tool")
+            call = validate_tool_call(
+                name, arguments_json, assistant_settings=self._assistant_settings
+            )
+            deadline = monotonic() + self._timeout_seconds
+            if not _WORKER_SLOTS.acquire(timeout=self._timeout_seconds):
+                raise ToolExecutionTimeoutError() from None
+            try:
+                future = _WORKERS.submit(self._execute, method, call)
+            except RuntimeError:
+                _WORKER_SLOTS.release()
+                raise ToolExecutionTimeoutError() from None
+            future.add_done_callback(_release_slot)
+            try:
+                result = future.result(timeout=max(0.0, deadline - monotonic()))
+            except FutureTimeoutError:
+                future.cancel()
+                raise ToolExecutionTimeoutError() from None
+        except ToolCallValidationError:
+            tool_audit_logger.info("tool=%s status=rejected", audit_name)
+            raise
+        except ToolExecutionTimeoutError:
+            tool_audit_logger.info("tool=%s status=timeout", audit_name)
+            raise
+        except Exception:
+            tool_audit_logger.info("tool=%s status=error", audit_name)
+            raise
+        status = (
+            "not_found"
+            if isinstance(result, ProductPriceNotFoundResult)
+            else "fallback"
+            if isinstance(result, FAQFallback)
+            else "proposed"
+            if isinstance(result, HumanHelpProposal)
+            else "ok"
+        )
+        tool_audit_logger.info("tool=%s status=%s", audit_name, status)
+        return result
 
     def _execute(self, method: HandlerMethod, call: ValidatedToolCall) -> ToolResult:
         with self._session_factory() as session:
