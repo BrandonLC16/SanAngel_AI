@@ -18,7 +18,7 @@ Meta Cloud API a GreenAPI dentro de F2.9. Ya están implementados y probados sin
 - normalización de mensajes de texto, texto extendido y texto citado;
 - cliente saliente de GreenAPI;
 - flujo WhatsApp -> chatbot -> WhatsApp;
-- idempotencia temporal en memoria;
+- idempotencia persistente por sucursal en F7.3;
 - ACK separado del procesamiento externo mediante `BackgroundTasks`.
 
 F2.9 está `✅ COMPLETADO`: la instancia real quedó autorizada, el webhook registrado y el
@@ -388,14 +388,19 @@ resultado ambiguo.
 Cada mensaje aceptado pasa a `MessageOrchestrator`, que consulta el servicio de chat y envía la
 respuesta con `WhatsAppClient`. La ruta no conoce OpenAI ni detalles del envío de GreenAPI.
 
-F2.7 reclama temporal y atómicamente `provider:external_message_id` antes de invocar el chatbot.
-Un ID ya reclamado o completado recibe ACK sin otra respuesta. La implementación
-`InMemoryIdempotencyStore` guarda como máximo 10000 IDs por proceso y no almacena texto ni
-remitentes.
+F7.3 usa `PersistentIdempotencyStore` en el flujo real. Reserva el `idMessage` entrante en
+`whatsapp_event_receipts` con una inserción atómica y una restricción única por sucursal. Otra
+entrega del mismo ID recibe ACK sin generar otra respuesta, incluso con varios procesos o después
+de reiniciar. Cada reserva, liberación previa al envío y finalización se confirma en una
+transacción SQLite independiente. El servicio de identidad de F7.2 queda conectado después de la
+reserva y antes de consultar al chatbot; una carrera del mismo remitente crea una sola
+conversación.
 
-Esta idempotencia no es apta para producción: se pierde al reiniciar, no se comparte entre
-procesos y puede volver a aceptar IDs desalojados. Debe sustituirse por almacenamiento persistente
-y coordinado antes del despliegue.
+Si falla el chatbot antes de enviar, se libera la reserva para permitir un intento posterior. Si
+se inició un envío o falló la confirmación del recibo después de enviarlo, la reserva se conserva:
+un reintento automático podría duplicar la respuesta. El estado `claimed` requiere conciliación
+operativa antes de cualquier reenvío. La base y GreenAPI no comparten una transacción, por lo que
+este control evita duplicados automáticos, pero no garantiza entrega exactamente una vez.
 
 F7.1 agrega las tablas `conversations`, `messages` y `whatsapp_event_receipts` mediante Alembic.
 La conversación queda ligada a una sucursal y al canal `whatsapp`; su identidad externa es una
@@ -412,9 +417,8 @@ estado, sin número, clave opaca ni texto. Configure una clave independiente, al
 32 a 256 caracteres por instalación y manténgala estable: rotarla sin migrar claves existentes
 inicia una identidad de conversación nueva para cada remitente.
 
-El servicio de F7.2 aún no está conectado al procesamiento del webhook: esa integración y los
-recibos persistentes quedan para F7.3. Antes de guardar contenido conversacional o habilitar
-producción se necesita la política de retención y borrado de F7.4.
+Antes de guardar contenido conversacional o habilitar producción se necesita la política de
+retención y borrado de F7.4.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
@@ -468,9 +472,10 @@ Los placeholders de prueba no son credenciales reales.
 - Un token local que no cumpla la longitud y formato requeridos produce un fallo cerrado; se debe
   rotar el mismo valor en `.env` y en `webhookUrlToken` de GreenAPI antes de reiniciar.
 - CORS usa orígenes explícitos y nunca `*`.
-- La Fase 2 valida el MVP y no declara el sistema production-ready. Antes de producción faltan,
-  entre otros controles, idempotencia persistente, cola durable, HTTPS estable, rate limiting,
-  secret manager, rotación operativa de secretos y observabilidad.
+- La Fase 2 valida el MVP y no declara el sistema production-ready. F7.3 ya persiste recibos;
+  antes de producción faltan, entre otros controles, conciliación de reservas ambiguas, cola
+  durable, HTTPS estable, rate limiting, secret manager, rotación operativa de secretos y
+  observabilidad.
 - El backend y el túnel temporal están detenidos; la URL `trycloudflare.com` usada en F2.9 ya no
   es válida.
 

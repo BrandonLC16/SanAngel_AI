@@ -1,6 +1,7 @@
 """Conversation persistence constrained to one backend-resolved branch."""
 
 from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.branch import Branch
@@ -13,6 +14,15 @@ class ConversationRepository:
         self._branch = branch
 
     def get_or_create(self, external_user_key: str) -> tuple[Conversation, bool]:
+        result = self._session.execute(
+            insert(Conversation)
+            .values(
+                branch_id=self._branch.id,
+                channel="whatsapp",
+                external_user_key=external_user_key,
+            )
+            .on_conflict_do_nothing(index_elements=["branch_id", "channel", "external_user_key"])
+        )
         conversation = self._session.scalar(
             select(Conversation).where(
                 Conversation.branch_id == self._branch.id,
@@ -20,14 +30,5 @@ class ConversationRepository:
                 Conversation.external_user_key == external_user_key,
             )
         )
-        if conversation is not None:
-            return conversation, False
-
-        conversation = Conversation(
-            branch_id=self._branch.id,
-            channel="whatsapp",
-            external_user_key=external_user_key,
-        )
-        self._session.add(conversation)
-        self._session.flush()
-        return conversation, True
+        assert conversation is not None
+        return conversation, result.rowcount == 1

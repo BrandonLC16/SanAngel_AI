@@ -1,13 +1,16 @@
 """Derive conversation context only from normalized sender and installation settings."""
 
+import asyncio
 import hashlib
 import hmac
 import logging
 from dataclasses import dataclass
 
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.core.config import ConversationIdentitySettings
+from backend.app.core.exceptions import ServiceUnavailableError
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.repositories.conversation_repository import ConversationRepository
 from backend.app.schemas.whatsapp import InboundMessage
@@ -51,3 +54,28 @@ class ConversationIdentityService:
             "created" if created else "existing",
         )
         return ConversationContext(conversation.id, branch.id, self._scope.branch_code)
+
+
+class PersistentConversationContextResolver:
+    """Commit conversation identity before invoking external response providers."""
+
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        *,
+        settings: ConversationIdentitySettings,
+    ) -> None:
+        self._session_factory = session_factory
+        self._settings = settings
+
+    async def resolve(self, message: InboundMessage) -> ConversationContext:
+        return await asyncio.to_thread(self._resolve, message)
+
+    def _resolve(self, message: InboundMessage) -> ConversationContext:
+        try:
+            with self._session_factory.begin() as session:
+                return ConversationIdentityService(session, settings=self._settings).resolve(
+                    message
+                )
+        except SQLAlchemyError:
+            raise ServiceUnavailableError("conversation identity persistence failed") from None

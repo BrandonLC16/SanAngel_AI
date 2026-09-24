@@ -1,14 +1,21 @@
 import asyncio
+from pathlib import Path
 
 import pytest
+from sqlalchemy import select
 
 from backend.app.api import dependencies
-from backend.app.core.config import Settings
+from backend.app.core.config import ConversationIdentitySettings, Settings
 from backend.app.core.exceptions import (
     AIProviderRateLimitError,
     MessageProcessingError,
     WhatsAppProviderTimeoutError,
 )
+from backend.app.db.base import Base
+from backend.app.db.models.branch import Branch
+from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
+from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.schemas.whatsapp import InboundMessage
 from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
@@ -87,6 +94,7 @@ def test_process_message_connects_normalized_input_answer_and_sender() -> None:
 
 def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     settings = Settings(
         assistant_branch_code="sucursal-demo",
@@ -96,7 +104,18 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
         _env_file=None,
     )
     chat_service = FakeChatResponder(answer="Respuesta conectada")
-    idempotency_store = InMemoryIdempotencyStore()
+    engine = create_database_engine(f"sqlite+pysqlite:///{(tmp_path / 'factory.db').as_posix()}")
+    Base.metadata.create_all(engine)
+    session_factory = create_database_session_factory(engine)
+    with session_factory.begin() as session:
+        session.add(
+            Branch(
+                code="sucursal-demo",
+                name="Sucursal demo",
+                address="Dirección ficticia",
+                business_hours="Lunes a viernes",
+            )
+        )
     created_clients: list[ContextualFakeWhatsAppSender] = []
 
     def fake_whatsapp_client(candidate: Settings) -> ContextualFakeWhatsAppSender:
@@ -105,14 +124,31 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
         return client
 
     monkeypatch.setattr(dependencies, "get_chat_service", lambda: chat_service)
-    monkeypatch.setattr(dependencies, "get_idempotency_store", lambda: idempotency_store)
+    monkeypatch.setattr(dependencies, "get_database_session_factory", lambda: session_factory)
+    monkeypatch.setattr(
+        dependencies,
+        "get_conversation_identity_settings",
+        lambda: ConversationIdentitySettings(
+            assistant_branch_code="sucursal-demo",
+            conversation_identity_key="test-only-conversation-identity-key-0001",
+            _env_file=None,
+        ),
+    )
     monkeypatch.setattr(dependencies, "WhatsAppClient", fake_whatsapp_client)
 
     async def run_flow() -> None:
         async with dependencies.create_message_orchestrator(settings) as orchestrator:
             await orchestrator.process_message(inbound_message(text="Pregunta conectada"))
 
-    asyncio.run(run_flow())
+    try:
+        asyncio.run(run_flow())
+        with session_factory() as session:
+            assert session.scalar(select(Conversation)) is not None
+            receipt = session.scalar(select(WhatsAppEventReceipt))
+            assert receipt is not None
+            assert receipt.status == "completed"
+    finally:
+        engine.dispose()
 
     assert len(created_clients) == 1
     whatsapp_client = created_clients[0]
@@ -140,7 +176,7 @@ def test_chat_failure_is_mapped_and_prevents_outbound_send() -> None:
     assert exc_info.value.source_error_code == "ai_service_unavailable"
     assert exc_info.value.provider_code is None
     assert exc_info.value.provider_subcode is None
-    assert asyncio.run(idempotency_store.claim("whatsapp:F7AEC1B7086ECDC7E6E45923F5EDB825"))
+    assert asyncio.run(idempotency_store.claim("F7AEC1B7086ECDC7E6E45923F5EDB825"))
 
 
 def test_outbound_failure_is_mapped_without_message_or_recipient_detail() -> None:
@@ -161,7 +197,7 @@ def test_outbound_failure_is_mapped_without_message_or_recipient_detail() -> Non
     assert exc_info.value.source_error_code == "whatsapp_service_unavailable"
     assert exc_info.value.provider_code is None
     assert exc_info.value.provider_subcode is None
-    assert asyncio.run(idempotency_store.claim("whatsapp:F7AEC1B7086ECDC7E6E45923F5EDB825"))
+    assert not asyncio.run(idempotency_store.claim("F7AEC1B7086ECDC7E6E45923F5EDB825"))
 
 
 def test_duplicate_message_id_does_not_generate_a_second_answer_or_send() -> None:

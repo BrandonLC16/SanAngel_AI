@@ -5,11 +5,16 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from backend.app.core.config import Settings, get_settings
+from backend.app.core.config import Settings, get_conversation_identity_settings, get_settings
+from backend.app.core.exceptions import BranchScopeMismatchError
+from backend.app.db.session import get_database_session_factory
+from backend.app.services.branch_scope import BranchScope
 from backend.app.services.chat_service import ChatService
-from backend.app.services.idempotency_store import IdempotencyStore, InMemoryIdempotencyStore
+from backend.app.services.conversation_identity_service import PersistentConversationContextResolver
+from backend.app.services.idempotency_store import IdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 from backend.app.services.openai_service import OpenAIService
+from backend.app.services.persistent_idempotency_store import PersistentIdempotencyStore
 from backend.app.services.whatsapp_background_processor import (
     MessageOrchestratorFactory,
     WhatsAppBackgroundProcessor,
@@ -28,11 +33,13 @@ def get_chat_service() -> ChatService:
     )
 
 
-@lru_cache
-def get_idempotency_store() -> IdempotencyStore:
-    """Return the bounded process-local MVP store; production requires persistence."""
+def get_idempotency_store(settings: Settings) -> IdempotencyStore:
+    """Bind one persistent receipt store to the installation's branch."""
 
-    return InMemoryIdempotencyStore()
+    return PersistentIdempotencyStore(
+        get_database_session_factory(),
+        branch_scope=BranchScope.from_settings(settings),
+    )
 
 
 @asynccontextmanager
@@ -41,11 +48,18 @@ async def create_message_orchestrator(
 ) -> AsyncIterator[MessageOrchestrator]:
     """Build provider adapters only after the webhook has authenticated its request."""
 
+    identity_settings = get_conversation_identity_settings()
+    if identity_settings.assistant_branch_code != settings.assistant_branch_code:
+        raise BranchScopeMismatchError("conversation identity scope does not match installation")
+    conversation_context_resolver = PersistentConversationContextResolver(
+        get_database_session_factory(), settings=identity_settings
+    )
     async with WhatsAppClient(settings) as whatsapp_client:
         yield MessageOrchestrator(
             get_chat_service(),
             whatsapp_client,
-            get_idempotency_store(),
+            get_idempotency_store(settings),
+            conversation_context_resolver=conversation_context_resolver,
         )
 
 

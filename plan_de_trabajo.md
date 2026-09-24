@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-24
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F7.2 — Identidad externa y sucursal inmutable de la instalación (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.2 completada
+**Subfase activa:** ninguna; F7.3 — Idempotencia persistente (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — Fase 7; F7.3 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2661,28 +2661,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F7.3 — Idempotencia persistente
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-24
 
 
 ### Alcance
 
-- [ ] reemplazar store temporal.
+- [x] reemplazar store temporal.
 
-- [ ] unique external message id.
+- [x] unique external message id.
 
-- [ ] transacción.
+- [x] transacción.
 
-- [ ] tests concurrentes razonables.
+- [x] tests concurrentes razonables.
 
 
 ### Criterios de aceptación
 
-- [ ] duplicados no producen doble respuesta.
+- [x] duplicados no producen doble respuesta.
 
 
 ### Seguridad
 
-- [ ] manejar carrera.
+- [x] manejar carrera.
 
 
 ### Prompt para Codex
@@ -4318,9 +4320,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 7 — Conversaciones WhatsApp + idempotencia persistente (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F7.2 — Identidad externa y sucursal inmutable de la instalación (`✅ COMPLETADO`).
-**Última subfase completada:** F7.2 — Identidad externa y sucursal inmutable de la instalación.
-**Siguiente subfase recomendada:** F7.3 — Idempotencia persistente, `⬜ PENDIENTE`;
+**Subfase activa:** ninguna; F7.3 — Idempotencia persistente (`✅ COMPLETADO`).
+**Última subfase completada:** F7.3 — Idempotencia persistente.
+**Siguiente subfase recomendada:** F7.4 — Política de retención y redacción, `⬜ PENDIENTE`;
 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
@@ -4330,7 +4332,9 @@ comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
 
 F7.1 completada el 2026-09-24 tras crear el esquema mínimo de WhatsApp y validar la migración
 desde cero y sobre revisiones previas. F7.2 completada el 2026-09-24 tras resolver la identidad
-externa con HMAC y sucursal de configuración; 539 pruebas de la suite completa. F7.3 sigue pendiente.
+externa con HMAC y sucursal de configuración. F7.3 completada el 2026-09-24 con recibos
+transaccionales por sucursal y protección ante carreras; 549 pruebas de la suite completa.
+F7.4 sigue pendiente.
 
 ---
 
@@ -7801,6 +7805,68 @@ Riesgos/Pendientes:
 Siguiente:
 
 - F7.3 — Idempotencia persistente, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-24 — F7.3 Idempotencia persistente
+
+Fase: Fase 7 — Conversaciones WhatsApp + idempotencia persistente, `🟨 EN_PROGRESO`.
+Subfase: F7.3 — Idempotencia persistente, `✅ COMPLETADO`.
+Estado: pasó por `🟨 EN_PROGRESO` y `🧪 VALIDACION` antes del cierre.
+
+Cambios:
+
+- el orquestador real usa `PersistentIdempotencyStore` en lugar del store en memoria; reclama
+  `idMessage` entrante mediante `INSERT ... ON CONFLICT DO NOTHING` y la unicidad de
+  `(branch_id, provider_message_id)` ya migrada en F7.1;
+- reserva, finalización y liberación previa al envío tienen transacciones SQLite independientes;
+  se conserva `claimed` tras iniciar un envío ambiguo o fallar el marcado para impedir una segunda
+  respuesta automática;
+- el flujo conecta el contexto de conversación de F7.2 antes de responder y su inserción también
+  tolera carreras del mismo remitente; configuración de identidad y alcance del orquestador deben
+  coincidir;
+- tests de dos orquestadores y doce stores concurrentes, nueva conexión, ramas separadas,
+  errores previos y posteriores al envío; README y guía de WhatsApp actualizados.
+
+Archivos: `README.md`, `docs/fase_2_whatsapp.md`, `backend/app/api/dependencies.py`,
+`backend/app/repositories/conversation_repository.py`,
+`backend/app/services/conversation_identity_service.py`,
+`backend/app/services/message_orchestrator.py`,
+`backend/app/services/persistent_idempotency_store.py`,
+`backend/tests/test_conversation_identity_service.py`,
+`backend/tests/test_message_orchestrator.py`,
+`backend/tests/test_persistent_idempotency_store.py`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.\\.venv\\Scripts\\python.exe -m pytest backend/tests/test_persistent_idempotency_store.py backend/tests/test_conversation_identity_service.py backend/tests/test_message_orchestrator.py -q` → 24 passed;
+- `.\\.venv\\Scripts\\python.exe -m pytest -q` → 549 passed;
+- `.\\.venv\\Scripts\\ruff.exe check .` → sin errores;
+- `.\\.venv\\Scripts\\ruff.exe format --check .` → 123 archivos conformes;
+- `.\\.venv\\Scripts\\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace; Git avisó sobre normalización LF/CRLF.
+
+Seguridad:
+
+- la restricción única y la inserción atómica dejan un solo ganador, también entre stores
+  independientes; duplicados no generan una segunda consulta al chatbot ni envío;
+- la sucursal se deriva de la configuración backend y una sucursal inactiva falla de forma cerrada;
+- IDs, números, texto y secretos no aparecen en los nuevos logs o errores de infraestructura;
+- el envío incierto retiene la reserva y bloquea reintentos automáticos que podrían duplicar la
+  respuesta.
+
+Riesgos/Pendientes:
+
+- un proceso puede detenerse tras reservar o un envío puede quedar ambiguo; `claimed` requiere
+  conciliación operacional antes de reenvío y no existe entrega exactamente una vez entre SQLite
+  y GreenAPI;
+- `BackgroundTasks` sigue sin ser una cola durable: un fallo posterior al ACK puede perder trabajo;
+- se requiere ejecutar migraciones y configurar `CONVERSATION_IDENTITY_KEY` estable antes de usar
+  el flujo persistente en cada instalación.
+
+Siguiente:
+
+- F7.4 — Política de retención y redacción, `⬜ PENDIENTE`; recomendada, no iniciada.
 
 ---
 

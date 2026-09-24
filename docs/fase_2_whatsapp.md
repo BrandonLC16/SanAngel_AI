@@ -187,7 +187,7 @@ recuperación y métricas.
 La clave es `provider:external_message_id`. El orquestador reclama antes de llamar a OpenAI,
 marca como completado después del envío y libera la reserva si el procesamiento falla.
 
-`InMemoryIdempotencyStore`:
+En F2.7, `InMemoryIdempotencyStore`:
 
 - es atómico dentro de un proceso;
 - almacena solo IDs, no texto ni remitentes;
@@ -195,8 +195,14 @@ marca como completado después del envío y libera la reserva si el procesamient
 - desaloja primero la entrada completada más antigua;
 - nunca desaloja una entrada activa.
 
-No es una solución de producción: no se comparte entre procesos, se pierde al reiniciar y deja
-una ventana entre envío y marcado. Debe reemplazarse por persistencia coordinada.
+En F7.3 el flujo real usa `PersistentIdempotencyStore` con la restricción única
+`(branch_id, provider_message_id)` de SQLite. La inserción atómica permite un solo ganador cuando
+dos procesos reclaman el mismo ID. La reserva se confirma antes de OpenAI y GreenAPI; la
+finalización se confirma después del envío. Se libera únicamente si el fallo ocurre antes de
+iniciar el envío. Ante un envío incierto o un fallo al finalizar el recibo, queda `claimed` y se
+bloquea el reenvío automático. Hace falta conciliación manual para esas reservas; la transacción
+de base de datos no puede abarcar el envío HTTP. La identidad de conversación se persiste bajo
+la sucursal configurada antes de consultar al chatbot.
 
 ## 9. Cliente saliente
 
@@ -331,8 +337,8 @@ F2.10 y la Fase 2 están `✅ COMPLETADO`. El cierre comprobó que:
 - README y este diseño permiten reproducir la configuración sin incluir credenciales;
 - el backend y el túnel temporal permanecen detenidos al cierre.
 
-La Fase 2 completa el MVP del canal, pero no declara el sistema apto para producción. Persisten
-estos riesgos conocidos:
+La Fase 2 completó el MVP del canal, pero no declaró el sistema apto para producción. Al cierre
+de F2 persistían estos riesgos (la idempotencia en memoria se reemplazó en F7.3):
 
 - la idempotencia vive en memoria y no coordina procesos o instancias;
 - `BackgroundTasks` no es durable y puede perder trabajo después del ACK;

@@ -1,5 +1,6 @@
-"""F7.2: sender continuity and immutable branch scope."""
+"""Sender continuity, immutable branch scope, and concurrent persistence."""
 
+import asyncio
 import logging
 from collections.abc import Generator
 from pathlib import Path
@@ -19,7 +20,10 @@ from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.schemas.whatsapp import InboundMessage
-from backend.app.services.conversation_identity_service import ConversationIdentityService
+from backend.app.services.conversation_identity_service import (
+    ConversationIdentityService,
+    PersistentConversationContextResolver,
+)
 
 IDENTITY_KEY = "test-only-conversation-identity-key-0001"
 EXTERNAL_USER_ID = "5215550000001@c.us"
@@ -124,6 +128,31 @@ def test_same_external_user_is_isolated_between_configured_branches(
     assert first.branch_id == first_id
     assert second.branch_id == second_id
     assert first.conversation_id != second.conversation_id
+
+
+def test_concurrent_messages_from_same_sender_share_one_conversation(
+    sessions: sessionmaker[Session],
+) -> None:
+    first_id, _ = create_branches(sessions)
+    resolvers = [
+        PersistentConversationContextResolver(sessions, settings=settings("sucursal-uno"))
+        for _ in range(8)
+    ]
+
+    async def race() -> list[int]:
+        contexts = await asyncio.gather(
+            *(
+                resolver.resolve(inbound(f"mensaje {index}"))
+                for index, resolver in enumerate(resolvers)
+            )
+        )
+        assert all(context.branch_id == first_id for context in contexts)
+        return [context.conversation_id for context in contexts]
+
+    conversation_ids = asyncio.run(race())
+    assert len(set(conversation_ids)) == 1
+    with sessions() as session:
+        assert len(session.scalars(select(Conversation)).all()) == 1
 
 
 def test_missing_or_inactive_configured_branch_fails_closed(
