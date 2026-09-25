@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.app.core.config import AssistantSettings, ConversationIdentitySettings
 from backend.app.core.exceptions import BranchNotConfiguredError, ServiceUnavailableError
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.message import Message
 from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
@@ -93,6 +94,14 @@ class WhatsAppPrivacyService:
                 )
                 if apply:
                     messages = session.execute(delete(Message).where(*old_messages)).rowcount
+                    session.execute(
+                        delete(ConversationResponderState).where(
+                            ConversationResponderState.branch_id == branch_id,
+                            ConversationResponderState.conversation_id.in_(
+                                select(Conversation.id).where(*old_conversations)
+                            ),
+                        )
+                    )
                     conversations = session.execute(
                         delete(Conversation).where(*old_conversations)
                     ).rowcount
@@ -161,6 +170,12 @@ class WhatsAppPrivacyService:
                     delete(Message).where(
                         Message.branch_id == branch_id,
                         Message.conversation_id == conversation_id,
+                    )
+                )
+                session.execute(
+                    delete(ConversationResponderState).where(
+                        ConversationResponderState.branch_id == branch_id,
+                        ConversationResponderState.conversation_id == conversation_id,
                     )
                 )
                 session.execute(

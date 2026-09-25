@@ -17,6 +17,7 @@ class AdminPermission(StrEnum):
     COMMERCIAL_WRITE = "commercial:write"
     BRANCH_WRITE = "branch:write"
     AUDIT_READ = "audit:read"
+    CONVERSATION_MODE_WRITE = "conversation:mode:write"
 
 
 ROLE_PERMISSIONS: dict[AdminRole, frozenset[AdminPermission]] = {
@@ -27,6 +28,7 @@ ROLE_PERMISSIONS: dict[AdminRole, frozenset[AdminPermission]] = {
             AdminPermission.USERS_READ,
             AdminPermission.COMMERCIAL_READ,
             AdminPermission.COMMERCIAL_WRITE,
+            AdminPermission.CONVERSATION_MODE_WRITE,
         }
     ),
     AdminRole.OWNER: frozenset(AdminPermission),

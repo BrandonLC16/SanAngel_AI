@@ -39,6 +39,10 @@ Las FAQ tienen alcance y clave normalizada únicos por sucursal; los recibos gua
 mínimos y, para precios, producto, unidad e importes anterior/nuevo, sin texto FAQ ni datos de
 contacto.
 
+`20260925_0011` agrega `conversation_responder_states` para F9.1: modo `AI`/`HUMAN`, único
+usuario humano de la misma sucursal y conteo de respuestas automáticas en curso. Migra las
+conversaciones existentes a `AI` sin reconstruir las tablas de mensajes.
+
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
 crea uno sin sobrescribir otro y comprueba su integridad. Revisar el

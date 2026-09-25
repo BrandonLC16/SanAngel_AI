@@ -39,6 +39,18 @@ class AdminCommercialConflictError(ApplicationError):
     status_code = 409
 
 
+class ConversationModeConflictError(ApplicationError):
+    error_code = "conversation_mode_conflict"
+    public_message = "La conversación no puede cambiar de responsable ahora."
+    status_code = 409
+
+
+class ConversationNotFoundError(ApplicationError):
+    error_code = "conversation_not_found"
+    public_message = "No se encontró la conversación."
+    status_code = 404
+
+
 class AdminRateLimitError(ApplicationError):
     error_code = "admin_login_limited"
     public_message = "Demasiados intentos. Inténtalo más tarde."

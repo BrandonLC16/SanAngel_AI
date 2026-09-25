@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 
 
 class ConversationRepository:
@@ -42,4 +43,9 @@ class ConversationRepository:
             )
         )
         assert conversation is not None
+        self._session.execute(
+            insert(ConversationResponderState)
+            .values(conversation_id=conversation.id, branch_id=self._branch.id)
+            .on_conflict_do_nothing(index_elements=["conversation_id"])
+        )
         return conversation, result.rowcount == 1

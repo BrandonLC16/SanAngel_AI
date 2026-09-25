@@ -15,6 +15,7 @@ from backend.app.core.exceptions import InvalidRequestError, ServiceUnavailableE
 from backend.app.db.base import Base
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.message import Message
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
@@ -80,6 +81,7 @@ def add_conversation(session: Session, branch_id: int, key: str, *, age_days: in
     )
     session.add(conversation)
     session.flush()
+    session.add(ConversationResponderState(conversation_id=conversation.id, branch_id=branch_id))
     return conversation
 
 
@@ -145,9 +147,11 @@ def test_preview_and_purge_expired_metadata_only_in_configured_branch(
     assert applied == preview
     with sessions() as session:
         conversations = session.scalars(select(Conversation)).all()
+        states = session.scalars(select(ConversationResponderState)).all()
         messages = session.scalars(select(Message)).all()
         receipts = session.scalars(select(WhatsAppEventReceipt)).all()
     assert {item.external_user_key for item in conversations} == {"b" * 64, "c" * 64}
+    assert {item.conversation_id for item in states} == {item.id for item in conversations}
     assert len(messages) == 1 and messages[0].branch_id == second_id
     assert {item.provider_message_id for item in receipts} == {
         "completed-recent",
@@ -264,9 +268,11 @@ def test_erase_sender_removes_only_scoped_conversation_and_omits_id_from_logs(
         assert not privacy.erase_sender(SENDER_ID)
     with sessions() as session:
         conversations = session.scalars(select(Conversation)).all()
+        states = session.scalars(select(ConversationResponderState)).all()
         messages = session.scalars(select(Message)).all()
         receipts = session.scalars(select(WhatsAppEventReceipt)).all()
     assert len(conversations) == 1 and conversations[0].branch_id == second_id
+    assert len(states) == 1 and states[0].conversation_id == other_branch.conversation_id
     assert len(messages) == 1 and messages[0].branch_id == second_id
     assert len(receipts) == 1
     assert SENDER_ID not in caplog.text

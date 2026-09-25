@@ -11,8 +11,8 @@
 | F7.5 | Agregados FAQ sin texto, contador atómico y consulta interna por sucursal. |
 
 Al cerrar Fase 7, siete revisiones Alembic llegaban a `20260924_0007`. F8.1 añadió la revisión
-`20260924_0008`, F8.2 añadió `20260924_0009` y F8.4 añadió `20260924_0010`; la prueba de
-recuperación usa la cabecera actual. Las pruebas crean una base vacía,
+`20260924_0008`, F8.2 añadió `20260924_0009`, F8.4 añadió `20260924_0010` y F9.1 añadió
+`20260925_0011`; la prueba de recuperación usa la cabecera actual. Las pruebas crean una base vacía,
 ejecutan `upgrade head` y `check`, preservan datos existentes al pasar de `20260924_0006` a la
 revisión final, prueban el recorrido de migraciones y restauran en otra ruta
 un respaldo con datos representativos de las cuatro tablas de Fase 7. La prueba de recuperación

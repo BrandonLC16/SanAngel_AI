@@ -11,6 +11,10 @@ from backend.app.db.session import get_database_session_factory
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.chat_service import ChatService
 from backend.app.services.conversation_identity_service import PersistentConversationContextResolver
+from backend.app.services.conversation_mode_service import (
+    ConversationModeService,
+    PersistentConversationModeGate,
+)
 from backend.app.services.idempotency_store import IdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 from backend.app.services.openai_service import OpenAIService
@@ -54,12 +58,16 @@ async def create_message_orchestrator(
     conversation_context_resolver = PersistentConversationContextResolver(
         get_database_session_factory(), settings=identity_settings
     )
+    conversation_mode_gate = PersistentConversationModeGate(
+        ConversationModeService(get_database_session_factory(), settings=identity_settings)
+    )
     async with WhatsAppClient(settings) as whatsapp_client:
         yield MessageOrchestrator(
             get_chat_service(),
             whatsapp_client,
             get_idempotency_store(settings),
             conversation_context_resolver=conversation_context_resolver,
+            conversation_mode_gate=conversation_mode_gate,
         )
 
 

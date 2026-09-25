@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-25
-**Fase activa:** Fase 8 — Panel administrativo seguro (`✅ COMPLETADO`)
-**Subfase activa:** ninguna; F8.9 — Cierre Fase 8 (`✅ COMPLETADO`)
-**Estado global:** ✅ COMPLETADO — Fase 8 cerrada; Fase 9 pendiente
+**Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`)
+**Subfase activa:** ninguna; F9.1 — Estado AI/HUMAN (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F9.1 cerrada; F9.2 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3286,35 +3286,39 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que un empleado tome una conversación de WhatsApp y responda sin que la IA compita con él.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-09-25
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F9.1 — Estado AI/HUMAN
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-25
+**Fecha de cierre:** 2026-09-25
+**Documento:** `docs/fase_9_modo.md`
 
 
 ### Alcance
 
-- [ ] conversation mode.
+- [x] conversation mode.
 
-- [ ] transiciones.
+- [x] transiciones.
 
-- [ ] servicio.
+- [x] servicio.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] un solo responsable responde.
+- [x] un solo responsable responde.
 
 
 ### Seguridad
 
-- [ ] transiciones autorizadas.
+- [x] transiciones autorizadas.
 
 
 ### Prompt para Codex
@@ -4353,10 +4357,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 8 — Panel administrativo seguro (`✅ COMPLETADO`).
-**Subfase activa:** ninguna; F8.9 — Cierre Fase 8 (`✅ COMPLETADO`).
-**Última subfase completada:** F8.9 — Cierre Fase 8.
-**Siguiente subfase recomendada:** F9.1 — Estado AI/HUMAN (`⬜ PENDIENTE`); Fase 9 no iniciada.
+**Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`).
+**Subfase activa:** ninguna; F9.1 — Estado AI/HUMAN (`✅ COMPLETADO`).
+**Última subfase completada:** F9.1 — Estado AI/HUMAN.
+**Siguiente subfase recomendada:** F9.2 — Bandeja de conversaciones (`⬜ PENDIENTE`), no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4391,6 +4395,9 @@ el 2026-09-25 con pruebas transversales de autorización, CSRF, XSS, CORS, lími
 vencida; 603 pruebas Python y 29 frontend aprobadas. F8.9 y Fase 8 cerradas el 2026-09-25 tras
 repetir la suite, lint, formato y build y documentar que el panel no debe exponerse a internet
 antes de F10.
+F9.1 completada el 2026-09-25 con modo persistente AI/HUMAN por conversación, asignación
+humana única, transiciones autorizadas y reserva atómica de respuestas de IA para impedir
+traspasos durante un envío; 608 pruebas Python y 29 frontend aprobadas. F9.2 sigue pendiente.
 
 ---
 
@@ -8575,6 +8582,56 @@ WhatsApp actual no alimenta automáticamente mensajes ni agregados FAQ del panel
 anteriores a F8.7 no tienen historial de precios por fila. No se usaron cuentas ni datos reales.
 
 Siguiente: F9.1 — Estado AI/HUMAN (`⬜ PENDIENTE`), recomendado y no iniciado.
+
+---
+
+## 2026-09-25 — F9.1 Estado AI/HUMAN
+
+**Fase/subfase:** Fase 9 / F9.1, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+**Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO`.
+
+Cambios: tabla de estado por conversación con modo `AI`/`HUMAN`, único usuario humano de la
+sucursal y contador de respuestas de IA en curso. El servicio interno autoriza y ejecuta
+transiciones condicionales; el orquestador reserva el modo `AI` antes de responder y omite modelo
+y envío en `HUMAN`. La migración agrega una tabla y migra conversaciones existentes a `AI` sin
+reconstruir `conversations`; la purga y el borrado individual eliminan también el estado. La
+primera prueba de migración reveló que reconstruir `conversations` violaba la FK de `messages`;
+se corrigió con la tabla separada y la prueba final pasó.
+
+Archivos: `backend/app/core/conversation_mode.py`, `backend/app/core/admin_roles.py`,
+`backend/app/core/exceptions.py`, `backend/app/db/models/conversation_responder_state.py`,
+`backend/app/db/models/__init__.py`, `backend/app/repositories/conversation_repository.py`,
+`backend/app/services/conversation_mode_service.py`, `backend/app/services/message_orchestrator.py`,
+`backend/app/services/whatsapp_privacy_service.py`, `backend/app/api/dependencies.py`,
+`migrations/versions/20260925_0011_conversation_mode.py`, `migrations/env.py`,
+`backend/tests/test_conversation_mode_service.py`, `backend/tests/test_conversation_schema.py`,
+`backend/tests/test_migrations.py`, `backend/tests/test_fase_7_recovery.py`,
+`backend/tests/test_message_orchestrator.py`, `backend/tests/test_whatsapp_privacy_service.py`,
+`docs/fase_9_modo.md`, `docs/fase_7_privacidad.md`, `docs/fase_7_cierre.md`,
+`migrations/README.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_conversation_mode_service.py backend/tests/test_message_orchestrator.py backend/tests/test_whatsapp_privacy_service.py backend/tests/test_migrations.py backend/tests/test_conversation_schema.py -q -p no:cacheprovider` → 40 aprobadas;
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 608 aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 177 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → dependencias coherentes;
+- `npm --prefix frontend run test` → 29 pruebas aprobadas;
+- `npm --prefix frontend run build` → tipos y bundle correctos;
+- `git diff --check` → sin errores de whitespace; avisos LF/CRLF del entorno.
+
+Seguridad: el alcance viene de `ASSISTANT_BRANCH_CODE`; `take` y `release` comprueban sucursal,
+vigencia del principal, rol y estado activo actuales. La FK compuesta prohíbe asignar personal
+de otra sucursal; pruebas de carrera verifican que AI y HUMAN no adquieren el mismo turno. No se
+añadieron endpoints admin ni secretos o textos de conversación al estado.
+
+Riesgos/Pendientes: un envío ambiguo o una caída puede dejar la reserva de IA activa y bloquear
+el traspaso hasta conciliación manual; no se libera ni reenvía automáticamente. F9.2 debe aplicar
+sesión backend, RBAC y CSRF al exponer toma/liberación; F9.3 implementará el envío humano. El
+panel no debe exponerse a internet antes de F10.
+
+Siguiente: F9.2 — Bandeja de conversaciones (`⬜ PENDIENTE`), recomendada y no iniciada.
 
 ---
 

@@ -1,22 +1,28 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from sqlalchemy import select
 
 from backend.app.api import dependencies
-from backend.app.core.config import ConversationIdentitySettings, Settings
+from backend.app.core.admin_roles import AdminRole
+from backend.app.core.config import AssistantSettings, ConversationIdentitySettings, Settings
 from backend.app.core.exceptions import (
     AIProviderRateLimitError,
     MessageProcessingError,
     WhatsAppProviderTimeoutError,
 )
 from backend.app.db.base import Base
+from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.schemas.whatsapp import InboundMessage
+from backend.app.services.admin_auth_service import AdminSessionInfo
+from backend.app.services.conversation_mode_service import ConversationModeService
 from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 
@@ -142,21 +148,60 @@ def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(
 
     try:
         asyncio.run(run_flow())
+        with session_factory.begin() as session:
+            conversation = session.scalar(select(Conversation))
+            assert conversation is not None
+            admin = AdminUser(
+                branch_id=conversation.branch_id,
+                username="editor",
+                role="editor",
+                password_hash="$argon2id$test",
+            )
+            session.add(admin)
+            session.flush()
+            principal = AdminSessionInfo(
+                username=admin.username,
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                csrf_token="test-only-csrf",
+                user_id=admin.id,
+                branch_id=admin.branch_id,
+                role=AdminRole.EDITOR,
+            )
+        modes = ConversationModeService(
+            session_factory,
+            settings=AssistantSettings(assistant_branch_code="sucursal-demo", _env_file=None),
+        )
+        modes.take(principal, conversation.id)
+
+        async def run_human_mode() -> bool:
+            async with dependencies.create_message_orchestrator(settings) as orchestrator:
+                return await orchestrator.process_message(
+                    InboundMessage(
+                        external_message_id="test-only-second-message-id",
+                        sender_id="5215550000001@c.us",
+                        text="Pregunta para humano",
+                    )
+                )
+
+        assert asyncio.run(run_human_mode()) is False
         with session_factory() as session:
             assert session.scalar(select(Conversation)) is not None
-            receipt = session.scalar(select(WhatsAppEventReceipt))
-            assert receipt is not None
-            assert receipt.status == "completed"
+            receipts = session.scalars(select(WhatsAppEventReceipt)).all()
+            assert len(receipts) == 2
+            assert all(receipt.status == "completed" for receipt in receipts)
+            state = session.scalar(select(ConversationResponderState))
+            assert state is not None and state.mode == "HUMAN"
     finally:
         engine.dispose()
 
-    assert len(created_clients) == 1
+    assert len(created_clients) == 2
     whatsapp_client = created_clients[0]
     assert whatsapp_client.settings is settings
     assert whatsapp_client.entered is True
     assert whatsapp_client.closed is True
     assert chat_service.messages == ["Pregunta conectada"]
     assert whatsapp_client.calls == [("5215550000001@c.us", "Respuesta conectada", False)]
+    assert created_clients[1].calls == []
 
 
 def test_chat_failure_is_mapped_and_prevents_outbound_send() -> None:

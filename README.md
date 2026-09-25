@@ -222,7 +222,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las diez revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las once revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
@@ -466,6 +466,11 @@ roles, CSRF, XSS, CORS, límite de login y expiración de sesión.
 El [cierre de Fase 8](docs/fase_8_cierre.md) resume las entregas y sus límites. El panel y los
 endpoints administrativos deben permanecer locales y restringidos: **no exponerlos a internet
 antes de completar F10**, que incluye TLS/proxy, cabeceras de seguridad y controles operativos.
+
+F9.1 incorpora el [modo AI/HUMAN](docs/fase_9_modo.md) por conversación. La transición interna
+exige personal autorizado de la misma sucursal; cada modo `HUMAN` tiene un solo usuario asignado.
+Una respuesta de IA en curso impide tomar el chat y el modo `HUMAN` impide nuevas respuestas
+automáticas. La bandeja y el envío humano pertenecen a subfases posteriores.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

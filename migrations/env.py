@@ -13,6 +13,9 @@ from backend.app.db.models.admin_user import (  # noqa: F401
 )
 from backend.app.db.models.branch import Branch  # noqa: F401
 from backend.app.db.models.conversation import Conversation  # noqa: F401
+from backend.app.db.models.conversation_responder_state import (
+    ConversationResponderState,  # noqa: F401
+)
 from backend.app.db.models.message import Message  # noqa: F401
 from backend.app.db.models.price import Price  # noqa: F401
 from backend.app.db.models.price_import_audit import PriceImportAudit  # noqa: F401

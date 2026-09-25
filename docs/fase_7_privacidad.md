@@ -2,13 +2,15 @@
 
 ## Alcance y datos guardados
 
-Esta política cubre las tablas `conversations`, `messages`, `whatsapp_event_receipts` y
-`unresolved_questions` del backend. No establece una conclusión de cumplimiento legal ni una
-política para las copias externas de GreenAPI, OpenAI o los respaldos operativos.
+Esta política cubre las tablas `conversations`, `conversation_responder_states`, `messages`,
+`whatsapp_event_receipts` y `unresolved_questions` del backend. No establece una conclusión de
+cumplimiento legal ni una política para las copias externas de GreenAPI, OpenAI o los respaldos
+operativos.
 
 | Tabla | Campos operativos | No se guarda |
 |---|---|---|
 | `conversations` | Sucursal, canal, HMAC-SHA256 del `chatId`, creación y última actividad | Número/chat ID en claro, nombre, texto |
+| `conversation_responder_states` | Sucursal, conversación, modo AI/HUMAN, usuario asignado y reservas de IA | Número/chat ID, texto, contraseña, token |
 | `messages` | Sucursal, conversación, dirección y hora | Texto, archivos, datos de pago; el flujo actual aún no crea filas aquí |
 | `whatsapp_event_receipts` | Sucursal, `idMessage` entrante, estado y horas | Remitente, texto, body completo del webhook, ID del envío saliente |
 | `unresolved_questions` | Sucursal, motivo FAQ, HMAC-SHA256 de la pregunta normalizada, contador y fechas | Pregunta en claro, remitente, número, conversación, respuesta, argumentos completos |
@@ -39,7 +41,7 @@ el responsable de privacidad y las necesidades reales de reentrega de GreenAPI:
 
 | Dato | Retención y acción |
 |---|---|
-| Conversación | Borrar 30 días después de `updated_at` si no quedan mensajes recientes. Cada mensaje entrante que resuelve la conversación actualiza esa fecha. |
+| Conversación y estado de responsable | Borrar 30 días después de `updated_at` si no quedan mensajes recientes. Cada mensaje entrante que resuelve la conversación actualiza esa fecha. |
 | Metadatos de mensaje | Borrar 30 días después de `occurred_at`, aun si la conversación sigue activa. |
 | Recibo `completed` | Borrar 30 días después de `completed_at`. Un evento repetido después de ese plazo podría procesarse otra vez. |
 | Recibo `claimed` | No borrar automáticamente. Si lleva más de un día, contarlo para conciliación. Borrarlo sin resolver un envío ambiguo podría causar una segunda respuesta. |
@@ -63,8 +65,8 @@ Revisar esas reservas antes de cualquier intervención o reenvío.
 ## Borrado individual
 
 `WhatsAppPrivacyService.erase_sender(external_user_id)` valida el identificador normalizado,
-deriva la misma clave HMAC y elimina la conversación y sus metadatos `messages` de la sucursal
-configurada. No hay endpoint público ni argumento CLI que ponga el número en una URL, logs o
+deriva la misma clave HMAC y elimina la conversación, su estado de responsable y sus metadatos
+`messages` de la sucursal configurada. No hay endpoint público ni argumento CLI que ponga el número en una URL, logs o
 historial de comandos. El servicio no puede asociar un recibo con un remitente porque la tabla
 deliberadamente no guarda esa relación; los recibos `completed` siguen su plazo de 30 días y
 los `claimed` requieren conciliación. El borrado individual puede ejecutarse desde una interfaz

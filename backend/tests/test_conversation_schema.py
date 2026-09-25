@@ -64,6 +64,31 @@ def test_migrated_tables_have_only_minimal_whatsapp_fields(engine: Engine) -> No
         "created_at",
         "updated_at",
     }
+    responder_columns = {
+        column["name"] for column in inspector.get_columns("conversation_responder_states")
+    }
+    assert responder_columns == {
+        "conversation_id",
+        "branch_id",
+        "mode",
+        "assigned_admin_user_id",
+        "ai_reply_count",
+    }
+    responder_checks = {
+        item["name"] for item in inspector.get_check_constraints("conversation_responder_states")
+    }
+    assert responder_checks == {
+        "ck_conversation_responder_mode",
+        "ck_conversation_responder_ai_reply_count",
+        "ck_conversation_responder_owner",
+    }
+    responder_foreign_keys = {
+        item["name"] for item in inspector.get_foreign_keys("conversation_responder_states")
+    }
+    assert responder_foreign_keys == {
+        "fk_conversation_responder_conversation_branch",
+        "fk_conversation_responder_admin_branch",
+    }
     assert {column["name"] for column in inspector.get_columns("messages")} == {
         "id",
         "branch_id",

@@ -13,6 +13,7 @@ from backend.app.core.config import get_database_settings
 from backend.app.db.models.admin_commercial import ManagedFAQ
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.message import Message
 from backend.app.db.models.price import Price
 from backend.app.db.models.product import Product
@@ -31,6 +32,7 @@ UNRESOLVED_REVISION = "20260924_0007"
 ADMIN_AUTH_REVISION = "20260924_0008"
 ADMIN_RBAC_REVISION = "20260924_0009"
 ADMIN_COMMERCIAL_REVISION = "20260924_0010"
+CONVERSATION_MODE_REVISION = "20260925_0011"
 
 
 def sqlite_url(path: Path) -> str:
@@ -41,13 +43,14 @@ def alembic_config() -> Config:
     return Config(str(REPOSITORY_ROOT / "alembic.ini"))
 
 
-def test_migration_history_has_reproducible_admin_commercial_head() -> None:
+def test_migration_history_has_reproducible_conversation_mode_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [ADMIN_COMMERCIAL_REVISION]
-    assert len(revisions) == 10
+    assert scripts.get_heads() == [CONVERSATION_MODE_REVISION]
+    assert len(revisions) == 11
     assert [revision.revision for revision in revisions] == [
+        CONVERSATION_MODE_REVISION,
         ADMIN_COMMERCIAL_REVISION,
         ADMIN_RBAC_REVISION,
         ADMIN_AUTH_REVISION,
@@ -59,16 +62,17 @@ def test_migration_history_has_reproducible_admin_commercial_head() -> None:
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == ADMIN_RBAC_REVISION
-    assert revisions[1].down_revision == ADMIN_AUTH_REVISION
-    assert revisions[2].down_revision == UNRESOLVED_REVISION
-    assert revisions[3].down_revision == CONVERSATION_REVISION
-    assert revisions[4].down_revision == AUDIT_REVISION
-    assert revisions[5].down_revision == PRICE_REVISION
-    assert revisions[6].down_revision == PRODUCT_REVISION
-    assert revisions[7].down_revision == BRANCH_REVISION
-    assert revisions[8].down_revision == INITIAL_REVISION
-    assert revisions[9].down_revision is None
+    assert revisions[0].down_revision == ADMIN_COMMERCIAL_REVISION
+    assert revisions[1].down_revision == ADMIN_RBAC_REVISION
+    assert revisions[2].down_revision == ADMIN_AUTH_REVISION
+    assert revisions[3].down_revision == UNRESOLVED_REVISION
+    assert revisions[4].down_revision == CONVERSATION_REVISION
+    assert revisions[5].down_revision == AUDIT_REVISION
+    assert revisions[6].down_revision == PRICE_REVISION
+    assert revisions[7].down_revision == PRODUCT_REVISION
+    assert revisions[8].down_revision == BRANCH_REVISION
+    assert revisions[9].down_revision == INITIAL_REVISION
+    assert revisions[10].down_revision is None
 
 
 def test_admin_rbac_upgrade_defaults_existing_users_and_downgrade_restores_schema(
@@ -184,7 +188,7 @@ def test_commercial_migration_preserves_existing_catalog_and_enforces_faq_scope(
             with engine.connect() as connection:
                 assert (
                     MigrationContext.configure(connection).get_current_revision()
-                    == ADMIN_COMMERCIAL_REVISION
+                    == CONVERSATION_MODE_REVISION
                 )
                 assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
         finally:
@@ -255,7 +259,7 @@ def test_upgrade_head_creates_all_registered_schema(
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == ADMIN_COMMERCIAL_REVISION
+        assert current_revision == CONVERSATION_MODE_REVISION
         assert table_names == [
             "admin_commercial_audits",
             "admin_login_throttles",
@@ -264,6 +268,7 @@ def test_upgrade_head_creates_all_registered_schema(
             "admin_users",
             "alembic_version",
             "branches",
+            "conversation_responder_states",
             "conversations",
             "managed_faqs",
             "messages",
@@ -475,14 +480,22 @@ def test_upgrade_existing_fase_7_data_to_head_preserves_rows(
                 )
                 session.add(branch)
                 session.flush()
-                conversation = Conversation(branch_id=branch.id, external_user_key="a" * 64)
-                session.add(conversation)
-                session.flush()
+                session.execute(
+                    text(
+                        "INSERT INTO conversations (branch_id, channel, external_user_key) "
+                        "VALUES (:branch_id, 'whatsapp', :external_user_key)"
+                    ),
+                    {"branch_id": branch.id, "external_user_key": "a" * 64},
+                )
+                conversation_id = session.execute(
+                    text("SELECT id FROM conversations WHERE branch_id = :branch_id"),
+                    {"branch_id": branch.id},
+                ).scalar_one()
                 session.add_all(
                     (
                         Message(
                             branch_id=branch.id,
-                            conversation_id=conversation.id,
+                            conversation_id=conversation_id,
                             direction="inbound",
                         ),
                         WhatsAppEventReceipt(
@@ -502,6 +515,8 @@ def test_upgrade_existing_fase_7_data_to_head_preserves_rows(
             with create_database_session_factory(engine)() as session:
                 assert session.scalar(select(Branch.code)) == "sucursal-uno"
                 assert session.scalar(select(Conversation.external_user_key)) == "a" * 64
+                assert session.scalar(select(ConversationResponderState.mode)) == "AI"
+                assert session.scalar(select(ConversationResponderState.ai_reply_count)) == 0
                 assert session.scalar(select(Message.direction)) == "inbound"
                 assert session.scalar(select(WhatsAppEventReceipt.status)) == "claimed"
                 assert session.scalars(select(UnresolvedQuestion)).all() == []
@@ -561,7 +576,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            ADMIN_COMMERCIAL_REVISION,
+            CONVERSATION_MODE_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -570,6 +585,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "admin_users",
                 "alembic_version",
                 "branches",
+                "conversation_responder_states",
                 "conversations",
                 "managed_faqs",
                 "messages",
@@ -612,7 +628,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == ADMIN_COMMERCIAL_REVISION
+        assert snapshot()[0] == CONVERSATION_MODE_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -626,7 +642,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            ADMIN_COMMERCIAL_REVISION,
+            CONVERSATION_MODE_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -635,6 +651,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "admin_users",
                 "alembic_version",
                 "branches",
+                "conversation_responder_states",
                 "conversations",
                 "managed_faqs",
                 "messages",
