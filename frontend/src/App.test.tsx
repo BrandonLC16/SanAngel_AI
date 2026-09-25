@@ -5,6 +5,7 @@ import { App } from './App'
 import { AdminApiError, getSession, login, logout } from './api'
 import { commercialApi } from './commercialApi'
 import { reviewApi } from './reviewApi'
+import { auditApi } from './auditApi'
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api')>()
@@ -20,6 +21,8 @@ vi.mock('./reviewApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./reviewApi')>()
   return { ...actual, reviewApi: { ...actual.reviewApi, conversations: vi.fn(), unresolved: vi.fn() } }
 })
+
+vi.mock('./auditApi', () => ({ auditApi: { events: vi.fn() } }))
 
 const validSession = {
   username: 'operador',
@@ -108,6 +111,15 @@ describe('shell del panel', () => {
     expect(await screen.findByText('No hay conversaciones con estos filtros.')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Preguntas no resueltas' }))
     expect(await screen.findByText('No hay agregados con estos filtros.')).toBeTruthy()
+  })
+
+  it('muestra auditoría solo al propietario y abre la lista', async () => {
+    vi.mocked(getSession).mockResolvedValue(validSession)
+    vi.mocked(auditApi.events).mockResolvedValue({ items: [], has_more: false })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Bienvenido al panel' })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Auditoría' }))
+    expect(await screen.findByText('No hay cambios con estos filtros.')).toBeTruthy()
   })
 
   it('muestra texto de usuario sin interpretarlo como HTML', async () => {

@@ -12,6 +12,9 @@ F8.6 incorpora [revisión de conversaciones y preguntas no resueltas](../docs/fa
 con filtros y detalle mínimo. La resolución de una FAQ exige un texto aprobado obtenido por un
 canal autorizado; el panel no revela la pregunta original ni identificadores de WhatsApp.
 
+F8.7 incorpora [auditoría administrativa](../docs/fase_8_auditoria.md) para propietarios, con
+filtros por entidad y producto. Los precios y roles muestran valores anterior y posterior mínimos.
+
 ## Preparación y validación
 
 Desde la raíz del repositorio:

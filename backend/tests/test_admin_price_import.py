@@ -5,10 +5,13 @@ from io import BytesIO
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
-from sqlalchemy import select
+from sqlalchemy import event, select
+from sqlalchemy.exc import IntegrityError
 
 from backend.app.api.routes.admin_price_import import _service
 from backend.app.core.admin_roles import AdminRole
+from backend.app.db.models.admin_commercial import AdminCommercialAudit
+from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.price import Price
 from backend.app.db.models.price_import_audit import PriceImportAudit
@@ -131,6 +134,11 @@ def test_authorization_csrf_branch_limit_and_one_time_confirmation(app, sessions
             assert session.scalar(select(Price).where(Price.product_id == foreign_id)) is None
             audits = session.scalars(select(PriceImportAudit)).all()
             assert len(audits) == 1 and audits[0].status == "success"
+            changes = session.scalars(select(AdminCommercialAudit)).all()
+            assert len(changes) == 1
+            assert changes[0].resource == "price" and changes[0].action == "create"
+            assert changes[0].product_id == own_id and changes[0].unit == "kg"
+            assert changes[0].old_amount is None and str(changes[0].new_amount) == "123.45"
     finally:
         app.dependency_overrides.pop(_service, None)
 
@@ -168,5 +176,82 @@ def test_pending_preview_is_bound_to_session_and_revalidates_prices(app, session
                 == "99.00"
             )
             assert session.scalar(select(PriceImportAudit.status)) == "rejected"
+    finally:
+        app.dependency_overrides.pop(_service, None)
+
+
+def test_admin_price_change_rolls_back_when_row_audit_fails(app, sessions) -> None:
+    AdminAuthService(sessions, settings=settings()).create_user(
+        "editor", PASSWORD, role=AdminRole.EDITOR
+    )
+    with sessions.begin() as session:
+        own = session.scalar(select(Branch).where(Branch.code == "sucursal-uno"))
+        assert own is not None
+        item = Product(branch_id=own.id, name="Aguja", category="Res")
+        session.add(item)
+        session.flush()
+        item_id = item.id
+    app.dependency_overrides[_service] = lambda: PriceImportTransactionService(
+        sessions, branch_scope=BranchScope("sucursal-uno")
+    )
+
+    def reject_audit(*_args: object) -> None:
+        raise IntegrityError("audit rejected", {}, Exception("private detail"))
+
+    try:
+        with TestClient(app, base_url="https://testserver") as client:
+            csrf = login(client, "editor")
+            token = upload(client, workbook(item_id), csrf).json()["preview_id"]
+            event.listen(AdminCommercialAudit, "before_insert", reject_audit)
+            try:
+                response = client.post(
+                    f"{BASE}/confirm",
+                    json={"preview_id": token, "confirmed": True},
+                    headers=csrf,
+                )
+            finally:
+                event.remove(AdminCommercialAudit, "before_insert", reject_audit)
+            assert response.status_code == 503
+            assert "private detail" not in response.text
+        with sessions() as session:
+            assert session.scalars(select(Price)).all() == []
+            assert session.scalars(select(AdminCommercialAudit)).all() == []
+            assert session.scalar(select(PriceImportAudit.status)) == "failed"
+    finally:
+        app.dependency_overrides.pop(_service, None)
+
+
+def test_imported_price_update_keeps_safe_before_after(app, sessions) -> None:
+    auth = AdminAuthService(sessions, settings=settings())
+    auth.create_user("editor", PASSWORD, role=AdminRole.EDITOR)
+    with sessions.begin() as session:
+        own = session.scalar(select(Branch).where(Branch.code == "sucursal-uno"))
+        assert own is not None
+        product = Product(branch_id=own.id, name="Aguja", category="Res")
+        session.add(product)
+        session.flush()
+        product_id = product.id
+        session.add(Price(branch_id=own.id, product_id=product_id, unit="kg", amount="99.00"))
+    app.dependency_overrides[_service] = lambda: PriceImportTransactionService(
+        sessions, branch_scope=BranchScope("sucursal-uno")
+    )
+    try:
+        with TestClient(app, base_url="https://testserver") as client:
+            csrf = login(client, "editor")
+            token = upload(client, workbook(product_id), csrf).json()["preview_id"]
+            receipt = client.post(
+                f"{BASE}/confirm",
+                json={"preview_id": token, "confirmed": True},
+                headers=csrf,
+            )
+            assert receipt.status_code == 200 and receipt.json()["updated"] == 1
+        with sessions() as session:
+            change = session.scalar(select(AdminCommercialAudit))
+            user = session.scalar(select(AdminUser).where(AdminUser.username == "editor"))
+            assert change is not None and user is not None
+            assert change.actor_user_id == user.id and change.action == "update"
+            assert change.product_id == product_id and change.unit == "kg"
+            assert str(change.old_amount) == "99.00"
+            assert str(change.new_amount) == "123.45"
     finally:
         app.dependency_overrides.pop(_service, None)

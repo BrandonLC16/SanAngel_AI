@@ -16,6 +16,7 @@ class AdminPermission(StrEnum):
     COMMERCIAL_READ = "commercial:read"
     COMMERCIAL_WRITE = "commercial:write"
     BRANCH_WRITE = "branch:write"
+    AUDIT_READ = "audit:read"
 
 
 ROLE_PERMISSIONS: dict[AdminRole, frozenset[AdminPermission]] = {

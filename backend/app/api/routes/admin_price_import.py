@@ -151,6 +151,7 @@ async def confirm_price_import(
             prepared=pending.prepared,
             confirmed=True,
             actor=ImportActor(f"admin-{principal.user_id}"),
+            admin_actor_user_id=principal.user_id,
         )
     except (PriceImportConfirmationError, PriceImportValidationError, PriceImportStalePreviewError):
         raise PriceImportReviewUnavailable() from None

@@ -4,9 +4,13 @@ from dataclasses import dataclass
 from hashlib import sha256
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.app.core.admin_roles import AdminPermission, AdminRole, permits
+from backend.app.db.models.admin_commercial import AdminCommercialAudit
+from backend.app.db.models.admin_user import AdminUser
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.repositories.price_import_audit_repository import (
     ImportActor,
@@ -94,6 +98,7 @@ class PriceImportTransactionService:
         prepared: PreparedPriceImport,
         confirmed: bool,
         actor: ImportActor,
+        admin_actor_user_id: int | None = None,
     ) -> PriceImportReceipt:
         if not isinstance(actor, ImportActor):
             raise PriceImportConfirmationError("trusted audit actor is required")
@@ -140,6 +145,20 @@ class PriceImportTransactionService:
                     BranchRepository(session),
                     assistant_branch_code=self._branch_scope.branch_code,
                 ).get_current_branch()
+                if admin_actor_user_id is not None:
+                    role = session.scalar(
+                        select(AdminUser.role).where(
+                            AdminUser.id == admin_actor_user_id,
+                            AdminUser.branch_id == branch.id,
+                            AdminUser.is_active.is_(True),
+                        )
+                    )
+                    if (
+                        role is None
+                        or not permits(AdminRole(role), AdminPermission.COMMERCIAL_WRITE)
+                        or actor.actor_id != f"admin-{admin_actor_user_id}"
+                    ):
+                        raise PriceImportConfirmationError("authorized audit actor is required")
                 products = ProductRepository(session, branch=branch)
                 prices = PriceRepository(session, branch=branch)
                 created = updated = unchanged = 0
@@ -161,11 +180,27 @@ class PriceImportTransactionService:
 
                     data = PriceData(amount=item.proposed_price_mxn, unit=item.unit)
                     if current is None:
-                        prices.create(product, data)
+                        changed = prices.create(product, data)
                         created += 1
+                        action = "create"
                     else:
-                        prices.update(current, data)
+                        changed = prices.update(current, data)
                         updated += 1
+                        action = "update"
+                    if admin_actor_user_id is not None:
+                        session.add(
+                            AdminCommercialAudit(
+                                branch_id=branch.id,
+                                actor_user_id=admin_actor_user_id,
+                                resource="price",
+                                resource_id=changed.id,
+                                action=action,
+                                product_id=product.id,
+                                unit=item.unit,
+                                old_amount=current_amount,
+                                new_amount=changed.amount,
+                            )
+                        )
 
                 audit = PriceImportAuditRepository(session, branch_scope=self._branch_scope).record(
                     attempt_id=attempt_id,

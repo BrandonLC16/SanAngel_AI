@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-25
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.6 — Conversaciones y preguntas no resueltas (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F8.6 cerrada; F8.7 pendiente
+**Subfase activa:** ninguna; F8.7 — Auditoría administrativa (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F8.7 cerrada; F8.8 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3142,30 +3142,33 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.7 — Auditoría administrativa
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-25
+**Fecha de finalización:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] actor.
+- [x] actor.
 
-- [ ] acción.
+- [x] acción.
 
-- [ ] timestamp.
+- [x] timestamp.
 
-- [ ] entidad.
+- [x] entidad.
 
-- [ ] before/after seguro.
+- [x] before/after seguro.
 
 
 ### Criterios de aceptación
 
-- [ ] cambios de precio trazables.
+- [x] cambios de precio trazables.
 
 
 ### Seguridad
 
-- [ ] no guardar passwords/tokens.
+- [x] no guardar passwords/tokens.
 
 
 ### Prompt para Codex
@@ -8436,6 +8439,53 @@ por lo que esas vistas pueden estar vacías o mostrar solo actividad de conversa
 ese flujo queda fuera de F8.6. No se usaron cuentas ni datos reales.
 
 Siguiente: F8.7 — Auditoría administrativa (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-09-25 — F8.7 Auditoría administrativa
+
+**Fase/subfase:** Fase 8 / F8.7, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+**Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO`.
+
+Cambios: vista administrativa de auditoría con actor local, acción, fecha UTC, entidad e ID y
+proyección before/after limitada a importes de precio y roles. Acceso de solo lectura para
+`owner`, filtros de entidad y producto, paginación y panel. Cada precio creado o actualizado por
+la importación Excel del panel deja ahora un recibo por fila en la transacción del precio; el
+servicio revalida el actor activo y su permiso antes de escribir.
+
+Archivos: `backend/app/core/admin_roles.py`, `backend/app/main.py`,
+`backend/app/api/routes/admin_audit.py`, `backend/app/api/routes/admin_price_import.py`,
+`backend/app/schemas/admin_audit.py`, `backend/app/services/admin_audit_service.py`,
+`backend/app/services/price_import_transaction.py`, `backend/tests/test_admin_audit.py`,
+`backend/tests/test_admin_price_import.py`, `frontend/src/App.tsx`,
+`frontend/src/App.test.tsx`, `frontend/src/AuditPanel.tsx`,
+`frontend/src/AuditPanel.test.tsx`, `frontend/src/auditApi.ts`, `frontend/README.md`,
+`docs/fase_8_auditoria.md`, `README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_admin_audit.py backend/tests/test_admin_price_import.py -q -p no:cacheprovider` → 6 aprobadas;
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 597 aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 168 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → dependencias coherentes;
+- `npm --prefix frontend run test` → 27 pruebas aprobadas;
+- `npm --prefix frontend run build` → tipos y bundle correctos;
+- `npm --prefix frontend audit --audit-level=high` → 0 vulnerabilidades reportadas;
+- `git diff --check` → sin errores de whitespace; avisos LF/CRLF del entorno.
+
+Seguridad: la ruta exige sesión HTTPS, permiso `owner` vigente y sucursal obtenida de backend.
+La respuesta se construye con campos permitidos explícitamente, usa `no-store` y no lee ni
+guarda passwords, hashes, tokens, cuerpos HTTP ni texto libre. Las pruebas comprueban 401/403,
+aislamiento entre sucursales, revocación de rol, before/after de precios y rollback completo al
+fallar un recibo de importación.
+
+Riesgos/Pendientes: las importaciones anteriores a F8.7 tienen solo el resumen de F5.5 y no
+permiten reconstruir importes por fila. La vista no distingue el origen manual o Excel de cada
+precio; los reportes de importación siguen separados. Definir retención y acceso operativo al
+historial antes de producción; no se utilizaron cuentas ni datos reales.
+
+Siguiente: F8.8 — Pruebas seguridad panel (`⬜ PENDIENTE`), recomendada, no iniciada.
 
 ---
 

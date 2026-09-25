@@ -9,6 +9,7 @@ from backend.app.api.errors import (
 )
 from backend.app.api.middleware import request_context_middleware, safe_exception_middleware
 from backend.app.api.routes.admin import router as admin_router
+from backend.app.api.routes.admin_audit import router as admin_audit_router
 from backend.app.api.routes.admin_auth import router as admin_auth_router
 from backend.app.api.routes.admin_commercial import router as admin_commercial_router
 from backend.app.api.routes.admin_price_import import router as admin_price_import_router
@@ -47,6 +48,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     application.include_router(whatsapp_router)
     application.include_router(admin_auth_router)
     application.include_router(admin_router)
+    application.include_router(admin_audit_router)
     application.include_router(admin_commercial_router)
     application.include_router(admin_price_import_router)
     application.include_router(admin_review_router)
