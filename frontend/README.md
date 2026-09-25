@@ -16,6 +16,7 @@ F8.7 incorpora [auditoría administrativa](../docs/fase_8_auditoria.md) para pro
 filtros por entidad y producto. Los precios y roles muestran valores anterior y posterior mínimos.
 F8.8 amplía las pruebas del shell y los formularios ante sesión vencida y texto HTML no confiable;
 véase [la guía de seguridad](../docs/fase_8_seguridad_panel.md).
+El [cierre de Fase 8](../docs/fase_8_cierre.md) documenta las entregas y los límites de despliegue.
 
 ## Preparación y validación
 
@@ -44,6 +45,7 @@ debe desactivar la validación TLS ni simular `X-Forwarded-Proto` desde un clien
 Para un despliegue, servir `frontend/dist/` y `/api` bajo el mismo origen
 HTTPS mediante el proxy inverso. El backend mantiene su allowlist CORS sin `*`; el shell usa
 rutas relativas y no necesita CORS entre orígenes.
+No publicar el panel ni `/api/v1/admin` en internet antes de completar los controles de F10.
 
 La sesión está en una cookie `Secure`/`HttpOnly` emitida por el backend. El cliente usa
 `credentials: 'same-origin'`; solo conserva el token CSRF en memoria mientras la sesión está

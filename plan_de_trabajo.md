@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-09-25
-**Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.8 — Pruebas seguridad panel (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F8.8 cerrada; F8.9 pendiente
+**Fase activa:** Fase 8 — Panel administrativo seguro (`✅ COMPLETADO`)
+**Subfase activa:** ninguna; F8.9 — Cierre Fase 8 (`✅ COMPLETADO`)
+**Estado global:** ✅ COMPLETADO — Fase 8 cerrada; Fase 9 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -2842,10 +2842,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Crear una interfaz de PC para administrar datos, revisar conversaciones y operar el sistema sin exponer secretos.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 **Fecha de inicio:** 2026-09-24
+**Fecha de cierre:** 2026-09-25
 
-**Documento guía:** `plan_de_trabajo.md`
+**Documento guía:** `plan_de_trabajo.md`; [cierre](docs/fase_8_cierre.md)
 
 
 ## F8.1 — Autenticación backend
@@ -3238,28 +3239,31 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.9 — Cierre Fase 8
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-25
+**Fecha de cierre:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] build.
+- [x] build.
 
-- [ ] docs.
+- [x] docs.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 8 completa.
+- [x] Fase 8 completa.
 
 
 ### Seguridad
 
-- [ ] no exponer aún a internet sin F10.
+- [x] no exponer aún a internet sin F10.
 
 
 ### Prompt para Codex
@@ -4278,11 +4282,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 | límite de iteraciones tool calling | F6 | Sí | ⬜ |
 | idempotencia persistente | F7 | Sí | ⬜ |
 | política de retención | F7 | Sí | ⬜ |
-| autenticación admin | F8 | Sí | ⬜ |
-| RBAC | F8 | Sí | ⬜ |
-| password hashing adecuado | F8 | Sí | ⬜ |
-| rate limit login | F8 | Sí | ⬜ |
-| audit log precios | F8 | Sí | ⬜ |
+| autenticación admin | F8 | Sí | ✅ F8.1/F8.8 |
+| RBAC | F8 | Sí | ✅ F8.2/F8.8 |
+| password hashing adecuado | F8 | Sí | ✅ F8.1 |
+| rate limit login | F8 | Sí | ✅ F8.1/F8.8 |
+| audit log precios | F8 | Sí | ✅ F8.7 |
 | handoff AI/HUMAN exclusivo | F9 | Sí si se usa | ⬜ |
 | HTTPS | F10 | Sí | ⬜ |
 | rate limiting | F10 | Sí | ⬜ |
@@ -4349,10 +4353,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F8.6 — Conversaciones y preguntas no resueltas (`✅ COMPLETADO`).
-**Última subfase completada:** F8.6 — Conversaciones y preguntas no resueltas.
-**Siguiente subfase recomendada:** F8.7 — Auditoría administrativa (`⬜ PENDIENTE`).
+**Fase activa:** Fase 8 — Panel administrativo seguro (`✅ COMPLETADO`).
+**Subfase activa:** ninguna; F8.9 — Cierre Fase 8 (`✅ COMPLETADO`).
+**Última subfase completada:** F8.9 — Cierre Fase 8.
+**Siguiente subfase recomendada:** F9.1 — Estado AI/HUMAN (`⬜ PENDIENTE`); Fase 9 no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4381,6 +4385,12 @@ por sesión, confirmación y recibo desde el panel; 590 pruebas Python y 19 fron
 F8.6 completada el 2026-09-25 con listados filtrados y detalle mínimo de conversaciones y
 agregados FAQ, más resolución transaccional de una FAQ aprobada; 593 pruebas Python y 25 frontend
 aprobadas.
+F8.7 completada el 2026-09-25 con auditoría de cambios comerciales y de rol, incluida trazabilidad
+de precios de la importación Excel; 597 pruebas Python y 27 frontend aprobadas. F8.8 completada
+el 2026-09-25 con pruebas transversales de autorización, CSRF, XSS, CORS, límite de login y sesión
+vencida; 603 pruebas Python y 29 frontend aprobadas. F8.9 y Fase 8 cerradas el 2026-09-25 tras
+repetir la suite, lint, formato y build y documentar que el panel no debe exponerse a internet
+antes de F10.
 
 ---
 
@@ -8529,6 +8539,42 @@ HTTPS, proxies confiables y cabeceras del servidor estático, incluida CSP, requ
 operativa antes de publicar el panel. CORS no autoriza solicitudes por sí solo.
 
 Siguiente: F8.9 — Cierre Fase 8 (`⬜ PENDIENTE`), recomendada, no iniciada.
+
+---
+
+## 2026-09-25 — F8.9 Cierre Fase 8
+
+**Fase/subfase:** Fase 8 / F8.9, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+**Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO`.
+
+Cambios: cierre de Fase 8 tras revisar F8.1–F8.8, repetir pruebas y build, y documentar entregas,
+límites y resultados. Se corrigió el checkpoint narrativo que aún señalaba F8.7 como pendiente y
+se actualizó la matriz de controles F8. No se modificó código de aplicación ni se añadieron pruebas
+redundantes a los controles de F8.8.
+
+Archivos: `docs/fase_8_cierre.md`, `README.md`, `frontend/README.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 603 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 171 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → dependencias coherentes;
+- `npm --prefix frontend run test` → 29 pruebas aprobadas en 10 archivos;
+- `npm --prefix frontend run build` → tipos y bundle correctos;
+- `git diff --check` → sin errores de whitespace; avisos LF/CRLF del entorno.
+
+Seguridad: las pruebas de F8.8 verifican rechazo anónimo de los endpoints admin protegidos,
+autorización, CSRF, XSS, CORS, límite de login y vencimiento de sesión. La configuración vigente
+escucha en `127.0.0.1` por defecto tanto en backend como en Vite. El panel y `/api/v1/admin`
+permanecen para acceso local restringido: no exponerlos a internet antes de completar F10.
+
+Riesgos/Pendientes: las pruebas locales y el build no validan un despliegue público. Quedan para
+F10 TLS/proxy confiable, cabeceras/CSP, gestión de secretos y controles operativos. El flujo
+WhatsApp actual no alimenta automáticamente mensajes ni agregados FAQ del panel; las importaciones
+anteriores a F8.7 no tienen historial de precios por fila. No se usaron cuentas ni datos reales.
+
+Siguiente: F9.1 — Estado AI/HUMAN (`⬜ PENDIENTE`), recomendado y no iniciado.
 
 ---
 

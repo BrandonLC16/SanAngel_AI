@@ -463,6 +463,9 @@ rol, visible solo para propietarios de la instalación. Los precios modificados 
 o su importación Excel conservan actor, fecha, producto, unidad e importes anterior y nuevo.
 F8.8 agrega [pruebas de seguridad del panel](docs/fase_8_seguridad_panel.md) para rutas anónimas,
 roles, CSRF, XSS, CORS, límite de login y expiración de sesión.
+El [cierre de Fase 8](docs/fase_8_cierre.md) resume las entregas y sus límites. El panel y los
+endpoints administrativos deben permanecer locales y restringidos: **no exponerlos a internet
+antes de completar F10**, que incluye TLS/proxy, cabeceras de seguridad y controles operativos.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
