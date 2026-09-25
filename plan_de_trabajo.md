@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-25
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.7 — Auditoría administrativa (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F8.7 cerrada; F8.8 pendiente
+**Subfase activa:** ninguna; F8.8 — Pruebas seguridad panel (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F8.8 cerrada; F8.9 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3189,32 +3189,35 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.8 — Pruebas seguridad panel
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-09-25
+**Fecha de finalización:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] authz.
+- [x] authz.
 
-- [ ] CSRF si aplica.
+- [x] CSRF si aplica.
 
-- [ ] XSS.
+- [x] XSS.
 
-- [ ] CORS.
+- [x] CORS.
 
-- [ ] fuerza bruta básica.
+- [x] fuerza bruta básica.
 
-- [ ] session expiry.
+- [x] session expiry.
 
 
 ### Criterios de aceptación
 
-- [ ] controles pasan.
+- [x] controles pasan.
 
 
 ### Seguridad
 
-- [ ] ningún endpoint admin anónimo.
+- [x] ningún endpoint de datos admin anónimo; login público por diseño.
 
 
 ### Prompt para Codex
@@ -8486,6 +8489,46 @@ precio; los reportes de importación siguen separados. Definir retención y acce
 historial antes de producción; no se utilizaron cuentas ni datos reales.
 
 Siguiente: F8.8 — Pruebas seguridad panel (`⬜ PENDIENTE`), recomendada, no iniciada.
+
+---
+
+## 2026-09-25 — F8.8 Pruebas seguridad panel
+
+**Fase/subfase:** Fase 8 / F8.8, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+**Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO`.
+
+Cambios: suite transversal que recorre los 27 métodos de rutas admin registrados y exige 401
+sin sesión en los 26 protegidos; `POST /auth/login` permanece público para autenticar. Comprueba
+CSRF ausente/incorrecto en cada escritura, roles backend ante cabeceras falsificadas, preflight
+CORS, límites persistentes de login y expiración en SQLite. El frontend añade pruebas de FAQ con
+HTML no confiable y retirada del panel al vencer la sesión o recibir 401. Se documentó el alcance.
+
+Archivos: `backend/tests/test_admin_panel_security.py`, `frontend/src/App.test.tsx`,
+`frontend/src/CommercialPanel.test.tsx`, `docs/fase_8_seguridad_panel.md`, `frontend/README.md`,
+`README.md`, `plan_de_trabajo.md`. No se modificó código de aplicación.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_admin_panel_security.py -q -p no:cacheprovider` → 6 aprobadas, repetidas tras un ajuste de estilo;
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 603 aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 170 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → dependencias coherentes;
+- `npm --prefix frontend run test` → 29 pruebas aprobadas;
+- `npm --prefix frontend run build` → tipos y bundle correctos;
+- `npm --prefix frontend audit --audit-level=high` → 0 vulnerabilidades reportadas;
+- `git diff --check` → sin errores de whitespace; avisos LF/CRLF del entorno.
+
+Seguridad: se probaron explícitamente autorización backend, CSRF en escrituras, renderizado de
+texto no confiable, CORS, límite básico por cuenta y origen directo, y rechazo de sesión vencida
+aun con cookie y CSRF. El login es la única ruta admin pública necesaria; no expone datos sin
+credenciales. Las pruebas usan datos ficticios, bases temporales y ningún servicio externo.
+
+Riesgos/Pendientes: estas pruebas locales no sustituyen una revisión de navegador y despliegue.
+HTTPS, proxies confiables y cabeceras del servidor estático, incluida CSP, requieren verificación
+operativa antes de publicar el panel. CORS no autoriza solicitudes por sí solo.
+
+Siguiente: F8.9 — Cierre Fase 8 (`⬜ PENDIENTE`), recomendada, no iniciada.
 
 ---
 

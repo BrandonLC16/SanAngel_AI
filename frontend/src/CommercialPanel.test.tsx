@@ -52,3 +52,17 @@ it('crea producto con CSRF y muestra texto de catálogo como texto', async () =>
     { name: 'Aguja', category: 'Res' }, 'test-only-csrf',
   ))
 })
+
+it('muestra pregunta y respuesta FAQ no confiables como texto', async () => {
+  const question = '<img src=x onerror=alert(1)>'
+  const answer = '<script>alert(1)</script>'
+  vi.mocked(commercialApi.faqs).mockResolvedValue([{
+    id: 8, category: 'general', question, answer, is_active: true,
+  }])
+  render(<CommercialPanel section="faqs" role="viewer" csrfToken="csrf" onExpired={vi.fn()} />)
+  expect(await screen.findByText(question)).toBeTruthy()
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Ver' }))
+  expect((screen.getByLabelText('Respuesta') as HTMLTextAreaElement).value).toBe(answer)
+  expect(document.querySelector('img')).toBeNull()
+  expect(document.querySelector('script')).toBeNull()
+})

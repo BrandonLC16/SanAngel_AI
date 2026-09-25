@@ -461,6 +461,8 @@ resueltas, con resolución de una FAQ aprobada sin exponer el texto original del
 F8.7 agrega [auditoría administrativa](docs/fase_8_auditoria.md) de cambios comerciales y de
 rol, visible solo para propietarios de la instalación. Los precios modificados mediante el panel
 o su importación Excel conservan actor, fecha, producto, unidad e importes anterior y nuevo.
+F8.8 agrega [pruebas de seguridad del panel](docs/fase_8_seguridad_panel.md) para rutas anónimas,
+roles, CSRF, XSS, CORS, límite de login y expiración de sesión.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

@@ -122,6 +122,24 @@ describe('shell del panel', () => {
     expect(await screen.findByText('No hay cambios con estos filtros.')).toBeTruthy()
   })
 
+  it('retira el panel ante una sesión vencida o un 401 posterior', async () => {
+    vi.mocked(getSession).mockResolvedValueOnce({
+      ...validSession, expires_at: new Date(Date.now() - 1000).toISOString(),
+    })
+    const first = render(<App />)
+    await screen.findByRole('heading', { name: 'Inicia sesión' })
+    expect(screen.queryByRole('heading', { name: 'Bienvenido al panel' })).toBeNull()
+    first.unmount()
+
+    vi.mocked(getSession).mockResolvedValue(validSession)
+    vi.mocked(auditApi.events).mockRejectedValue(new AdminApiError(401))
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Bienvenido al panel' })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Auditoría' }))
+    await screen.findByRole('heading', { name: 'Inicia sesión' })
+    expect(screen.queryByRole('heading', { name: 'Auditoría' })).toBeNull()
+  })
+
   it('muestra texto de usuario sin interpretarlo como HTML', async () => {
     vi.mocked(getSession).mockResolvedValue({
       ...validSession,

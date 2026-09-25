@@ -14,6 +14,8 @@ canal autorizado; el panel no revela la pregunta original ni identificadores de 
 
 F8.7 incorpora [auditoría administrativa](../docs/fase_8_auditoria.md) para propietarios, con
 filtros por entidad y producto. Los precios y roles muestran valores anterior y posterior mínimos.
+F8.8 amplía las pruebas del shell y los formularios ante sesión vencida y texto HTML no confiable;
+véase [la guía de seguridad](../docs/fase_8_seguridad_panel.md).
 
 ## Preparación y validación
 
