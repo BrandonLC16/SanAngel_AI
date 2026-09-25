@@ -8,6 +8,10 @@ sucursal; los permisos visuales del panel solo facilitan el uso.
 F8.5 incorpora [importación de precios Excel](../docs/fase_8_import_excel.md): carga, vista
 previa, confirmación y recibo para editores y propietarios. La sucursal destino la fija el backend.
 
+F8.6 incorpora [revisión de conversaciones y preguntas no resueltas](../docs/fase_8_revision.md)
+con filtros y detalle mínimo. La resolución de una FAQ exige un texto aprobado obtenido por un
+canal autorizado; el panel no revela la pregunta original ni identificadores de WhatsApp.
+
 ## Preparación y validación
 
 Desde la raíz del repositorio:

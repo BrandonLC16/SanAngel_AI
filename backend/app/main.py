@@ -12,6 +12,7 @@ from backend.app.api.routes.admin import router as admin_router
 from backend.app.api.routes.admin_auth import router as admin_auth_router
 from backend.app.api.routes.admin_commercial import router as admin_commercial_router
 from backend.app.api.routes.admin_price_import import router as admin_price_import_router
+from backend.app.api.routes.admin_review import router as admin_review_router
 from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.whatsapp import router as whatsapp_router
@@ -48,6 +49,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     application.include_router(admin_router)
     application.include_router(admin_commercial_router)
     application.include_router(admin_price_import_router)
+    application.include_router(admin_review_router)
     return application
 
 

@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-25
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.5 — UI importación Excel (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F8.5 cerrada; F8.6 pendiente
+**Subfase activa:** ninguna; F8.6 — Conversaciones y preguntas no resueltas (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F8.6 cerrada; F8.7 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3098,28 +3098,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.6 — Conversaciones y preguntas no resueltas
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Inicio:** 2026-09-25
+**Cierre:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] listado.
+- [x] listado.
 
-- [ ] filtros.
+- [x] filtros.
 
-- [ ] detalle mínimo.
+- [x] detalle mínimo.
 
-- [ ] resolver FAQ.
+- [x] resolver FAQ.
 
 
 ### Criterios de aceptación
 
-- [ ] operación útil.
+- [x] operación útil.
 
 
 ### Seguridad
 
-- [ ] PII minimizada.
+- [x] PII minimizada.
 
 
 ### Prompt para Codex
@@ -4342,9 +4344,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F8.5 — UI importación Excel (`✅ COMPLETADO`).
-**Última subfase completada:** F8.5 — UI importación Excel.
-**Siguiente subfase recomendada:** F8.6 — Conversaciones y preguntas no resueltas (`⬜ PENDIENTE`).
+**Subfase activa:** ninguna; F8.6 — Conversaciones y preguntas no resueltas (`✅ COMPLETADO`).
+**Última subfase completada:** F8.6 — Conversaciones y preguntas no resueltas.
+**Siguiente subfase recomendada:** F8.7 — Auditoría administrativa (`⬜ PENDIENTE`).
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4370,6 +4372,9 @@ F8.4 completada el 2026-09-24 con CRUD limitado a la sucursal configurada, preci
 FAQ administradas con superposición al TSV, auditoría transaccional y panel; 588 pruebas Python
 y 15 pruebas frontend aprobadas. F8.5 completada el 2026-09-25 con carga acotada, vista previa
 por sesión, confirmación y recibo desde el panel; 590 pruebas Python y 19 frontend aprobadas.
+F8.6 completada el 2026-09-25 con listados filtrados y detalle mínimo de conversaciones y
+agregados FAQ, más resolución transaccional de una FAQ aprobada; 593 pruebas Python y 25 frontend
+aprobadas.
 
 ---
 
@@ -8387,6 +8392,50 @@ compartido. Sigue pendiente la política operativa de retención/borrado de repo
 de producción. Pruebas sin cuentas reales ni datos de una tienda.
 
 Siguiente: F8.6 — Conversaciones y preguntas no resueltas (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-09-25 — F8.6 Conversaciones y preguntas no resueltas
+
+**Fase/subfase:** Fase 8 / F8.6, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+
+Cambios: rutas y servicio con listados acotados, filtros y detalle mínimo de conversaciones y
+agregados FAQ; panel de revisión con paginación; resolución de FAQ con pregunta proporcionada
+por personal autorizado, correspondencia HMAC, escritura y auditoría transaccionales. Se expuso
+un derivador interno de clave en el servicio F7.5 sin cambiar el formato ni la persistencia.
+
+Archivos: `backend/app/main.py`, `backend/app/api/routes/admin_review.py`,
+`backend/app/schemas/admin_review.py`, `backend/app/services/admin_review_service.py`,
+`backend/app/services/unresolved_question_service.py`, `backend/tests/test_admin_review.py`,
+`frontend/src/App.tsx`, `frontend/src/App.test.tsx`, `frontend/src/ReviewPanel.tsx`,
+`frontend/src/ReviewPanel.test.tsx`, `frontend/src/reviewApi.ts`,
+`frontend/src/reviewApi.test.ts`, `frontend/src/styles.css`, `frontend/README.md`,
+`README.md`, `docs/fase_8_revision.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 593 pruebas aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 163 archivos correctos;
+- `npm run test` (en `frontend`) → 25 pruebas aprobadas;
+- `npm run build` (en `frontend`) → TypeScript y bundle correctos;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace (avisos LF/CRLF del entorno).
+
+Seguridad: sesión HTTPS, RBAC y CSRF en resolución; sucursal inyectada por backend y revalidada
+con rol vigente en base. Listas y detalle no entregan número, `chatId`, HMAC ni texto; paginación
+y detalle están acotados. Un ID de otra sucursal devuelve 404. La pregunta aportada se coteja
+con HMAC y se rechazan formatos evidentes de correo/teléfono; la respuesta de resolución solo
+contiene IDs. FAQ, retiro del agregado y auditoría forman una transacción; el fallo de auditoría
+revierte todo.
+
+Riesgos: el panel no puede reconstruir una pregunta a partir del HMAC; resolver un agregado
+requiere el texto exacto obtenido por un canal autorizado. La detección de PII no reemplaza
+revisión humana. El flujo WhatsApp actual aún no crea filas `messages` ni invoca la tool FAQ,
+por lo que esas vistas pueden estar vacías o mostrar solo actividad de conversación; integrar
+ese flujo queda fuera de F8.6. No se usaron cuentas ni datos reales.
+
+Siguiente: F8.7 — Auditoría administrativa (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

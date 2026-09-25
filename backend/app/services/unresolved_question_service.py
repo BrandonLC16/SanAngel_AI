@@ -42,15 +42,10 @@ class UnresolvedQuestionService:
             HumanHelpReason.FAQ_AMBIGUOUS,
         }:
             raise ValueError("an unresolved FAQ fallback is required")
-        normalized = self._normalize(query)
+        question_key = self.question_key(query)
         branch = BranchService(
             BranchRepository(self._session), assistant_branch_code=self._scope.branch_code
         ).get_current_branch()
-        question_key = hmac.new(
-            self._key,
-            f"unresolved-faq:v1:{normalized}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
         now = datetime.now(UTC)
         statement = insert(UnresolvedQuestion).values(
             branch_id=branch.id,
@@ -93,6 +88,15 @@ class UnresolvedQuestionService:
             )
             for row in rows
         )
+
+    def question_key(self, query: str) -> str:
+        """Derive the same scoped lookup key without exposing the secret or question."""
+        normalized = self._normalize(query)
+        return hmac.new(
+            self._key,
+            f"unresolved-faq:v1:{normalized}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
 
     @staticmethod
     def _normalize(query: str) -> str:

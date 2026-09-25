@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { AdminApiError, getSession, login, logout, type AdminSession } from './api'
 import { CommercialPanel, type CommercialSection } from './CommercialPanel'
 import { PriceImportPanel } from './PriceImportPanel'
+import { ReviewPanel } from './ReviewPanel'
 
 type Notice = { kind: 'error' | 'info'; text: string } | null
 
@@ -36,7 +37,7 @@ export function App() {
   const [checking, setChecking] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
-  const [section, setSection] = useState<'overview' | CommercialSection | 'import'>('overview')
+  const [section, setSection] = useState<'overview' | CommercialSection | 'import' | 'conversations' | 'unresolved'>('overview')
 
   const handleExpired = useCallback(() => {
     setSession(null)
@@ -190,6 +191,8 @@ export function App() {
     products: 'Productos y precios',
     faqs: 'Preguntas frecuentes',
     import: 'Importación Excel',
+    conversations: 'Conversaciones',
+    unresolved: 'Preguntas no resueltas',
   }
 
   return (
@@ -203,8 +206,8 @@ export function App() {
           <button type="button" className={`nav-item ${section === 'products' ? 'nav-active' : ''}`} aria-current={section === 'products' ? 'page' : undefined} onClick={() => setSection('products')}><span aria-hidden="true">▦</span>Productos y precios</button>
           <button type="button" className={`nav-item ${section === 'faqs' ? 'nav-active' : ''}`} aria-current={section === 'faqs' ? 'page' : undefined} onClick={() => setSection('faqs')}><span aria-hidden="true">▤</span>FAQ</button>
           <button type="button" className={`nav-item ${section === 'import' ? 'nav-active' : ''}`} aria-current={section === 'import' ? 'page' : undefined} onClick={() => setSection('import')}><span aria-hidden="true">⇧</span>Importación Excel</button>
-          <p className="nav-caption nav-second">PRÓXIMAMENTE</p>
-          <span className="nav-item nav-disabled"><span aria-hidden="true">◇</span>Conversaciones</span>
+          <button type="button" className={`nav-item ${section === 'conversations' ? 'nav-active' : ''}`} aria-current={section === 'conversations' ? 'page' : undefined} onClick={() => setSection('conversations')}><span aria-hidden="true">◇</span>Conversaciones</button>
+          <button type="button" className={`nav-item ${section === 'unresolved' ? 'nav-active' : ''}`} aria-current={section === 'unresolved' ? 'page' : undefined} onClick={() => setSection('unresolved')}><span aria-hidden="true">?</span>Preguntas no resueltas</button>
         </nav>
         <div className="sidebar-footer">Panel de operación<br /><strong>Acceso interno</strong></div>
       </aside>
@@ -225,6 +228,7 @@ export function App() {
           </div>
           <section className="coming-panel"><div className="coming-icon" aria-hidden="true">↗</div><div><span className="card-kicker">ADMINISTRACIÓN</span><h2>Datos de tu instalación</h2><p>Gestiona sucursal, catálogo, precios y preguntas frecuentes desde el menú.</p></div></section></> :
             section === 'import' ? <PriceImportPanel role={session.role} csrfToken={session.csrf_token} onExpired={handleExpired} /> :
+            section === 'conversations' || section === 'unresolved' ? <ReviewPanel section={section} role={session.role} csrfToken={session.csrf_token} onExpired={handleExpired} /> :
             <CommercialPanel section={section} role={session.role} csrfToken={session.csrf_token} onExpired={handleExpired} />}
         </main>
       </div>

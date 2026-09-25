@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { AdminApiError, getSession, login, logout } from './api'
 import { commercialApi } from './commercialApi'
+import { reviewApi } from './reviewApi'
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api')>()
@@ -13,6 +14,11 @@ vi.mock('./api', async (importOriginal) => {
 vi.mock('./commercialApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./commercialApi')>()
   return { ...actual, commercialApi: { ...actual.commercialApi, branch: vi.fn() } }
+})
+
+vi.mock('./reviewApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./reviewApi')>()
+  return { ...actual, reviewApi: { ...actual.reviewApi, conversations: vi.fn(), unresolved: vi.fn() } }
 })
 
 const validSession = {
@@ -89,6 +95,19 @@ describe('shell del panel', () => {
     await user.click(screen.getByRole('button', { name: 'Sucursal' }))
     expect(await screen.findByText('sucursal-uno')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Guardar sucursal' })).toBeTruthy()
+  })
+
+  it('abre conversaciones y preguntas no resueltas desde la navegación', async () => {
+    vi.mocked(getSession).mockResolvedValue(validSession)
+    vi.mocked(reviewApi.conversations).mockResolvedValue({ items: [], has_more: false })
+    vi.mocked(reviewApi.unresolved).mockResolvedValue({ items: [], has_more: false })
+    render(<App />)
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { name: 'Bienvenido al panel' })
+    await user.click(screen.getByRole('button', { name: 'Conversaciones' }))
+    expect(await screen.findByText('No hay conversaciones con estos filtros.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Preguntas no resueltas' }))
+    expect(await screen.findByText('No hay agregados con estos filtros.')).toBeTruthy()
   })
 
   it('muestra texto de usuario sin interpretarlo como HTML', async () => {

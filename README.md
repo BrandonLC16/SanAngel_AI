@@ -57,8 +57,8 @@ de solo lectura que valida `.xlsx`, tamaño, paquete,
 sucursal configurada, cabeceras, tipos, duplicados y rangos, y devuelve errores por fila sin
 escribir en la base. F5.3 añade un preview de solo lectura: coteja ID y nombre del producto
 dentro de la sucursal configurada y presenta altas, cambios, precios iguales y errores mediante
-datos mínimos aptos para revisión administrativa. El preview/import Excel aún no tiene endpoint
-de administración.
+datos mínimos aptos para revisión administrativa. F8.5 expone este flujo en el panel
+autenticado.
 
 F5.4 incorpora un servicio interno de importación transaccional. Exige un preview revisado y
 confirmación explícita, vuelve a validar archivo y catálogo bajo una transacción, y crea o
@@ -66,10 +66,9 @@ actualiza únicamente precios de la sucursal configurada. Ante un error revierte
 F5.5 añade auditoría persistente a cada intento de confirmación: actor opaco, fecha UTC, huella
 SHA-256 del archivo como identificador lógico, sucursal, resultado, conteos y errores seguros.
 El recibo enlaza al reporte, que se consulta con alcance de sucursal. El Excel no se guarda en la
-base ni en disco. El servicio no está conectado a un endpoint ni al chatbot.
+base ni en disco. F8.5 lo conecta a rutas administrativas; no está conectado al chatbot.
 F5.6 cierra la Fase 5 con pruebas de cargas maliciosas y revisión de seguridad del flujo interno.
-La futura interfaz administrativa aún debe autenticar al personal y limitar el upload antes de
-leerlo completo.
+F8.5 conecta la importación al panel autenticado y limita el upload antes de leerlo completo.
 
 F6.1 define los [contratos estrictos de cuatro tools](docs/fase_6_tools.md) para Responses API:
 precio, datos de sucursal, FAQ y propuesta de ayuda humana. La allowlist y los argumentos se
@@ -455,6 +454,10 @@ F8.4 agrega [administración comercial](docs/fase_8_commercial.md) de la sucursa
 productos, precios exactos y FAQ mediante rutas con sesión, RBAC y CSRF. El panel ofrece los
 formularios y listas correspondientes. Cada cambio efectivo deja auditoría transaccional;
 las FAQ administradas sustituyen por pregunta a las del TSV cuando se usa la tool FAQ.
+
+F8.5 incorpora [la importación Excel del panel](docs/fase_8_import_excel.md). F8.6 agrega
+[listados y detalle mínimo](docs/fase_8_revision.md) de conversaciones y preguntas FAQ no
+resueltas, con resolución de una FAQ aprobada sin exponer el texto original del agregado.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
