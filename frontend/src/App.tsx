@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { AdminApiError, getSession, login, logout, type AdminSession } from './api'
 import { CommercialPanel, type CommercialSection } from './CommercialPanel'
+import { PriceImportPanel } from './PriceImportPanel'
 
 type Notice = { kind: 'error' | 'info'; text: string } | null
 
@@ -35,7 +36,7 @@ export function App() {
   const [checking, setChecking] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
-  const [section, setSection] = useState<'overview' | CommercialSection>('overview')
+  const [section, setSection] = useState<'overview' | CommercialSection | 'import'>('overview')
 
   const handleExpired = useCallback(() => {
     setSession(null)
@@ -188,6 +189,7 @@ export function App() {
     branch: 'Sucursal',
     products: 'Productos y precios',
     faqs: 'Preguntas frecuentes',
+    import: 'Importación Excel',
   }
 
   return (
@@ -200,6 +202,7 @@ export function App() {
           <button type="button" className={`nav-item ${section === 'branch' ? 'nav-active' : ''}`} aria-current={section === 'branch' ? 'page' : undefined} onClick={() => setSection('branch')}><span aria-hidden="true">◇</span>Sucursal</button>
           <button type="button" className={`nav-item ${section === 'products' ? 'nav-active' : ''}`} aria-current={section === 'products' ? 'page' : undefined} onClick={() => setSection('products')}><span aria-hidden="true">▦</span>Productos y precios</button>
           <button type="button" className={`nav-item ${section === 'faqs' ? 'nav-active' : ''}`} aria-current={section === 'faqs' ? 'page' : undefined} onClick={() => setSection('faqs')}><span aria-hidden="true">▤</span>FAQ</button>
+          <button type="button" className={`nav-item ${section === 'import' ? 'nav-active' : ''}`} aria-current={section === 'import' ? 'page' : undefined} onClick={() => setSection('import')}><span aria-hidden="true">⇧</span>Importación Excel</button>
           <p className="nav-caption nav-second">PRÓXIMAMENTE</p>
           <span className="nav-item nav-disabled"><span aria-hidden="true">◇</span>Conversaciones</span>
         </nav>
@@ -221,6 +224,7 @@ export function App() {
             <section className="summary-card"><span className="card-kicker">TU PERFIL</span><h2>{roleNames[session.role]}</h2><p>Los permisos de tu cuenta se verifican en el servidor.</p></section>
           </div>
           <section className="coming-panel"><div className="coming-icon" aria-hidden="true">↗</div><div><span className="card-kicker">ADMINISTRACIÓN</span><h2>Datos de tu instalación</h2><p>Gestiona sucursal, catálogo, precios y preguntas frecuentes desde el menú.</p></div></section></> :
+            section === 'import' ? <PriceImportPanel role={session.role} csrfToken={session.csrf_token} onExpired={handleExpired} /> :
             <CommercialPanel section={section} role={session.role} csrfToken={session.csrf_token} onExpired={handleExpired} />}
         </main>
       </div>

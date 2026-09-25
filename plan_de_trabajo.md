@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-09-24
+**Última actualización:** 2026-09-25
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F8.4 — CRUD comercial (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F8.4 cerrada; F8.5 pendiente
+**Subfase activa:** ninguna; F8.5 — UI importación Excel (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F8.5 cerrada; F8.6 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3050,32 +3050,34 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F8.5 — UI importación Excel
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Inicio:** 2026-09-25
+**Cierre:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] upload.
+- [x] upload.
 
-- [ ] preview.
+- [x] preview.
 
-- [ ] confirmación.
+- [x] confirmación.
 
-- [ ] resultado.
+- [x] resultado.
 
-- [ ] mostrar la sucursal destino fijada por backend.
+- [x] mostrar la sucursal destino fijada por backend.
 
 
 ### Criterios de aceptación
 
-- [ ] flujo seguro usable.
+- [x] flujo seguro usable.
 
 
 ### Seguridad
 
-- [ ] CSRF/autorización, límites archivo.
+- [x] CSRF/autorización, límites archivo.
 
-- [ ] no permitir cambiar sucursal manipulando el formulario.
+- [x] no permitir cambiar sucursal manipulando el formulario.
 
 
 ### Prompt para Codex
@@ -4340,9 +4342,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 8 — Panel administrativo seguro (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F8.4 — CRUD comercial (`✅ COMPLETADO`).
-**Última subfase completada:** F8.4 — CRUD comercial.
-**Siguiente subfase recomendada:** F8.5 — UI importación Excel (`⬜ PENDIENTE`).
+**Subfase activa:** ninguna; F8.5 — UI importación Excel (`✅ COMPLETADO`).
+**Última subfase completada:** F8.5 — UI importación Excel.
+**Siguiente subfase recomendada:** F8.6 — Conversaciones y preguntas no resueltas (`⬜ PENDIENTE`).
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4366,7 +4368,8 @@ backend, endpoints de perfil/usuarios/rol, auditoría transaccional y rechazo 40
 F8.3 completada el 2026-09-24 tras abrir el bundle en navegador de PC, revisar el layout y repetir pruebas, build y lint.
 F8.4 completada el 2026-09-24 con CRUD limitado a la sucursal configurada, precios exactos,
 FAQ administradas con superposición al TSV, auditoría transaccional y panel; 588 pruebas Python
-y 15 pruebas frontend aprobadas. F8.5 no se inició.
+y 15 pruebas frontend aprobadas. F8.5 completada el 2026-09-25 con carga acotada, vista previa
+por sesión, confirmación y recibo desde el panel; 590 pruebas Python y 19 frontend aprobadas.
 
 ---
 
@@ -8344,6 +8347,46 @@ Riesgos/Pendientes:
   usaron solo bases temporales, sin login real ni escrituras sobre datos de una tienda.
 
 Siguiente: F8.5 — UI importación Excel, `⬜ PENDIENTE`; recomendada, no iniciada.
+
+---
+
+## 2026-09-25 — F8.5 UI importación Excel
+
+**Fase/subfase:** Fase 8 / F8.5, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+
+Cambios: se añadieron rutas de vista previa y confirmación para Excel, con cuerpo acotado y
+nombre validado; estado temporal ligado a la sesión y consumido una vez; panel con destino
+fijo, carga, impacto, errores y recibo. Se documentó el contrato y su límite operativo.
+
+Archivos: `backend/app/main.py`, `backend/app/api/routes/admin_price_import.py`,
+`backend/app/services/admin_price_import_pending.py`, `backend/tests/test_admin_price_import.py`,
+`frontend/src/App.tsx`, `frontend/src/PriceImportPanel.tsx`,
+`frontend/src/PriceImportPanel.test.tsx`, `frontend/src/priceImportApi.ts`,
+`frontend/src/priceImportApi.test.ts`, `frontend/src/styles.css`, `frontend/README.md`,
+`docs/fase_8_import_excel.md`, `plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 590 aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 158 archivos correctos;
+- `npm run test` (en `frontend`) → 19 aprobadas;
+- `npm run build` (en `frontend`) → TypeScript y bundle correctos;
+- `.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+- `git diff --check` → sin errores de whitespace (avisos LF/CRLF del entorno).
+
+Seguridad: sesión HTTPS, RBAC y CSRF se verifican antes de leer el cuerpo; límite de 2 MiB
+por `Content-Length` y lectura por partes, además de límites ZIP/filas de F5. La sucursal se
+inyecta desde backend y se rechazan archivos de otra sucursal. La confirmación exige vista
+previa válida ligada a la sesión, es de un solo uso y revalida catálogo/precios dentro de la
+transacción con auditoría. No se persisten bytes, nombres ni contenido de celdas del XLSX.
+
+Riesgos: las vistas previas residen en memoria de un solo proceso (máximo 16, 10 minutos). Un
+reinicio las invalida; no usar varios workers/instancias para este flujo sin un almacén temporal
+compartido. Sigue pendiente la política operativa de retención/borrado de reportes de F5 antes
+de producción. Pruebas sin cuentas reales ni datos de una tienda.
+
+Siguiente: F8.6 — Conversaciones y preguntas no resueltas (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

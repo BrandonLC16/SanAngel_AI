@@ -11,12 +11,14 @@ from backend.app.api.middleware import request_context_middleware, safe_exceptio
 from backend.app.api.routes.admin import router as admin_router
 from backend.app.api.routes.admin_auth import router as admin_auth_router
 from backend.app.api.routes.admin_commercial import router as admin_commercial_router
+from backend.app.api.routes.admin_price_import import router as admin_price_import_router
 from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.whatsapp import router as whatsapp_router
 from backend.app.core.config import HttpSettings, get_http_settings
 from backend.app.core.exceptions import ApplicationError
 from backend.app.core.logging import configure_logging
+from backend.app.services.admin_price_import_pending import AdminPriceImportPendingStore
 
 
 def create_app(settings: HttpSettings | None = None) -> FastAPI:
@@ -26,6 +28,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     configure_logging(http_settings.log_level)
 
     application = FastAPI(title=http_settings.app_name)
+    application.state.price_import_pending = AdminPriceImportPendingStore()
     application.add_exception_handler(ApplicationError, application_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.middleware("http")(safe_exception_middleware)
@@ -44,6 +47,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     application.include_router(admin_auth_router)
     application.include_router(admin_router)
     application.include_router(admin_commercial_router)
+    application.include_router(admin_price_import_router)
     return application
 
 

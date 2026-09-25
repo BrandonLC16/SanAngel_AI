@@ -5,6 +5,9 @@ layout, cierre de sesión y estados de error. F8.4 incorpora listas y formulario
 sucursal configurada, productos, precios y FAQ. El backend aplica RBAC, CSRF y alcance de
 sucursal; los permisos visuales del panel solo facilitan el uso.
 
+F8.5 incorpora [importación de precios Excel](../docs/fase_8_import_excel.md): carga, vista
+previa, confirmación y recibo para editores y propietarios. La sucursal destino la fija el backend.
+
 ## Preparación y validación
 
 Desde la raíz del repositorio:
