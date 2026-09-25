@@ -43,6 +43,12 @@ contacto.
 usuario humano de la misma sucursal y conteo de respuestas automáticas en curso. Migra las
 conversaciones existentes a `AI` sin reconstruir las tablas de mensajes.
 
+`20260925_0012` agrega el destinatario cifrado a `conversations`, la reserva de envío manual al
+estado de responsable y `manual_send_receipts` para idempotencia y aceptación de GreenAPI. Las
+conversaciones existentes conservan `recipient_ciphertext=NULL` hasta el siguiente mensaje
+entrante; no se puede responder manualmente a ellas antes de ese momento. La migración no
+almacena texto ni destinatarios en claro.
+
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
 crea uno sin sobrescribir otro y comprueba su integridad. Revisar el

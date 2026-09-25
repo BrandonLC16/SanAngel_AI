@@ -12,6 +12,7 @@ from backend.app.core.config import AssistantSettings, ConversationIdentitySetti
 from backend.app.core.exceptions import BranchNotConfiguredError, ServiceUnavailableError
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
+from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
 from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
@@ -73,6 +74,13 @@ class WhatsAppPrivacyService:
                             Message.occurred_at >= message_cutoff,
                         )
                     ),
+                    ~exists(
+                        select(ManualSendReceipt.id).where(
+                            ManualSendReceipt.branch_id == branch_id,
+                            ManualSendReceipt.conversation_id == Conversation.id,
+                            ManualSendReceipt.status.in_(("pending", "uncertain")),
+                        )
+                    ),
                 )
                 old_receipts = (
                     WhatsAppEventReceipt.branch_id == branch_id,
@@ -94,6 +102,14 @@ class WhatsAppPrivacyService:
                 )
                 if apply:
                     messages = session.execute(delete(Message).where(*old_messages)).rowcount
+                    session.execute(
+                        delete(ManualSendReceipt).where(
+                            ManualSendReceipt.branch_id == branch_id,
+                            ManualSendReceipt.conversation_id.in_(
+                                select(Conversation.id).where(*old_conversations)
+                            ),
+                        )
+                    )
                     session.execute(
                         delete(ConversationResponderState).where(
                             ConversationResponderState.branch_id == branch_id,
@@ -170,6 +186,12 @@ class WhatsAppPrivacyService:
                     delete(Message).where(
                         Message.branch_id == branch_id,
                         Message.conversation_id == conversation_id,
+                    )
+                )
+                session.execute(
+                    delete(ManualSendReceipt).where(
+                        ManualSendReceipt.branch_id == branch_id,
+                        ManualSendReceipt.conversation_id == conversation_id,
                     )
                 )
                 session.execute(

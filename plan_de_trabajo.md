@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-25
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F9.2 — Bandeja de conversaciones (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F9.2 cerrada; F9.3 pendiente
+**Subfase activa:** F9.3 — Respuesta humana por WhatsApp (`⛔ BLOQUEADO`, inicio 2026-09-25)
+**Estado global:** ⛔ BLOQUEADO — F9.3 requiere prueba de recepción en un WhatsApp autorizado
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3383,22 +3383,23 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F9.3 — Respuesta humana por WhatsApp
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ⛔ BLOQUEADO
+**Fecha de inicio:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] endpoint admin.
+- [x] endpoint admin.
 
-- [ ] WhatsAppClient.
+- [x] WhatsAppClient.
 
-- [ ] confirmación de envío.
+- [x] confirmación de aceptación en la cola de GreenAPI.
 
-- [ ] estado.
+- [x] estado.
 
-- [ ] tests.
+- [x] tests locales.
 
-- [ ] cliente GreenAPI seleccionado por la sucursal de la conversación.
+- [x] cliente GreenAPI restringido a la sucursal de la conversación.
 
 
 ### Criterios de aceptación
@@ -3408,9 +3409,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ### Seguridad
 
-- [ ] solo usuario autorizado.
+- [x] solo usuario autorizado.
 
-- [ ] nunca enviar desde el número de otra sucursal.
+- [x] nunca enviar desde el número de otra sucursal.
 
 
 ### Prompt para Codex
@@ -4360,9 +4361,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F9.2 — Bandeja de conversaciones (`✅ COMPLETADO`).
+**Subfase activa:** F9.3 — Respuesta humana por WhatsApp (`⛔ BLOQUEADO`, inicio 2026-09-25).
 **Última subfase completada:** F9.2 — Bandeja de conversaciones.
-**Siguiente subfase recomendada:** F9.3 — Respuesta humana por WhatsApp (`⬜ PENDIENTE`), no iniciada.
+**Siguiente subfase recomendada:** F9.4 — Handoff automático/manual (`⬜ PENDIENTE`), no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4401,7 +4402,9 @@ F9.1 completada el 2026-09-25 con modo persistente AI/HUMAN por conversación, a
 humana única, transiciones autorizadas y reserva atómica de respuestas de IA para impedir
 traspasos durante un envío; 608 pruebas Python y 29 frontend aprobadas. F9.2 completada el
 2026-09-25 con bandeja filtrable, detalle de estado y toma/liberación desde el panel con sesión,
-RBAC, CSRF y metadatos mínimos; 609 pruebas Python y 30 frontend aprobadas. F9.3 sigue pendiente.
+RBAC, CSRF y metadatos mínimos; 609 pruebas Python y 30 frontend aprobadas. F9.3 tiene
+implementación y validación local aprobadas (614 pruebas Python y 32 frontend), pero continúa
+bloqueada hasta comprobar recepción real en un WhatsApp de prueba autorizado.
 
 ---
 
@@ -8680,6 +8683,55 @@ desde el HMAC. Una respuesta de IA ambigua puede bloquear la toma hasta concilia
 panel no debe exponerse a internet antes de F10.
 
 Siguiente: F9.3 — Respuesta humana por WhatsApp (`⬜ PENDIENTE`), recomendada y no iniciada.
+
+---
+
+## 2026-09-25 — F9.3 Respuesta humana por WhatsApp, validación pendiente
+
+**Fase/subfase:** Fase 9 / F9.3, `⛔ BLOQUEADO` (inicio 2026-09-25).
+**Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `⛔ BLOQUEADO`.
+
+Cambios: ruta administrativa para enviar texto confirmado desde el chat `HUMAN` asignado,
+reutilizando `WhatsAppClient` de la instalación. El destinatario entrante se conserva cifrado y
+se comprueba con la identidad HMAC y la sucursal; las conversaciones previas necesitan un nuevo
+mensaje entrante. La reserva persistente por UUID impide reenvíos duplicados; se guarda aceptación
+en cola o resultado incierto y se bloquea el chat ante este último. El panel permite revisar antes
+de enviar y muestra el estado sin afirmar entrega. Se documentó el alcance y la privacidad.
+
+Archivos: `backend/app/api/routes/admin_review.py`, `backend/app/core/admin_roles.py`,
+`backend/app/core/exceptions.py`, `backend/app/db/models/{__init__,conversation,conversation_responder_state,manual_send_receipt}.py`,
+`backend/app/schemas/admin_review.py`, `backend/app/services/{admin_review_service,conversation_identity_service,conversation_mode_service,conversation_recipient_cipher,manual_reply_service,whatsapp_privacy_service}.py`,
+`backend/tests/{test_conversation_schema,test_fase_7_recovery,test_manual_reply,test_migrations,test_whatsapp_privacy_service}.py`,
+`frontend/src/{ReviewPanel,ReviewPanel.test,reviewApi,reviewApi.test}.ts*`,
+`migrations/versions/20260925_0012_manual_whatsapp_replies.py`, `migrations/README.md`,
+`pyproject.toml`, `README.md`, `docs/{fase_7_privacidad,fase_9_bandeja,fase_9_modo,fase_9_respuesta_humana}.md`,
+`plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pip install -e ".[dev]"` → dependencia `cryptography` instalada;
+- `.venv\Scripts\python.exe -m pytest -q` → primera ejecución: 613 aprobadas, 1 fallo por expectativa antigua de revisión Alembic `0011` en prueba de restauración; actualizada a `0012` y repetida: 614 aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 184 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → dependencias coherentes;
+- `npm --prefix frontend test -- --run` → 32 aprobadas;
+- `npm --prefix frontend run build` → TypeScript y bundle correctos;
+- `git -c core.safecrlf=false diff --check` → aprobado.
+
+Seguridad: sesión vigente, RBAC, CSRF y asignación exacta se comprueban en el endpoint y servicio.
+Pruebas negativas para anónimo, `viewer`, otro editor, propietario sin asignación y conversación
+de otra sucursal. El número permanece cifrado; texto, contraseña y tokens no se guardan en el
+recibo ni se devuelven. El envío usa solo las credenciales y la instancia de la sucursal configurada.
+
+Bloqueo y riesgos: las pruebas locales demuestran la llamada a la misma ruta GreenAPI, pero su
+`idMessage` solo acredita aceptación en cola. Falta comprobar la recepción real en un WhatsApp de
+prueba autorizado; se solicitó al usuario un chat y autorización para responder. Hasta obtener esa
+evidencia, el criterio «mensaje manual llega por el mismo canal» no está probado y F9.3 no se
+marca completada. Un resultado `pending`/`uncertain` requiere conciliación operativa y el panel
+no debe exponerse a internet antes de F10.
+
+Siguiente: terminar la validación F9.3 con un chat de prueba autorizado. F9.4 — Handoff
+automático/manual permanece `⬜ PENDIENTE` y no se inició.
 
 ---
 

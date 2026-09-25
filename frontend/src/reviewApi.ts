@@ -6,8 +6,13 @@ export type ConversationItem = {
   mode: ConversationMode; assigned_to_me: boolean
 }
 export type MessageMetadata = { direction: 'inbound' | 'outbound'; occurred_at: string }
-export type ConversationDetail = ConversationItem & { message_count: number; recent_messages: MessageMetadata[] }
+export type ManualSendSummary = { receipt_id: number; status: 'pending' | 'accepted' | 'uncertain'; created_at: string }
+export type ConversationDetail = ConversationItem & {
+  message_count: number; recent_messages: MessageMetadata[]
+  manual_send_blocked: boolean; latest_manual_send: ManualSendSummary | null
+}
 export type ConversationModeResult = { mode: ConversationMode; assigned_to_me: boolean }
+export type ManualReplyResult = { receipt_id: number; status: ManualSendSummary['status'] }
 export type UnresolvedItem = {
   id: number; reason: 'faq_unknown' | 'faq_ambiguous'; occurrences: number
   first_seen_at: string; last_seen_at: string
@@ -77,6 +82,14 @@ export const reviewApi = {
   release(id: number, csrf: string): Promise<ConversationModeResult> {
     return request(`/conversations/${positiveId(id)}/release`, {
       method: 'POST', headers: { 'X-CSRF-Token': csrf },
+    })
+  },
+  sendManual(id: number, text: string, requestId: string, csrf: string): Promise<ManualReplyResult> {
+    if (!text.trim() || text.length > 2000) throw new AdminApiError(422)
+    return request(`/conversations/${positiveId(id)}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+      body: JSON.stringify({ text: text.trim(), request_id: requestId, confirmed: true }),
     })
   },
   unresolved(filters: { reason?: string; minOccurrences: number; offset: number }): Promise<Page<UnresolvedItem>> {

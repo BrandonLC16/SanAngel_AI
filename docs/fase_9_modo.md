@@ -30,5 +30,7 @@ dejar la conversación bloqueada; no se despeja automáticamente ni se reenvía 
 
 La purga y el borrado individual de metadatos eliminan el estado junto con la conversación. La
 tabla no almacena texto de mensajes, número de WhatsApp, contraseña ni token. F9.2 incorporó la
-[bandeja y los controles de toma/liberación](fase_9_bandeja.md); F9.3 incorporará el envío humano. El panel sigue sin
+[bandeja y los controles de toma/liberación](fase_9_bandeja.md); F9.3 incorporó el
+[envío humano](fase_9_respuesta_humana.md) y bloquea la liberación mientras el envío esté
+pendiente o incierto. El panel sigue sin
 estar preparado para exposición pública hasta F10.

@@ -29,6 +29,15 @@ it('usa rutas del mismo origen y solo envía CSRF en escrituras', async () => {
     expect(fetchMock.mock.calls[index]![1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': 'csrf' } })
     expect(fetchMock.mock.calls[index]![0]).not.toContain('csrf')
   }
+  const requestId = '00000000-0000-4000-8000-000000000001'
+  await reviewApi.sendManual(7, ' Respuesta de prueba ', requestId, 'csrf')
+  expect(fetchMock.mock.calls[5]![0]).toBe('/api/v1/admin/review/conversations/7/messages')
+  expect(fetchMock.mock.calls[5]![1]).toMatchObject({
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': 'csrf' },
+    body: JSON.stringify({ text: 'Respuesta de prueba', request_id: requestId, confirmed: true }),
+  })
+  expect(fetchMock.mock.calls[5]![0]).not.toContain('csrf')
 })
 
 it('rechaza IDs, filtros y paginación inválidos antes de llamar al servidor', () => {
@@ -41,5 +50,7 @@ it('rechaza IDs, filtros y paginación inválidos antes de llamar al servidor', 
   expect(() => reviewApi.conversations({ offset: 5001 })).toThrow()
   expect(() => reviewApi.conversations({ mode: 'OTHER' as 'AI', offset: 0 })).toThrow()
   expect(() => reviewApi.take(0, 'csrf')).toThrow()
+  expect(() => reviewApi.sendManual(0, 'texto', 'request-id', 'csrf')).toThrow()
+  expect(() => reviewApi.sendManual(1, '   ', 'request-id', 'csrf')).toThrow()
   expect(fetchMock).not.toHaveBeenCalled()
 })

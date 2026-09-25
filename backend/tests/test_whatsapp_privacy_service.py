@@ -13,9 +13,11 @@ from backend.app.cli.purge_whatsapp_metadata import main
 from backend.app.core.config import AssistantSettings, ConversationIdentitySettings
 from backend.app.core.exceptions import InvalidRequestError, ServiceUnavailableError
 from backend.app.db.base import Base
+from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
+from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
@@ -184,6 +186,38 @@ def test_recent_message_preserves_parent_when_conversation_timestamp_is_old(
     with sessions() as session:
         assert len(session.scalars(select(Conversation)).all()) == 1
         assert len(session.scalars(select(Message)).all()) == 1
+
+
+def test_uncertain_manual_send_preserves_old_conversation_for_review(
+    sessions: sessionmaker[Session],
+) -> None:
+    first_id, _ = branch_ids(sessions)
+    with sessions.begin() as session:
+        actor = AdminUser(
+            branch_id=first_id,
+            username="editor",
+            password_hash="$argon2id$test-only-hash",
+            role="editor",
+        )
+        session.add(actor)
+        session.flush()
+        conversation = add_conversation(session, first_id, "e" * 64, age_days=31)
+        session.add(
+            ManualSendReceipt(
+                conversation_id=conversation.id,
+                branch_id=first_id,
+                actor_user_id=actor.id,
+                request_id="00000000-0000-4000-8000-000000000001",
+                status="uncertain",
+            )
+        )
+    result = WhatsAppPrivacyService(sessions, settings=settings()).purge_expired(
+        apply=True, now=NOW
+    )
+    assert result.conversations == 0
+    with sessions() as session:
+        assert session.scalars(select(Conversation)).all()
+        assert session.scalars(select(ManualSendReceipt)).all()
 
 
 def test_inactive_configured_branch_still_purges_expired_receipts(

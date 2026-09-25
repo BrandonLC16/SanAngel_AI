@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator
 
 from backend.app.core.conversation_mode import ConversationMode
 from backend.app.schemas.admin_commercial import FAQWrite
@@ -35,11 +35,38 @@ class MessageMetadata(_ReviewModel):
 class ConversationDetail(ConversationItem):
     message_count: int
     recent_messages: list[MessageMetadata]
+    manual_send_blocked: bool
+    latest_manual_send: "ManualSendSummary | None"
 
 
 class ConversationModeResult(_ReviewModel):
     mode: ConversationMode
     assigned_to_me: bool
+
+
+class ManualSendSummary(_ReviewModel):
+    receipt_id: int
+    status: Literal["pending", "accepted", "uncertain"]
+    created_at: datetime
+
+
+class ManualReplyRequest(_ReviewModel):
+    request_id: UUID4
+    text: str = Field(min_length=1, max_length=2000)
+    confirmed: Literal[True]
+
+    @field_validator("text")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized or "\x00" in normalized:
+            raise ValueError("invalid manual reply text")
+        return normalized
+
+
+class ManualReplyResult(_ReviewModel):
+    receipt_id: int
+    status: Literal["pending", "accepted", "uncertain"]
 
 
 class UnresolvedItem(_ReviewModel):

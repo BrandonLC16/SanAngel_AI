@@ -33,6 +33,7 @@ ADMIN_AUTH_REVISION = "20260924_0008"
 ADMIN_RBAC_REVISION = "20260924_0009"
 ADMIN_COMMERCIAL_REVISION = "20260924_0010"
 CONVERSATION_MODE_REVISION = "20260925_0011"
+MANUAL_REPLY_REVISION = "20260925_0012"
 
 
 def sqlite_url(path: Path) -> str:
@@ -47,9 +48,10 @@ def test_migration_history_has_reproducible_conversation_mode_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [CONVERSATION_MODE_REVISION]
-    assert len(revisions) == 11
+    assert scripts.get_heads() == [MANUAL_REPLY_REVISION]
+    assert len(revisions) == 12
     assert [revision.revision for revision in revisions] == [
+        MANUAL_REPLY_REVISION,
         CONVERSATION_MODE_REVISION,
         ADMIN_COMMERCIAL_REVISION,
         ADMIN_RBAC_REVISION,
@@ -62,17 +64,18 @@ def test_migration_history_has_reproducible_conversation_mode_head() -> None:
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == ADMIN_COMMERCIAL_REVISION
-    assert revisions[1].down_revision == ADMIN_RBAC_REVISION
-    assert revisions[2].down_revision == ADMIN_AUTH_REVISION
-    assert revisions[3].down_revision == UNRESOLVED_REVISION
-    assert revisions[4].down_revision == CONVERSATION_REVISION
-    assert revisions[5].down_revision == AUDIT_REVISION
-    assert revisions[6].down_revision == PRICE_REVISION
-    assert revisions[7].down_revision == PRODUCT_REVISION
-    assert revisions[8].down_revision == BRANCH_REVISION
-    assert revisions[9].down_revision == INITIAL_REVISION
-    assert revisions[10].down_revision is None
+    assert revisions[0].down_revision == CONVERSATION_MODE_REVISION
+    assert revisions[1].down_revision == ADMIN_COMMERCIAL_REVISION
+    assert revisions[2].down_revision == ADMIN_RBAC_REVISION
+    assert revisions[3].down_revision == ADMIN_AUTH_REVISION
+    assert revisions[4].down_revision == UNRESOLVED_REVISION
+    assert revisions[5].down_revision == CONVERSATION_REVISION
+    assert revisions[6].down_revision == AUDIT_REVISION
+    assert revisions[7].down_revision == PRICE_REVISION
+    assert revisions[8].down_revision == PRODUCT_REVISION
+    assert revisions[9].down_revision == BRANCH_REVISION
+    assert revisions[10].down_revision == INITIAL_REVISION
+    assert revisions[11].down_revision is None
 
 
 def test_admin_rbac_upgrade_defaults_existing_users_and_downgrade_restores_schema(
@@ -188,7 +191,7 @@ def test_commercial_migration_preserves_existing_catalog_and_enforces_faq_scope(
             with engine.connect() as connection:
                 assert (
                     MigrationContext.configure(connection).get_current_revision()
-                    == CONVERSATION_MODE_REVISION
+                    == MANUAL_REPLY_REVISION
                 )
                 assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
         finally:
@@ -259,7 +262,7 @@ def test_upgrade_head_creates_all_registered_schema(
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == CONVERSATION_MODE_REVISION
+        assert current_revision == MANUAL_REPLY_REVISION
         assert table_names == [
             "admin_commercial_audits",
             "admin_login_throttles",
@@ -271,6 +274,7 @@ def test_upgrade_head_creates_all_registered_schema(
             "conversation_responder_states",
             "conversations",
             "managed_faqs",
+            "manual_send_receipts",
             "messages",
             "price_import_audits",
             "prices",
@@ -576,7 +580,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            CONVERSATION_MODE_REVISION,
+            MANUAL_REPLY_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -588,6 +592,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "conversation_responder_states",
                 "conversations",
                 "managed_faqs",
+                "manual_send_receipts",
                 "messages",
                 "price_import_audits",
                 "prices",
@@ -628,7 +633,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == CONVERSATION_MODE_REVISION
+        assert snapshot()[0] == MANUAL_REPLY_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -642,7 +647,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            CONVERSATION_MODE_REVISION,
+            MANUAL_REPLY_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -654,6 +659,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "conversation_responder_states",
                 "conversations",
                 "managed_faqs",
+                "manual_send_receipts",
                 "messages",
                 "price_import_audits",
                 "prices",

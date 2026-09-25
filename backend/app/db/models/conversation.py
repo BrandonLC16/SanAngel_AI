@@ -17,7 +17,7 @@ from backend.app.db.base import Base
 
 
 class Conversation(Base):
-    """Correlate one sender without storing a phone number or message text."""
+    """Correlate one sender without storing a plain phone number or message text."""
 
     __tablename__ = "conversations"
     __table_args__ = (
@@ -38,6 +38,7 @@ class Conversation(Base):
     )
     channel: Mapped[str] = mapped_column(String(16), nullable=False, default="whatsapp")
     external_user_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    recipient_ciphertext: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
     )

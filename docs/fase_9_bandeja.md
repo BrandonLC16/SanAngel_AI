@@ -22,7 +22,7 @@ autorización y aplica la transición condicional en la base. Una ID de otra suc
 una toma concurrente o un cambio incompatible da 409. El panel actualiza la bandeja después
 de cada transición y muestra errores si el estado cambió mientras el operador lo veía.
 
-Esta subfase permite asignar y liberar conversaciones, pero aún no envía respuestas humanas.
-El panel sigue siendo interno y no debe exponerse a internet antes de F10. F9.3 deberá resolver
-de forma segura el destinatario para responder por WhatsApp: la clave HMAC conservada en la
-conversación no permite reconstruir el `chatId`.
+La [respuesta humana por WhatsApp](fase_9_respuesta_humana.md) de F9.3 agrega el envío tras
+confirmación y mantiene el chat bloqueado cuando el resultado es incierto. La clave HMAC por sí
+sola no permite reconstruir el `chatId`; los mensajes entrantes nuevos guardan el destinatario
+cifrado para ese fin. El panel sigue siendo interno y no debe exponerse a internet antes de F10.

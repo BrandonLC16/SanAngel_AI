@@ -25,6 +25,7 @@ from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
+from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
 from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.repositories.branch_repository import BranchRepository
@@ -32,6 +33,7 @@ from backend.app.schemas.admin_review import (
     ConversationDetail,
     ConversationItem,
     ConversationPage,
+    ManualSendSummary,
     MessageMetadata,
     ResolveFAQRequest,
     ResolveFAQResult,
@@ -186,6 +188,15 @@ class AdminReviewService:
             if row is None:
                 raise AdminCommercialNotFoundError()
             state = session.get(ConversationResponderState, row.id)
+            latest_send = session.scalar(
+                select(ManualSendReceipt)
+                .where(
+                    ManualSendReceipt.branch_id == branch.id,
+                    ManualSendReceipt.conversation_id == row.id,
+                )
+                .order_by(ManualSendReceipt.id.desc())
+                .limit(1)
+            )
             count = (
                 session.scalar(
                     select(func.count(Message.id)).where(
@@ -203,6 +214,16 @@ class AdminReviewService:
             return ConversationDetail(
                 **self._conversation_item(row, state, principal.user_id).model_dump(),
                 message_count=count,
+                manual_send_blocked=state.manual_send_blocked if state is not None else False,
+                latest_manual_send=(
+                    ManualSendSummary(
+                        receipt_id=latest_send.id,
+                        status=latest_send.status,
+                        created_at=latest_send.created_at,
+                    )
+                    if latest_send is not None
+                    else None
+                ),
                 recent_messages=[
                     MessageMetadata(direction=item.direction, occurred_at=item.occurred_at)
                     for item in messages

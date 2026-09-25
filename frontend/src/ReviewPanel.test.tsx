@@ -21,7 +21,7 @@ it('filtra conversaciones y muestra solo el detalle mínimo', async () => {
   })
   vi.mocked(reviewApi.conversation).mockResolvedValue({
     id: 7, channel: 'whatsapp', created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z',
-    mode: 'AI', assigned_to_me: false, message_count: 1, recent_messages: [{ direction: 'inbound', occurred_at: '2026-09-25T10:00:00Z' }],
+    mode: 'AI', assigned_to_me: false, message_count: 1, recent_messages: [{ direction: 'inbound', occurred_at: '2026-09-25T10:00:00Z' }], manual_send_blocked: false, latest_manual_send: null,
   })
   const user = userEvent.setup()
   render(<ReviewPanel section="conversations" role="viewer" csrfToken="csrf" onExpired={vi.fn()} />)
@@ -40,9 +40,9 @@ it('filtra por responsable y permite al editor tomar y liberar su chat', async (
   const initial = { id: 7, channel: 'whatsapp' as const, created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z', mode: 'AI' as const, assigned_to_me: false }
   vi.mocked(reviewApi.conversations).mockResolvedValue({ items: [initial], has_more: false })
   vi.mocked(reviewApi.conversation)
-    .mockResolvedValueOnce({ ...initial, message_count: 0, recent_messages: [] })
-    .mockResolvedValueOnce({ ...initial, mode: 'HUMAN', assigned_to_me: true, message_count: 0, recent_messages: [] })
-    .mockResolvedValueOnce({ ...initial, mode: 'AI', assigned_to_me: false, message_count: 0, recent_messages: [] })
+    .mockResolvedValueOnce({ ...initial, message_count: 0, recent_messages: [], manual_send_blocked: false, latest_manual_send: null })
+    .mockResolvedValueOnce({ ...initial, mode: 'HUMAN', assigned_to_me: true, message_count: 0, recent_messages: [], manual_send_blocked: false, latest_manual_send: null })
+    .mockResolvedValueOnce({ ...initial, mode: 'AI', assigned_to_me: false, message_count: 0, recent_messages: [], manual_send_blocked: false, latest_manual_send: null })
   vi.mocked(reviewApi.take).mockResolvedValue({ mode: 'HUMAN', assigned_to_me: true })
   vi.mocked(reviewApi.release).mockResolvedValue({ mode: 'AI', assigned_to_me: false })
   const user = userEvent.setup()
@@ -57,6 +57,39 @@ it('filtra por responsable y permite al editor tomar y liberar su chat', async (
   await waitFor(() => expect(reviewApi.take).toHaveBeenCalledWith(7, 'csrf'))
   await user.click(await screen.findByRole('button', { name: 'Liberar chat' }))
   await waitFor(() => expect(reviewApi.release).toHaveBeenCalledWith(7, 'csrf'))
+})
+
+it('pide revisar el texto y confirma el envio solo desde un chat asignado', async () => {
+  const initial = { id: 8, channel: 'whatsapp' as const, created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z', mode: 'HUMAN' as const, assigned_to_me: true }
+  const detail = { ...initial, message_count: 0, recent_messages: [], manual_send_blocked: false, latest_manual_send: null }
+  vi.mocked(reviewApi.conversations).mockResolvedValue({ items: [initial], has_more: false })
+  vi.mocked(reviewApi.conversation).mockResolvedValue(detail)
+  vi.mocked(reviewApi.sendManual).mockResolvedValue({ receipt_id: 23, status: 'accepted' })
+  const user = userEvent.setup()
+  render(<ReviewPanel section="conversations" role="editor" csrfToken="csrf" onExpired={vi.fn()} />)
+  await screen.findByText('Conversación #8')
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }))
+  await user.type(await screen.findByLabelText('Respuesta por WhatsApp'), 'Mensaje de prueba')
+  await user.click(screen.getByRole('button', { name: 'Revisar mensaje' }))
+  expect(reviewApi.sendManual).not.toHaveBeenCalled()
+  expect(screen.getByLabelText('Confirmación de envío').textContent).toContain('Mensaje de prueba')
+  await user.click(screen.getByRole('button', { name: 'Confirmar y enviar' }))
+  await waitFor(() => expect(reviewApi.sendManual).toHaveBeenCalledWith(8, 'Mensaje de prueba', expect.any(String), 'csrf'))
+  expect(await screen.findByText(/GreenAPI aceptó el mensaje #23 en su cola/)).toBeTruthy()
+  expect(screen.getByLabelText('Respuesta por WhatsApp')).toHaveProperty('value', '')
+})
+
+it('oculta la respuesta si el chat pertenece a otra persona', async () => {
+  const initial = { id: 8, channel: 'whatsapp' as const, created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z', mode: 'HUMAN' as const, assigned_to_me: false }
+  vi.mocked(reviewApi.conversations).mockResolvedValue({ items: [initial], has_more: false })
+  vi.mocked(reviewApi.conversation).mockResolvedValue({ ...initial, message_count: 0, recent_messages: [], manual_send_blocked: false, latest_manual_send: null })
+  const user = userEvent.setup()
+  render(<ReviewPanel section="conversations" role="editor" csrfToken="csrf" onExpired={vi.fn()} />)
+  await screen.findByText('Conversación #8')
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }))
+  await screen.findByLabelText('Detalle de conversación')
+  expect(screen.queryByLabelText('Respuesta por WhatsApp')).toBeNull()
+  expect(reviewApi.sendManual).not.toHaveBeenCalled()
 })
 
 it('permite resolver una FAQ solo al editor y limpia la pregunta del formulario', async () => {

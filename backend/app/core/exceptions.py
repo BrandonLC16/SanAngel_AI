@@ -51,6 +51,12 @@ class ConversationNotFoundError(ApplicationError):
     status_code = 404
 
 
+class ConversationRecipientUnavailableError(ApplicationError):
+    error_code = "conversation_recipient_unavailable"
+    public_message = "El destinatario aún no está disponible para esta conversación."
+    status_code = 409
+
+
 class AdminRateLimitError(ApplicationError):
     error_code = "admin_login_limited"
     public_message = "Demasiados intentos. Inténtalo más tarde."

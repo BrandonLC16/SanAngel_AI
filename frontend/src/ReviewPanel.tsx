@@ -35,11 +35,13 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [manualDraft, setManualDraft] = useState('')
+  const [manualPreview, setManualPreview] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const canWrite = role === 'editor' || role === 'owner'
 
   async function load(nextOffset: number, filters = applied) {
-    setBusy(true); setError(null); setDetail(null)
+    setBusy(true); setError(null); setDetail(null); setManualDraft(''); setManualPreview(null)
     try {
       const page = await reviewApi.conversations({ updatedFrom: filters.updatedFrom || undefined, updatedTo: filters.updatedTo || undefined, mode: filters.mode || undefined, mine: filters.mine, offset: nextOffset })
       setItems(page.items); setHasMore(page.has_more); setOffset(nextOffset); setApplied(filters)
@@ -52,7 +54,7 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
   useEffect(() => { void load(0) }, [])
 
   async function show(id: number) {
-    setBusy(true); setError(null); setNotice(null)
+    setBusy(true); setError(null); setNotice(null); setManualDraft(''); setManualPreview(null)
     try { setDetail(await reviewApi.conversation(id)) }
     catch (failure) {
       setError(errorText(failure))
@@ -84,12 +86,41 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
     } finally { setBusy(false) }
   }
 
+  async function sendManual() {
+    if (!canWrite || !detail || !detail.assigned_to_me || detail.mode !== 'HUMAN' || detail.manual_send_blocked || !manualPreview || busy) return
+    const id = detail.id
+    const text = manualPreview
+    setManualPreview(null); setManualDraft(''); setBusy(true); setError(null); setNotice(null)
+    try {
+      const result = await reviewApi.sendManual(id, text, crypto.randomUUID(), csrfToken)
+      setNotice(result.status === 'accepted'
+        ? `GreenAPI aceptó el mensaje #${result.receipt_id} en su cola. La entrega aún no está confirmada.`
+        : `El resultado del mensaje #${result.receipt_id} es incierto. No lo reenvíes; requiere revisión.`)
+      try {
+        const [current, page] = await Promise.all([
+          reviewApi.conversation(id),
+          reviewApi.conversations({ updatedFrom: applied.updatedFrom || undefined, updatedTo: applied.updatedTo || undefined, mode: applied.mode || undefined, mine: applied.mine, offset }),
+        ])
+        setDetail(current); setItems(page.items); setHasMore(page.has_more)
+      } catch (failure) {
+        if (failure instanceof AdminApiError && failure.status === 401) onExpired()
+        else setError('El estado del envío no pudo actualizarse. No reenvíes; recarga el detalle.')
+      }
+    } catch (failure) {
+      setError(`${errorText(failure)} El envío podría haberse iniciado; no lo reenvíes hasta revisar su estado.`)
+      if (failure instanceof AdminApiError && failure.status === 401) onExpired()
+      else {
+        try { setDetail(await reviewApi.conversation(id)) } catch { /* Conserva el aviso de envío incierto. */ }
+      }
+    } finally { setBusy(false) }
+  }
+
   return <div className="commercial review-panel">
     {error && <div role="alert" className="notice notice-error">{error}</div>}
     {notice && <div role="status" className="notice notice-info">{notice}</div>}
     <section className="admin-card">
       <h2>Bandeja de conversaciones activas</h2>
-      <p className="muted">Conversaciones conservadas en esta sucursal, ordenadas por actividad. Solo se muestran metadatos; no se guardan números ni contenido de mensajes. La respuesta humana aún no está disponible.</p>
+      <p className="muted">Conversaciones conservadas en esta sucursal, ordenadas por actividad. Solo se muestran metadatos; el destinatario se guarda cifrado y el texto de mensajes no se conserva.</p>
       <form className="review-filters" onSubmit={(event: FormEvent) => { event.preventDefault(); void load(0, { updatedFrom, updatedTo, mode, mine }) }}>
         <label htmlFor="conversation-from">Actividad desde</label>
         <input id="conversation-from" type="date" value={updatedFrom} disabled={busy} onChange={(event) => setUpdatedFrom(event.target.value)} />
@@ -107,7 +138,23 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
       </div>
       <div className="admin-actions"><button type="button" disabled={busy || offset === 0} onClick={() => void load(Math.max(0, offset - PAGE_SIZE))}>Anterior</button><button type="button" disabled={busy || !hasMore} onClick={() => void load(offset + PAGE_SIZE)}>Siguiente</button></div>
     </section>
-    {detail && <section className="admin-card" aria-label="Detalle de conversación"><h2>Conversación #{detail.id}</h2><p>Canal: WhatsApp · Creada: {formatDate(detail.created_at)} · Última actividad: {formatDate(detail.updated_at)}</p><p>Responsable: {detail.mode === 'AI' ? 'IA' : detail.assigned_to_me ? 'Personal · asignada a ti' : 'Personal · asignada a otra persona'}</p><p>Metadatos de mensajes disponibles: {detail.message_count}</p>{detail.recent_messages.length === 0 ? <p>No hay metadatos de mensajes guardados.</p> : <ul className="review-messages">{detail.recent_messages.map((message, index) => <li key={index}>{message.direction === 'inbound' ? 'Entrante' : 'Saliente'} · {formatDate(message.occurred_at)}</li>)}</ul>}{canWrite && detail.mode === 'AI' && <button type="button" disabled={busy} onClick={() => void changeMode('take')}>Tomar chat</button>}{canWrite && detail.mode === 'HUMAN' && (detail.assigned_to_me || role === 'owner') && <button type="button" disabled={busy} onClick={() => void changeMode('release')}>Liberar chat</button>}</section>}
+    {detail && <section className="admin-card" aria-label="Detalle de conversación">
+      <h2>Conversación #{detail.id}</h2>
+      <p>Canal: WhatsApp · Creada: {formatDate(detail.created_at)} · Última actividad: {formatDate(detail.updated_at)}</p>
+      <p>Responsable: {detail.mode === 'AI' ? 'IA' : detail.assigned_to_me ? 'Personal · asignada a ti' : 'Personal · asignada a otra persona'}</p>
+      <p>Metadatos de mensajes disponibles: {detail.message_count}</p>
+      {detail.recent_messages.length === 0 ? <p>No hay metadatos de mensajes guardados.</p> : <ul className="review-messages">{detail.recent_messages.map((message, index) => <li key={index}>{message.direction === 'inbound' ? 'Entrante' : 'Saliente'} · {formatDate(message.occurred_at)}</li>)}</ul>}
+      {detail.latest_manual_send && <p>Último envío manual #{detail.latest_manual_send.receipt_id}: {detail.latest_manual_send.status === 'accepted' ? 'aceptado en cola por GreenAPI; entrega no confirmada' : 'pendiente o incierto; requiere revisión antes de reenviar'}.</p>}
+      {canWrite && detail.mode === 'AI' && <button type="button" disabled={busy} onClick={() => void changeMode('take')}>Tomar chat</button>}
+      {canWrite && detail.mode === 'HUMAN' && (detail.assigned_to_me || role === 'owner') && <button type="button" disabled={busy || detail.manual_send_blocked} onClick={() => void changeMode('release')}>Liberar chat</button>}
+      {detail.manual_send_blocked && <p role="status">Envío manual pendiente o incierto. El chat está bloqueado para evitar un duplicado.</p>}
+      {canWrite && detail.mode === 'HUMAN' && detail.assigned_to_me && !detail.manual_send_blocked && <form className="admin-form" onSubmit={(event) => { event.preventDefault(); if (manualDraft.trim()) setManualPreview(manualDraft.trim()) }}>
+        <label htmlFor="manual-reply">Respuesta por WhatsApp</label>
+        <textarea id="manual-reply" value={manualDraft} maxLength={2000} required disabled={busy} onChange={(event) => { setManualDraft(event.target.value); setManualPreview(null) }} />
+        <button type="submit" disabled={busy || !manualDraft.trim()}>Revisar mensaje</button>
+      </form>}
+      {manualPreview && <div className="admin-card" aria-label="Confirmación de envío"><p>Revisa el texto antes de enviarlo a este mismo chat de WhatsApp:</p><blockquote>{manualPreview}</blockquote><button type="button" disabled={busy} onClick={() => void sendManual()}>Confirmar y enviar</button><button type="button" disabled={busy} onClick={() => setManualPreview(null)}>Cancelar</button></div>}
+    </section>}
   </div>
 }
 

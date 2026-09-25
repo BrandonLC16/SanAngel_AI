@@ -150,7 +150,9 @@ No lo reutilices como token de instancia ni lo compartas. Un valor anterior de m
 caracteres debe rotarse antes del próximo arranque.
 
 Genera otro valor independiente con el mismo comando para `CONVERSATION_IDENTITY_KEY`. Consérvalo
-estable por instalación para que el mismo remitente conserve su conversación.
+estable por instalación para que el mismo remitente conserve su conversación y para descifrar el
+destinatario de las respuestas humanas. Una rotación cambia el HMAC y hace inaccesibles las
+conversaciones anteriores sin una migración; un mensaje entrante posterior inicia otra conversación.
 
 ## Configuración
 
@@ -160,7 +162,8 @@ se representan con `SecretStr` y no aparecen en `repr`, serializaciones ni error
 Variables relevantes:
 
 - `ASSISTANT_BRANCH_CODE`: código inmutable de la única sucursal atendida por esta instalación;
-- `CONVERSATION_IDENTITY_KEY`: secreto backend-only para derivar la identidad externa opaca;
+- `CONVERSATION_IDENTITY_KEY`: secreto backend-only para derivar la identidad externa opaca y
+  cifrar el destinatario de respuestas humanas;
 - `ADMIN_AUTH_KEY`: secreto backend-only independiente para CSRF y límite de login del personal;
 - `OPENAI_API_KEY`: clave backend-only para la prueba real del chatbot;
 - `OPENAI_MODEL`: modelo configurable, `gpt-5.6` por defecto;
@@ -471,7 +474,10 @@ F9.1 incorpora el [modo AI/HUMAN](docs/fase_9_modo.md) por conversación. La tra
 exige personal autorizado de la misma sucursal; cada modo `HUMAN` tiene un solo usuario asignado.
 Una respuesta de IA en curso impide tomar el chat y el modo `HUMAN` impide nuevas respuestas
 automáticas. F9.2 agrega la [bandeja de conversaciones](docs/fase_9_bandeja.md) con filtros,
-detalle mínimo y toma/liberación bajo sesión, RBAC y CSRF. El envío humano pertenece a F9.3.
+detalle mínimo y toma/liberación bajo sesión, RBAC y CSRF. F9.3 incorpora la
+[respuesta humana por WhatsApp](docs/fase_9_respuesta_humana.md) con revisión explícita, envío
+desde la instancia configurada y un recibo de aceptación en cola. Los resultados inciertos
+bloquean nuevos envíos hasta conciliación; no se afirma entrega al teléfono.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

@@ -3,20 +3,23 @@
 ## Alcance y datos guardados
 
 Esta política cubre las tablas `conversations`, `conversation_responder_states`, `messages`,
-`whatsapp_event_receipts` y `unresolved_questions` del backend. No establece una conclusión de
+`whatsapp_event_receipts`, `manual_send_receipts` y `unresolved_questions` del backend. No establece una conclusión de
 cumplimiento legal ni una política para las copias externas de GreenAPI, OpenAI o los respaldos
 operativos.
 
 | Tabla | Campos operativos | No se guarda |
 |---|---|---|
-| `conversations` | Sucursal, canal, HMAC-SHA256 del `chatId`, creación y última actividad | Número/chat ID en claro, nombre, texto |
-| `conversation_responder_states` | Sucursal, conversación, modo AI/HUMAN, usuario asignado y reservas de IA | Número/chat ID, texto, contraseña, token |
-| `messages` | Sucursal, conversación, dirección y hora | Texto, archivos, datos de pago; el flujo actual aún no crea filas aquí |
+| `conversations` | Sucursal, canal, HMAC-SHA256 del `chatId`, destinatario cifrado, creación y última actividad | Número/chat ID en claro, nombre, texto |
+| `conversation_responder_states` | Sucursal, conversación, modo AI/HUMAN, usuario asignado y reservas de IA/envío manual | Número/chat ID, texto, contraseña, token |
+| `messages` | Sucursal, conversación, dirección y hora | Texto, archivos, datos de pago |
+| `manual_send_receipts` | Sucursal, conversación, actor, solicitud, estado, hora e ID de mensaje del proveedor | Destinatario, texto, contraseña, token |
 | `whatsapp_event_receipts` | Sucursal, `idMessage` entrante, estado y horas | Remitente, texto, body completo del webhook, ID del envío saliente |
 | `unresolved_questions` | Sucursal, motivo FAQ, HMAC-SHA256 de la pregunta normalizada, contador y fechas | Pregunta en claro, remitente, número, conversación, respuesta, argumentos completos |
 
 `CONVERSATION_IDENTITY_KEY` es secreto backend y se mantiene estable por instalación. El `chatId`
-solo pasa por memoria para correlacionar la conversación y enviar la respuesta. La configuración
+se cifra con una subclave independiente derivada de esa clave para responder manualmente desde el
+mismo canal. Solo se descifra en memoria al enviar. Las conversaciones anteriores a F9.3 no tienen
+ese dato hasta el siguiente mensaje entrante. La configuración
 de OpenAI conserva `store=false` por defecto. Los logs de WhatsApp y de la purga registran
 categorías, sucursal y conteos; omiten identificadores completos, HMAC, mensajes y secretos.
 Omitir el identificador es la redacción preferida. Las pruebas comprueban esa omisión.
@@ -41,10 +44,11 @@ el responsable de privacidad y las necesidades reales de reentrega de GreenAPI:
 
 | Dato | Retención y acción |
 |---|---|
-| Conversación y estado de responsable | Borrar 30 días después de `updated_at` si no quedan mensajes recientes. Cada mensaje entrante que resuelve la conversación actualiza esa fecha. |
+| Conversación, destinatario cifrado y estado de responsable | Borrar 30 días después de `updated_at` si no quedan mensajes recientes ni envíos manuales pendientes o inciertos. Cada mensaje entrante que resuelve la conversación actualiza esa fecha. |
 | Metadatos de mensaje | Borrar 30 días después de `occurred_at`, aun si la conversación sigue activa. |
 | Recibo `completed` | Borrar 30 días después de `completed_at`. Un evento repetido después de ese plazo podría procesarse otra vez. |
 | Recibo `claimed` | No borrar automáticamente. Si lleva más de un día, contarlo para conciliación. Borrarlo sin resolver un envío ambiguo podría causar una segunda respuesta. |
+| Recibo manual | Borrar los `accepted` junto con su conversación al vencer el plazo. Conservar `pending` y `uncertain` para conciliación; no reenviar automáticamente. El borrado explícito del remitente elimina sus recibos. |
 | Pregunta no resuelta agregada | Borrar 30 días después de `last_seen_at`; un registro posterior crea un contador nuevo. |
 
 La purga usa solo la sucursal de `ASSISTANT_BRANCH_CODE`; también se permite purgarla cuando su

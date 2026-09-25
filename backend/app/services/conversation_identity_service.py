@@ -17,6 +17,7 @@ from backend.app.repositories.conversation_repository import ConversationReposit
 from backend.app.schemas.whatsapp import GREEN_API_CHAT_ID_PATTERN, InboundMessage
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.branch_service import BranchService
+from backend.app.services.conversation_recipient_cipher import ConversationRecipientCipher
 
 logger = logging.getLogger(__name__)
 _CHAT_ID = re.compile(GREEN_API_CHAT_ID_PATTERN)
@@ -36,6 +37,7 @@ class ConversationIdentityService:
         self._session = session
         self._scope = BranchScope.from_settings(settings)
         self._identity_key = settings.conversation_identity_key.get_secret_value().encode("ascii")
+        self._recipient_cipher = ConversationRecipientCipher(settings)
 
     def resolve(self, message: InboundMessage) -> ConversationContext:
         branch = BranchService(
@@ -46,6 +48,7 @@ class ConversationIdentityService:
         conversation, created = ConversationRepository(self._session, branch=branch).get_or_create(
             external_user_key
         )
+        conversation.recipient_ciphertext = self._recipient_cipher.encrypt(message.sender_id)
         logger.info(
             "conversation_context_resolved branch_code=%s status=%s",
             self._scope.branch_code,

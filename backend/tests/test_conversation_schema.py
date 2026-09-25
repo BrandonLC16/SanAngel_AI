@@ -61,6 +61,7 @@ def test_migrated_tables_have_only_minimal_whatsapp_fields(engine: Engine) -> No
         "branch_id",
         "channel",
         "external_user_key",
+        "recipient_ciphertext",
         "created_at",
         "updated_at",
     }
@@ -73,6 +74,7 @@ def test_migrated_tables_have_only_minimal_whatsapp_fields(engine: Engine) -> No
         "mode",
         "assigned_admin_user_id",
         "ai_reply_count",
+        "manual_send_blocked",
     }
     responder_checks = {
         item["name"] for item in inspector.get_check_constraints("conversation_responder_states")
@@ -95,6 +97,23 @@ def test_migrated_tables_have_only_minimal_whatsapp_fields(engine: Engine) -> No
         "conversation_id",
         "direction",
         "occurred_at",
+    }
+    assert {column["name"] for column in inspector.get_columns("manual_send_receipts")} == {
+        "id",
+        "conversation_id",
+        "branch_id",
+        "actor_user_id",
+        "request_id",
+        "status",
+        "provider_message_id",
+        "created_at",
+    }
+    assert {item["name"] for item in inspector.get_unique_constraints("manual_send_receipts")} == {
+        "uq_manual_send_request"
+    }
+    assert {item["name"] for item in inspector.get_foreign_keys("manual_send_receipts")} == {
+        "fk_manual_send_conversation_branch",
+        "fk_manual_send_actor_branch",
     }
     assert {column["name"] for column in inspector.get_columns("whatsapp_event_receipts")} == {
         "id",

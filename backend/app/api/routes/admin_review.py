@@ -8,13 +8,19 @@ from fastapi import APIRouter, Depends, Query, Response
 
 from backend.app.api.admin_authorization import require_admin_csrf, require_permission
 from backend.app.core.admin_roles import AdminPermission
-from backend.app.core.config import get_admin_auth_settings, get_conversation_identity_settings
+from backend.app.core.config import (
+    get_admin_auth_settings,
+    get_conversation_identity_settings,
+    get_settings,
+)
 from backend.app.core.conversation_mode import ConversationMode
 from backend.app.db.session import get_database_session_factory
 from backend.app.schemas.admin_review import (
     ConversationDetail,
     ConversationModeResult,
     ConversationPage,
+    ManualReplyRequest,
+    ManualReplyResult,
     ResolveFAQRequest,
     ResolveFAQResult,
     UnresolvedItem,
@@ -23,6 +29,7 @@ from backend.app.schemas.admin_review import (
 from backend.app.services.admin_auth_service import AdminSessionInfo
 from backend.app.services.admin_review_service import AdminReviewService
 from backend.app.services.conversation_mode_service import ConversationModeService
+from backend.app.services.manual_reply_service import ManualReplyService
 
 router = APIRouter(prefix="/api/v1/admin/review", tags=["admin-review"])
 
@@ -38,6 +45,15 @@ def get_admin_review_service() -> AdminReviewService:
 def get_conversation_mode_service() -> ConversationModeService:
     return ConversationModeService(
         get_database_session_factory(), settings=get_admin_auth_settings()
+    )
+
+
+def get_manual_reply_service() -> ManualReplyService:
+    return ManualReplyService(
+        get_database_session_factory(),
+        admin_settings=get_admin_auth_settings(),
+        identity_settings=get_conversation_identity_settings(),
+        whatsapp_settings=get_settings(),
     )
 
 
@@ -115,6 +131,22 @@ async def release_conversation(
     result = await asyncio.to_thread(service.release, principal, conversation_id)
     _no_store(response)
     return ConversationModeResult(mode=result.mode, assigned_to_me=False)
+
+
+@router.post("/conversations/{conversation_id}/messages", response_model=ManualReplyResult)
+async def send_manual_reply(
+    conversation_id: int,
+    payload: ManualReplyRequest,
+    response: Response,
+    principal: Annotated[
+        AdminSessionInfo, Depends(require_permission(AdminPermission.CONVERSATION_SEND))
+    ],
+    _csrf: Annotated[str, Depends(require_admin_csrf)],
+    service: Annotated[ManualReplyService, Depends(get_manual_reply_service)],
+) -> ManualReplyResult:
+    result = await service.send(principal, conversation_id, payload.request_id, payload.text)
+    _no_store(response)
+    return ManualReplyResult(receipt_id=result.receipt_id, status=result.status)
 
 
 @router.get("/unresolved", response_model=UnresolvedPage)

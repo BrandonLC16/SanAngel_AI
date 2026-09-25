@@ -131,6 +131,8 @@ class ConversationModeService:
                 row = self._state_row(session, branch.id, conversation_id)
                 if row.mode != ConversationMode.HUMAN.value:
                     raise ConversationModeConflictError()
+                if row.manual_send_blocked:
+                    raise ConversationModeConflictError()
                 if row.assigned_admin_user_id != principal.user_id and role != AdminRole.OWNER:
                     raise AdminAuthorizationError()
                 changed = session.execute(
@@ -142,6 +144,7 @@ class ConversationModeService:
                         ConversationResponderState.assigned_admin_user_id
                         == row.assigned_admin_user_id,
                         ConversationResponderState.ai_reply_count == 0,
+                        ConversationResponderState.manual_send_blocked.is_(False),
                     )
                     .values(
                         mode=ConversationMode.AI.value,
