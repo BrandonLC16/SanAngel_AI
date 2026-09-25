@@ -9,9 +9,11 @@ from fastapi import APIRouter, Depends, Query, Response
 from backend.app.api.admin_authorization import require_admin_csrf, require_permission
 from backend.app.core.admin_roles import AdminPermission
 from backend.app.core.config import get_admin_auth_settings, get_conversation_identity_settings
+from backend.app.core.conversation_mode import ConversationMode
 from backend.app.db.session import get_database_session_factory
 from backend.app.schemas.admin_review import (
     ConversationDetail,
+    ConversationModeResult,
     ConversationPage,
     ResolveFAQRequest,
     ResolveFAQResult,
@@ -20,6 +22,7 @@ from backend.app.schemas.admin_review import (
 )
 from backend.app.services.admin_auth_service import AdminSessionInfo
 from backend.app.services.admin_review_service import AdminReviewService
+from backend.app.services.conversation_mode_service import ConversationModeService
 
 router = APIRouter(prefix="/api/v1/admin/review", tags=["admin-review"])
 
@@ -29,6 +32,12 @@ def get_admin_review_service() -> AdminReviewService:
         get_database_session_factory(),
         admin_settings=get_admin_auth_settings(),
         identity_settings=get_conversation_identity_settings(),
+    )
+
+
+def get_conversation_mode_service() -> ConversationModeService:
+    return ConversationModeService(
+        get_database_session_factory(), settings=get_admin_auth_settings()
     )
 
 
@@ -45,6 +54,8 @@ async def list_conversations(
     service: Annotated[AdminReviewService, Depends(get_admin_review_service)],
     updated_from: date | None = None,
     updated_to: date | None = None,
+    mode: ConversationMode | None = None,
+    mine: bool = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0, le=5000)] = 0,
 ) -> ConversationPage:
@@ -53,6 +64,8 @@ async def list_conversations(
         principal,
         updated_from=updated_from,
         updated_to=updated_to,
+        mode=mode,
+        mine=mine,
         limit=limit,
         offset=offset,
     )
@@ -72,6 +85,36 @@ async def get_conversation(
     result = await asyncio.to_thread(service.get_conversation, principal, conversation_id)
     _no_store(response)
     return result
+
+
+@router.post("/conversations/{conversation_id}/take", response_model=ConversationModeResult)
+async def take_conversation(
+    conversation_id: int,
+    response: Response,
+    principal: Annotated[
+        AdminSessionInfo, Depends(require_permission(AdminPermission.CONVERSATION_MODE_WRITE))
+    ],
+    _csrf: Annotated[str, Depends(require_admin_csrf)],
+    service: Annotated[ConversationModeService, Depends(get_conversation_mode_service)],
+) -> ConversationModeResult:
+    result = await asyncio.to_thread(service.take, principal, conversation_id)
+    _no_store(response)
+    return ConversationModeResult(mode=result.mode, assigned_to_me=True)
+
+
+@router.post("/conversations/{conversation_id}/release", response_model=ConversationModeResult)
+async def release_conversation(
+    conversation_id: int,
+    response: Response,
+    principal: Annotated[
+        AdminSessionInfo, Depends(require_permission(AdminPermission.CONVERSATION_MODE_WRITE))
+    ],
+    _csrf: Annotated[str, Depends(require_admin_csrf)],
+    service: Annotated[ConversationModeService, Depends(get_conversation_mode_service)],
+) -> ConversationModeResult:
+    result = await asyncio.to_thread(service.release, principal, conversation_id)
+    _no_store(response)
+    return ConversationModeResult(mode=result.mode, assigned_to_me=False)
 
 
 @router.get("/unresolved", response_model=UnresolvedPage)

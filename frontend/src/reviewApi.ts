@@ -1,8 +1,13 @@
 import { AdminApiError } from './api'
 
-export type ConversationItem = { id: number; channel: 'whatsapp'; created_at: string; updated_at: string }
+export type ConversationMode = 'AI' | 'HUMAN'
+export type ConversationItem = {
+  id: number; channel: 'whatsapp'; created_at: string; updated_at: string
+  mode: ConversationMode; assigned_to_me: boolean
+}
 export type MessageMetadata = { direction: 'inbound' | 'outbound'; occurred_at: string }
 export type ConversationDetail = ConversationItem & { message_count: number; recent_messages: MessageMetadata[] }
+export type ConversationModeResult = { mode: ConversationMode; assigned_to_me: boolean }
 export type UnresolvedItem = {
   id: number; reason: 'faq_unknown' | 'faq_ambiguous'; occurrences: number
   first_seen_at: string; last_seen_at: string
@@ -50,14 +55,29 @@ function validDate(value: string): string {
 }
 
 export const reviewApi = {
-  conversations(filters: { updatedFrom?: string; updatedTo?: string; offset: number }): Promise<Page<ConversationItem>> {
+  conversations(filters: { updatedFrom?: string; updatedTo?: string; mode?: ConversationMode; mine?: boolean; offset: number }): Promise<Page<ConversationItem>> {
     const query = pageQuery(filters.offset)
     if (filters.updatedFrom) query.set('updated_from', validDate(filters.updatedFrom))
     if (filters.updatedTo) query.set('updated_to', validDate(filters.updatedTo))
+    if (filters.mode) {
+      if (filters.mode !== 'AI' && filters.mode !== 'HUMAN') throw new AdminApiError(422)
+      query.set('mode', filters.mode)
+    }
+    if (filters.mine) query.set('mine', 'true')
     return request(`/conversations?${query}`)
   },
   conversation(id: number): Promise<ConversationDetail> {
     return request(`/conversations/${positiveId(id)}`)
+  },
+  take(id: number, csrf: string): Promise<ConversationModeResult> {
+    return request(`/conversations/${positiveId(id)}/take`, {
+      method: 'POST', headers: { 'X-CSRF-Token': csrf },
+    })
+  },
+  release(id: number, csrf: string): Promise<ConversationModeResult> {
+    return request(`/conversations/${positiveId(id)}/release`, {
+      method: 'POST', headers: { 'X-CSRF-Token': csrf },
+    })
   },
   unresolved(filters: { reason?: string; minOccurrences: number; offset: number }): Promise<Page<UnresolvedItem>> {
     const query = pageQuery(filters.offset)

@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.app.core.conversation_mode import ConversationMode
 from backend.app.schemas.admin_commercial import FAQWrite
 
 
@@ -17,6 +18,8 @@ class ConversationItem(_ReviewModel):
     channel: Literal["whatsapp"]
     created_at: datetime
     updated_at: datetime
+    mode: ConversationMode
+    assigned_to_me: bool
 
 
 class ConversationPage(_ReviewModel):
@@ -32,6 +35,11 @@ class MessageMetadata(_ReviewModel):
 class ConversationDetail(ConversationItem):
     message_count: int
     recent_messages: list[MessageMetadata]
+
+
+class ConversationModeResult(_ReviewModel):
+    mode: ConversationMode
+    assigned_to_me: bool
 
 
 class UnresolvedItem(_ReviewModel):

@@ -7,16 +7,21 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event, select
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.api.routes.admin_review import get_admin_review_service
+from backend.app.api.routes.admin_review import (
+    get_admin_review_service,
+    get_conversation_mode_service,
+)
 from backend.app.core.admin_roles import AdminRole
 from backend.app.core.config import ConversationIdentitySettings
 from backend.app.db.models.admin_commercial import AdminCommercialAudit, ManagedFAQ
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.message import Message
 from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.services.admin_auth_service import AdminAuthService
 from backend.app.services.admin_review_service import AdminReviewService
+from backend.app.services.conversation_mode_service import ConversationModeService
 from backend.app.services.faq_response_policy import (
     UNKNOWN_FALLBACK,
     FAQFallback,
@@ -42,6 +47,9 @@ def identity_settings(branch: str = "sucursal-uno") -> ConversationIdentitySetti
 def configure(app, sessions) -> None:
     app.dependency_overrides[get_admin_review_service] = lambda: AdminReviewService(
         sessions, admin_settings=settings(), identity_settings=identity_settings()
+    )
+    app.dependency_overrides[get_conversation_mode_service] = lambda: ConversationModeService(
+        sessions, settings=settings()
     )
 
 
@@ -137,6 +145,93 @@ def test_conversation_filters_detail_and_foreign_id_are_minimal(app, sessions) -
         assert "a" * 64 not in rendered
         assert "c" * 64 not in rendered
         assert "chatId" not in rendered and "text" not in rendered
+
+
+def test_conversation_inbox_take_release_filters_rbac_csrf_and_privacy(app, sessions) -> None:
+    auth = AdminAuthService(sessions, settings=settings())
+    auth.create_user("viewer", PASSWORD)
+    auth.create_user("editor", PASSWORD, role=AdminRole.EDITOR)
+    auth.create_user("other_editor", PASSWORD, role=AdminRole.EDITOR)
+    auth.create_user("owner", PASSWORD, role=AdminRole.OWNER)
+    with sessions.begin() as session:
+        own = session.scalar(select(Branch).where(Branch.code == "sucursal-uno"))
+        foreign = session.scalar(select(Branch).where(Branch.code == "sucursal-dos"))
+        assert own is not None and foreign is not None
+        first = Conversation(branch_id=own.id, external_user_key="d" * 64)
+        second = Conversation(branch_id=own.id, external_user_key="e" * 64)
+        other = Conversation(branch_id=foreign.id, external_user_key="f" * 64)
+        session.add_all([first, second, other])
+        session.flush()
+        first_id, second_id, foreign_id = first.id, second.id, other.id
+    configure(app, sessions)
+    take_url = f"{BASE}/conversations/{first_id}/take"
+    release_url = f"{BASE}/conversations/{first_id}/release"
+    with (
+        TestClient(app, base_url="https://testserver") as anonymous,
+        TestClient(app, base_url="https://testserver") as viewer,
+        TestClient(app, base_url="https://testserver") as editor,
+        TestClient(app, base_url="https://testserver") as other_editor,
+        TestClient(app, base_url="https://testserver") as owner,
+    ):
+        assert anonymous.post(take_url).status_code == 401
+        viewer_csrf = login(viewer, "viewer")
+        editor_csrf = login(editor, "editor")
+        other_csrf = login(other_editor, "other_editor")
+        owner_csrf = login(owner, "owner")
+        assert viewer.post(take_url, headers=viewer_csrf).status_code == 403
+        assert editor.post(take_url).status_code == 403
+        assert editor.post(take_url, headers={"X-CSRF-Token": "wrong"}).status_code == 403
+        assert (
+            editor.post(f"{BASE}/conversations/{foreign_id}/take", headers=editor_csrf).status_code
+            == 404
+        )
+        assert editor.get(f"{BASE}/conversations?mode=invalid").status_code == 422
+
+        initial = editor.get(f"{BASE}/conversations")
+        assert initial.status_code == 200
+        assert {item["id"] for item in initial.json()["items"]} == {first_id, second_id}
+        assert all(item["mode"] == "AI" for item in initial.json()["items"])
+        taken = editor.post(take_url, headers=editor_csrf)
+        assert taken.status_code == 200
+        assert taken.headers["cache-control"] == "no-store"
+        assert taken.json() == {"mode": "HUMAN", "assigned_to_me": True}
+        assert other_editor.post(take_url, headers=other_csrf).status_code == 409
+        human = editor.get(f"{BASE}/conversations", params={"mode": "HUMAN", "mine": True})
+        assert [item["id"] for item in human.json()["items"]] == [first_id]
+        assert human.json()["items"][0]["assigned_to_me"] is True
+        assert viewer.get(f"{BASE}/conversations", params={"mine": True}).json()["items"] == []
+        ai = editor.get(f"{BASE}/conversations", params={"mode": "AI"})
+        assert [item["id"] for item in ai.json()["items"]] == [second_id]
+        detail = other_editor.get(f"{BASE}/conversations/{first_id}")
+        assert detail.json()["mode"] == "HUMAN"
+        assert detail.json()["assigned_to_me"] is False
+        assert other_editor.post(release_url, headers=other_csrf).status_code == 403
+        assert viewer.post(release_url, headers=viewer_csrf).status_code == 403
+        assert editor.post(release_url, headers=editor_csrf).json() == {
+            "mode": "AI",
+            "assigned_to_me": False,
+        }
+        assert editor.post(take_url, headers=editor_csrf).status_code == 200
+        assert owner.post(release_url, headers=owner_csrf).json() == {
+            "mode": "AI",
+            "assigned_to_me": False,
+        }
+        assert editor.post(release_url, headers=editor_csrf).status_code == 409
+        rendered = json.dumps(initial.json()) + json.dumps(human.json()) + detail.text + taken.text
+        assert not any(
+            key in rendered
+            for key in (
+                "d" * 64,
+                "e" * 64,
+                "f" * 64,
+                "external_user_key",
+                "assigned_admin_user_id",
+                "chatId",
+            )
+        )
+    with sessions() as session:
+        row = session.get(ConversationResponderState, first_id)
+        assert row is not None and row.mode == "AI" and row.assigned_admin_user_id is None
 
 
 def test_unresolved_filters_and_faq_resolution_require_match_csrf_and_scope(app, sessions) -> None:

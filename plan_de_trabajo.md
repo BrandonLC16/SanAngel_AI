@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-09-25
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F9.1 — Estado AI/HUMAN (`✅ COMPLETADO`)
-**Estado global:** 🟨 EN_PROGRESO — F9.1 cerrada; F9.2 pendiente
+**Subfase activa:** ninguna; F9.2 — Bandeja de conversaciones (`✅ COMPLETADO`)
+**Estado global:** 🟨 EN_PROGRESO — F9.2 cerrada; F9.3 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3339,28 +3339,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F9.2 — Bandeja de conversaciones
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-09-25
+**Fecha de cierre:** 2026-09-25
 
 
 ### Alcance
 
-- [ ] lista activas.
+- [x] lista activas.
 
-- [ ] filtros.
+- [x] filtros.
 
-- [ ] detalle.
+- [x] detalle.
 
-- [ ] tomar/liberar.
+- [x] tomar/liberar.
 
 
 ### Criterios de aceptación
 
-- [ ] empleado puede tomar chat.
+- [x] empleado puede tomar chat.
 
 
 ### Seguridad
 
-- [ ] RBAC/PII.
+- [x] RBAC/PII.
 
 
 ### Prompt para Codex
@@ -4358,9 +4360,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`).
-**Subfase activa:** ninguna; F9.1 — Estado AI/HUMAN (`✅ COMPLETADO`).
-**Última subfase completada:** F9.1 — Estado AI/HUMAN.
-**Siguiente subfase recomendada:** F9.2 — Bandeja de conversaciones (`⬜ PENDIENTE`), no iniciada.
+**Subfase activa:** ninguna; F9.2 — Bandeja de conversaciones (`✅ COMPLETADO`).
+**Última subfase completada:** F9.2 — Bandeja de conversaciones.
+**Siguiente subfase recomendada:** F9.3 — Respuesta humana por WhatsApp (`⬜ PENDIENTE`), no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -4397,7 +4399,9 @@ repetir la suite, lint, formato y build y documentar que el panel no debe expone
 antes de F10.
 F9.1 completada el 2026-09-25 con modo persistente AI/HUMAN por conversación, asignación
 humana única, transiciones autorizadas y reserva atómica de respuestas de IA para impedir
-traspasos durante un envío; 608 pruebas Python y 29 frontend aprobadas. F9.2 sigue pendiente.
+traspasos durante un envío; 608 pruebas Python y 29 frontend aprobadas. F9.2 completada el
+2026-09-25 con bandeja filtrable, detalle de estado y toma/liberación desde el panel con sesión,
+RBAC, CSRF y metadatos mínimos; 609 pruebas Python y 30 frontend aprobadas. F9.3 sigue pendiente.
 
 ---
 
@@ -8632,6 +8636,50 @@ sesión backend, RBAC y CSRF al exponer toma/liberación; F9.3 implementará el 
 panel no debe exponerse a internet antes de F10.
 
 Siguiente: F9.2 — Bandeja de conversaciones (`⬜ PENDIENTE`), recomendada y no iniciada.
+
+---
+
+## 2026-09-25 — F9.2 Bandeja de conversaciones
+
+**Fase/subfase:** Fase 9 / F9.2, `✅ COMPLETADO` (inicio y cierre 2026-09-25).
+**Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO`.
+
+Cambios: la lista existente añade modo `AI`/`HUMAN` y filtro de chats propios a los filtros de
+fecha, con estado de asignación mínima en lista y detalle. Las rutas de toma y liberación
+exponen el servicio transaccional de F9.1; el panel permite al editor tomar su chat y al asignado
+o propietario liberarlo. La definición de «activas» es conversaciones conservadas en la base,
+puesto que aún no existe estado de cierre. La primera prueba transversal detectó que el servicio
+se construía antes de validar CSRF; se ajustó el orden y la repetición aprobó.
+
+Archivos: `backend/app/api/routes/admin_review.py`, `backend/app/schemas/admin_review.py`,
+`backend/app/services/admin_review_service.py`, `backend/tests/test_admin_review.py`,
+`frontend/src/ReviewPanel.tsx`, `frontend/src/ReviewPanel.test.tsx`, `frontend/src/reviewApi.ts`,
+`frontend/src/reviewApi.test.ts`, `docs/fase_9_bandeja.md`, `docs/fase_9_modo.md`, `README.md`,
+`plan_de_trabajo.md`.
+
+Comandos y resultados:
+
+- `.venv\Scripts\python.exe -m pytest backend/tests/test_admin_review.py backend/tests/test_admin_panel_security.py -q -p no:cacheprovider` → primera ejecución 9 aprobadas y 1 fallo por orden de dependencias; tras corregirlo, 10 aprobadas;
+- `npm --prefix frontend test -- --run src/ReviewPanel.test.tsx src/reviewApi.test.ts` → 6 aprobadas;
+- `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` → 609 aprobadas;
+- `.venv\Scripts\ruff.exe check .` → aprobado;
+- `.venv\Scripts\ruff.exe format --check .` → 178 archivos correctos;
+- `.venv\Scripts\python.exe -m pip check` → dependencias coherentes;
+- `npm --prefix frontend test` → 30 aprobadas;
+- `npm --prefix frontend run build` → tipos y bundle correctos;
+- `git diff --check` → sin errores de whitespace; avisos LF/CRLF del entorno.
+
+Seguridad: ningún endpoint administrativo nuevo es anónimo. Lista y detalle requieren sesión y
+alcance de sucursal; tomar/liberar exigen permiso backend `conversation:mode:write`, CSRF y la
+revalidación del servicio. Se probaron viewer, editores concurrentes, propietario, ID ajena y
+ausencia de número, `chatId`, HMAC, texto e identidad de otro empleado en las respuestas.
+
+Riesgos/Pendientes: tomar un chat suspende las respuestas de IA pero aún no permite enviar una
+respuesta humana. F9.3 deberá resolver el destinatario de WhatsApp sin intentar reconstruirlo
+desde el HMAC. Una respuesta de IA ambigua puede bloquear la toma hasta conciliación manual. El
+panel no debe exponerse a internet antes de F10.
+
+Siguiente: F9.3 — Respuesta humana por WhatsApp (`⬜ PENDIENTE`), recomendada y no iniciada.
 
 ---
 

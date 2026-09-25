@@ -470,7 +470,8 @@ antes de completar F10**, que incluye TLS/proxy, cabeceras de seguridad y contro
 F9.1 incorpora el [modo AI/HUMAN](docs/fase_9_modo.md) por conversación. La transición interna
 exige personal autorizado de la misma sucursal; cada modo `HUMAN` tiene un solo usuario asignado.
 Una respuesta de IA en curso impide tomar el chat y el modo `HUMAN` impide nuevas respuestas
-automáticas. La bandeja y el envío humano pertenecen a subfases posteriores.
+automáticas. F9.2 agrega la [bandeja de conversaciones](docs/fase_9_bandeja.md) con filtros,
+detalle mínimo y toma/liberación bajo sesión, RBAC y CSRF. El envío humano pertenece a F9.3.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

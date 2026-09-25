@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.core.admin_roles import AdminPermission, AdminRole, permits
 from backend.app.core.config import AdminAuthSettings, ConversationIdentitySettings
+from backend.app.core.conversation_mode import ConversationMode
 from backend.app.core.exceptions import (
     AdminAuthorizationError,
     AdminCommercialConflictError,
@@ -23,6 +24,7 @@ from backend.app.db.models.admin_commercial import AdminCommercialAudit, Managed
 from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.message import Message
 from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.repositories.branch_repository import BranchRepository
@@ -97,9 +99,16 @@ class AdminReviewService:
             raise InvalidRequestError()
 
     @staticmethod
-    def _conversation_item(row: Conversation) -> ConversationItem:
+    def _conversation_item(
+        row: Conversation, state: ConversationResponderState | None, user_id: int
+    ) -> ConversationItem:
         return ConversationItem(
-            id=row.id, channel=row.channel, created_at=row.created_at, updated_at=row.updated_at
+            id=row.id,
+            channel=row.channel,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            mode=state.mode if state is not None else ConversationMode.AI,
+            assigned_to_me=state is not None and state.assigned_admin_user_id == user_id,
         )
 
     @staticmethod
@@ -118,6 +127,8 @@ class AdminReviewService:
         *,
         updated_from: date | None = None,
         updated_to: date | None = None,
+        mode: ConversationMode | None = None,
+        mine: bool = False,
         limit: int = 50,
         offset: int = 0,
     ) -> ConversationPage:
@@ -125,7 +136,23 @@ class AdminReviewService:
         if updated_from and updated_to and updated_from > updated_to:
             raise InvalidRequestError()
         with self._context(principal, AdminPermission.COMMERCIAL_READ) as (session, branch):
-            query = select(Conversation).where(Conversation.branch_id == branch.id)
+            query = (
+                select(Conversation, ConversationResponderState)
+                .outerjoin(
+                    ConversationResponderState,
+                    ConversationResponderState.conversation_id == Conversation.id,
+                )
+                .where(Conversation.branch_id == branch.id)
+            )
+            if mode is not None:
+                query = query.where(
+                    func.coalesce(ConversationResponderState.mode, ConversationMode.AI.value)
+                    == mode.value
+                )
+            if mine:
+                query = query.where(
+                    ConversationResponderState.assigned_admin_user_id == principal.user_id
+                )
             if updated_from is not None:
                 query = query.where(
                     Conversation.updated_at >= datetime.combine(updated_from, time.min)
@@ -134,13 +161,16 @@ class AdminReviewService:
                 query = query.where(
                     Conversation.updated_at <= datetime.combine(updated_to, time.max)
                 )
-            rows = session.scalars(
+            rows = session.execute(
                 query.order_by(Conversation.updated_at.desc(), Conversation.id.desc())
                 .offset(offset)
                 .limit(limit + 1)
             ).all()
             return ConversationPage(
-                items=[self._conversation_item(row) for row in rows[:limit]],
+                items=[
+                    self._conversation_item(row, state, principal.user_id)
+                    for row, state in rows[:limit]
+                ],
                 has_more=len(rows) > limit and offset + limit <= MAX_OFFSET,
             )
 
@@ -155,6 +185,7 @@ class AdminReviewService:
             )
             if row is None:
                 raise AdminCommercialNotFoundError()
+            state = session.get(ConversationResponderState, row.id)
             count = (
                 session.scalar(
                     select(func.count(Message.id)).where(
@@ -170,7 +201,7 @@ class AdminReviewService:
                 .limit(MAX_DETAIL_MESSAGES)
             ).all()
             return ConversationDetail(
-                **self._conversation_item(row).model_dump(),
+                **self._conversation_item(row, state, principal.user_id).model_dump(),
                 message_count=count,
                 recent_messages=[
                     MessageMetadata(direction=item.direction, occurred_at=item.occurred_at)

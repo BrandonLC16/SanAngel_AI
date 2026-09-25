@@ -18,8 +18,8 @@ El servicio interno `ConversationModeService` permite estas transiciones:
 El servicio recibe el alcance desde configuración backend, comprueba la sucursal de la
 conversación, el rol y el estado actual del usuario, y usa actualizaciones condicionales en una
 transacción. Un principal vencido, `viewer`, inactivo o de otra sucursal no puede cambiar el modo.
-La futura ruta administrativa deberá obtener el principal mediante la sesión HTTPS vigente y
-exigir CSRF; F9.1 no incorpora endpoints ni botones de toma/liberación.
+Las rutas y botones administrativos de F9.2 obtienen el principal mediante la sesión HTTPS
+vigente y exigen CSRF; F9.1 solo incorporó el servicio interno.
 
 El orquestador de WhatsApp reserva una respuesta de IA antes de consultar al modelo. Mientras la
 reserva está activa, `take` falla. Después de confirmar el envío y finalizar el recibo del evento,
@@ -29,6 +29,6 @@ la conversación a un humano mientras pudiera llegar esa respuesta. Una caída e
 dejar la conversación bloqueada; no se despeja automáticamente ni se reenvía a ciegas.
 
 La purga y el borrado individual de metadatos eliminan el estado junto con la conversación. La
-tabla no almacena texto de mensajes, número de WhatsApp, contraseña ni token. F9.2 incorporará la
-bandeja y los controles de toma/liberación; F9.3 incorporará el envío humano. El panel sigue sin
+tabla no almacena texto de mensajes, número de WhatsApp, contraseña ni token. F9.2 incorporó la
+[bandeja y los controles de toma/liberación](fase_9_bandeja.md); F9.3 incorporará el envío humano. El panel sigue sin
 estar preparado para exposición pública hasta F10.

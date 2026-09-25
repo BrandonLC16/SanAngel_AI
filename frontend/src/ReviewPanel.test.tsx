@@ -17,11 +17,11 @@ afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 it('filtra conversaciones y muestra solo el detalle mínimo', async () => {
   vi.mocked(reviewApi.conversations).mockResolvedValue({
-    items: [{ id: 7, channel: 'whatsapp', created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z' }], has_more: false,
+    items: [{ id: 7, channel: 'whatsapp', created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z', mode: 'AI', assigned_to_me: false }], has_more: false,
   })
   vi.mocked(reviewApi.conversation).mockResolvedValue({
     id: 7, channel: 'whatsapp', created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z',
-    message_count: 1, recent_messages: [{ direction: 'inbound', occurred_at: '2026-09-25T10:00:00Z' }],
+    mode: 'AI', assigned_to_me: false, message_count: 1, recent_messages: [{ direction: 'inbound', occurred_at: '2026-09-25T10:00:00Z' }],
   })
   const user = userEvent.setup()
   render(<ReviewPanel section="conversations" role="viewer" csrfToken="csrf" onExpired={vi.fn()} />)
@@ -29,10 +29,34 @@ it('filtra conversaciones y muestra solo el detalle mínimo', async () => {
   expect(document.body.textContent).not.toContain('chatId')
   await user.type(screen.getByLabelText('Actividad desde'), '2026-09-01')
   await user.click(screen.getByRole('button', { name: 'Filtrar' }))
-  await waitFor(() => expect(reviewApi.conversations).toHaveBeenLastCalledWith({ updatedFrom: '2026-09-01', updatedTo: undefined, offset: 0 }))
+  await waitFor(() => expect(reviewApi.conversations).toHaveBeenLastCalledWith({ updatedFrom: '2026-09-01', updatedTo: undefined, mode: undefined, mine: false, offset: 0 }))
   await user.click(screen.getByRole('button', { name: 'Ver detalle' }))
   expect(await screen.findByText('Metadatos de mensajes disponibles: 1')).toBeTruthy()
   expect(document.body.textContent).toContain('Entrante')
+  expect(screen.queryByRole('button', { name: 'Tomar chat' })).toBeNull()
+})
+
+it('filtra por responsable y permite al editor tomar y liberar su chat', async () => {
+  const initial = { id: 7, channel: 'whatsapp' as const, created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-25T10:00:00Z', mode: 'AI' as const, assigned_to_me: false }
+  vi.mocked(reviewApi.conversations).mockResolvedValue({ items: [initial], has_more: false })
+  vi.mocked(reviewApi.conversation)
+    .mockResolvedValueOnce({ ...initial, message_count: 0, recent_messages: [] })
+    .mockResolvedValueOnce({ ...initial, mode: 'HUMAN', assigned_to_me: true, message_count: 0, recent_messages: [] })
+    .mockResolvedValueOnce({ ...initial, mode: 'AI', assigned_to_me: false, message_count: 0, recent_messages: [] })
+  vi.mocked(reviewApi.take).mockResolvedValue({ mode: 'HUMAN', assigned_to_me: true })
+  vi.mocked(reviewApi.release).mockResolvedValue({ mode: 'AI', assigned_to_me: false })
+  const user = userEvent.setup()
+  render(<ReviewPanel section="conversations" role="editor" csrfToken="csrf" onExpired={vi.fn()} />)
+  await screen.findByText('Conversación #7')
+  await user.selectOptions(screen.getByLabelText('Responsable'), 'HUMAN')
+  await user.selectOptions(screen.getByLabelText('Asignación'), 'mine')
+  await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+  await waitFor(() => expect(reviewApi.conversations).toHaveBeenLastCalledWith({ updatedFrom: undefined, updatedTo: undefined, mode: 'HUMAN', mine: true, offset: 0 }))
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }))
+  await user.click(await screen.findByRole('button', { name: 'Tomar chat' }))
+  await waitFor(() => expect(reviewApi.take).toHaveBeenCalledWith(7, 'csrf'))
+  await user.click(await screen.findByRole('button', { name: 'Liberar chat' }))
+  await waitFor(() => expect(reviewApi.release).toHaveBeenCalledWith(7, 'csrf'))
 })
 
 it('permite resolver una FAQ solo al editor y limpia la pregunta del formulario', async () => {
