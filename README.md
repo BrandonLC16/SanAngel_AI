@@ -478,6 +478,10 @@ detalle mínimo y toma/liberación bajo sesión, RBAC y CSRF. F9.3 incorpora la
 [respuesta humana por WhatsApp](docs/fase_9_respuesta_humana.md) con revisión explícita, envío
 desde la instancia configurada y un recibo de aceptación en cola. Los resultados inciertos
 bloquean nuevos envíos hasta conciliación; no se afirma entrega al teléfono.
+F9.4 agrega [solicitudes de ayuda humana](docs/fase_9_handoff.md): una petición explícita del
+cliente o una respuesta de IA fallida/vacía deja un aviso persistente por conversación en la
+bandeja de la sucursal. La IA se detiene para ese chat hasta que personal autorizado lo tome.
+El acuse al cliente no afirma que alguien haya respondido.
 
 F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen

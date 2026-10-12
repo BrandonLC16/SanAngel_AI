@@ -110,6 +110,22 @@ def test_conversation_filters_detail_and_foreign_id_are_minimal(app, sessions) -
                 ),
             ]
         )
+        session.add_all(
+            [
+                ConversationResponderState(
+                    branch_id=own.id,
+                    conversation_id=current.id,
+                    help_reason="ai_unavailable",
+                    help_requested_at=now,
+                ),
+                ConversationResponderState(
+                    branch_id=foreign.id,
+                    conversation_id=other.id,
+                    help_reason="customer_requested",
+                    help_requested_at=now,
+                ),
+            ]
+        )
     configure(app, sessions)
     with TestClient(app, base_url="https://testserver") as client:
         assert client.get(f"{BASE}/conversations").status_code == 401
@@ -118,6 +134,12 @@ def test_conversation_filters_detail_and_foreign_id_are_minimal(app, sessions) -
         assert page.status_code == 200
         assert page.headers["cache-control"] == "no-store"
         assert [item["id"] for item in page.json()["items"]] == [own_id]
+        assert page.json()["items"][0]["help_reason"] == "ai_unavailable"
+        assert page.json()["items"][0]["help_requested_at"] is not None
+        assert page.json()["pending_help_count"] == 1
+        hidden = client.get(f"{BASE}/conversations", params={"mode": "HUMAN"})
+        assert hidden.json()["items"] == []
+        assert hidden.json()["pending_help_count"] == 1
         assert page.json()["has_more"] is True
         assert [
             item["id"]
@@ -136,6 +158,7 @@ def test_conversation_filters_detail_and_foreign_id_are_minimal(app, sessions) -
         detail = client.get(f"{BASE}/conversations/{own_id}")
         assert detail.status_code == 200
         assert detail.json()["message_count"] == 2
+        assert detail.json()["help_reason"] == "ai_unavailable"
         assert {item["direction"] for item in detail.json()["recent_messages"]} == {
             "inbound",
             "outbound",

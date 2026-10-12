@@ -1,8 +1,9 @@
-from typing import Protocol
+from typing import Literal, Protocol
 
-from backend.app.core.exceptions import ApplicationError, MessageProcessingError
+from backend.app.core.exceptions import AIProviderError, ApplicationError, MessageProcessingError
 from backend.app.schemas.whatsapp import InboundMessage
 from backend.app.services.conversation_identity_service import ConversationContext
+from backend.app.services.human_handoff_policy import HUMAN_HELP_ACK, explicitly_requests_human
 from backend.app.services.idempotency_store import IdempotencyStore
 
 
@@ -28,6 +29,10 @@ class ConversationModeGate(Protocol):
     async def begin_ai_reply(self, conversation_id: int) -> bool: ...
 
     async def finish_ai_reply(self, conversation_id: int) -> None: ...
+
+    async def request_human_help(
+        self, conversation_id: int, reason: Literal["customer_requested", "ai_unavailable"]
+    ) -> bool: ...
 
 
 class MessageOrchestrator:
@@ -67,7 +72,25 @@ class MessageOrchestrator:
                     await self._idempotency_store.mark_processed(idempotency_key)
                     return False
                 ai_conversation_id = context.conversation_id
-            answer = await self._chat_service.answer(message.text)
+            if ai_conversation_id is not None and explicitly_requests_human(message.text):
+                assert self._conversation_mode_gate is not None
+                await self._conversation_mode_gate.request_human_help(
+                    ai_conversation_id, "customer_requested"
+                )
+                answer = HUMAN_HELP_ACK
+            else:
+                try:
+                    answer = await self._chat_service.answer(message.text)
+                    if not answer.strip():
+                        raise AIProviderError("AI provider returned no answer")
+                except AIProviderError:
+                    if ai_conversation_id is None:
+                        raise
+                    assert self._conversation_mode_gate is not None
+                    await self._conversation_mode_gate.request_human_help(
+                        ai_conversation_id, "ai_unavailable"
+                    )
+                    answer = HUMAN_HELP_ACK
             send_attempted = True
             await self._whatsapp_client.send_text(message.sender_id, answer)
             await self._idempotency_store.mark_processed(idempotency_key)

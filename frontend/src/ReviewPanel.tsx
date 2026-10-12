@@ -33,6 +33,7 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
   const [detail, setDetail] = useState<ConversationDetail | null>(null)
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const [pendingHelpCount, setPendingHelpCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [manualDraft, setManualDraft] = useState('')
@@ -44,7 +45,7 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
     setBusy(true); setError(null); setDetail(null); setManualDraft(''); setManualPreview(null)
     try {
       const page = await reviewApi.conversations({ updatedFrom: filters.updatedFrom || undefined, updatedTo: filters.updatedTo || undefined, mode: filters.mode || undefined, mine: filters.mine, offset: nextOffset })
-      setItems(page.items); setHasMore(page.has_more); setOffset(nextOffset); setApplied(filters)
+      setItems(page.items); setHasMore(page.has_more); setPendingHelpCount(page.pending_help_count ?? 0); setOffset(nextOffset); setApplied(filters)
     } catch (failure) {
       setError(errorText(failure))
       if (failure instanceof AdminApiError && failure.status === 401) onExpired()
@@ -52,6 +53,17 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
   }
 
   useEffect(() => { void load(0) }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void reviewApi.conversations({ updatedFrom: applied.updatedFrom || undefined, updatedTo: applied.updatedTo || undefined, mode: applied.mode || undefined, mine: applied.mine, offset })
+        .then((page) => { setItems(page.items); setHasMore(page.has_more); setPendingHelpCount(page.pending_help_count ?? 0) })
+        .catch((failure) => {
+          if (failure instanceof AdminApiError && failure.status === 401) onExpired()
+        })
+    }, 30000)
+    return () => window.clearInterval(timer)
+  }, [applied, offset, onExpired])
 
   async function show(id: number) {
     setBusy(true); setError(null); setNotice(null); setManualDraft(''); setManualPreview(null)
@@ -121,6 +133,8 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
     <section className="admin-card">
       <h2>Bandeja de conversaciones activas</h2>
       <p className="muted">Conversaciones conservadas en esta sucursal, ordenadas por actividad. Solo se muestran metadatos; el destinatario se guarda cifrado y el texto de mensajes no se conserva.</p>
+      {pendingHelpCount > 0 && <p role="status" className="notice notice-info">Hay {pendingHelpCount} solicitud{pendingHelpCount === 1 ? '' : 'es'} de ayuda pendiente{pendingHelpCount === 1 ? '' : 's'} en esta sucursal. Quita los filtros para verlas. Todavía no hay respuesta humana confirmada.</p>}
+      <button type="button" disabled={busy} onClick={() => void load(0)}>Actualizar solicitudes</button>
       <form className="review-filters" onSubmit={(event: FormEvent) => { event.preventDefault(); void load(0, { updatedFrom, updatedTo, mode, mine }) }}>
         <label htmlFor="conversation-from">Actividad desde</label>
         <input id="conversation-from" type="date" value={updatedFrom} disabled={busy} onChange={(event) => setUpdatedFrom(event.target.value)} />
@@ -134,7 +148,7 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
       </form>
       <div className="admin-list">
         {items.length === 0 && !busy && <p>No hay conversaciones con estos filtros.</p>}
-        {items.map((item) => <div className="admin-row" key={item.id}><div><strong>Conversación #{item.id}</strong><small>{item.mode === 'AI' ? 'IA' : item.assigned_to_me ? 'Personal · asignada a ti' : 'Personal · asignada'} · Última actividad: {formatDate(item.updated_at)}</small></div><button type="button" disabled={busy} onClick={() => void show(item.id)}>Ver detalle</button></div>)}
+        {items.map((item) => <div className="admin-row" key={item.id}><div><strong>Conversación #{item.id}</strong><small>{item.help_requested_at ? `Ayuda solicitada · ${item.help_reason === 'customer_requested' ? 'cliente pidió atención' : 'IA sin respuesta'} · ` : ''}{item.mode === 'AI' ? 'IA' : item.assigned_to_me ? 'Personal · asignada a ti' : 'Personal · asignada'} · Última actividad: {formatDate(item.updated_at)}</small></div><button type="button" disabled={busy} onClick={() => void show(item.id)}>Ver detalle</button></div>)}
       </div>
       <div className="admin-actions"><button type="button" disabled={busy || offset === 0} onClick={() => void load(Math.max(0, offset - PAGE_SIZE))}>Anterior</button><button type="button" disabled={busy || !hasMore} onClick={() => void load(offset + PAGE_SIZE)}>Siguiente</button></div>
     </section>
@@ -142,6 +156,7 @@ function Conversations({ role, csrfToken, onExpired }: Pick<Props, 'role' | 'csr
       <h2>Conversación #{detail.id}</h2>
       <p>Canal: WhatsApp · Creada: {formatDate(detail.created_at)} · Última actividad: {formatDate(detail.updated_at)}</p>
       <p>Responsable: {detail.mode === 'AI' ? 'IA' : detail.assigned_to_me ? 'Personal · asignada a ti' : 'Personal · asignada a otra persona'}</p>
+      {detail.help_requested_at && <p role="status" className="notice notice-info">Ayuda pendiente desde {formatDate(detail.help_requested_at)} ({detail.help_reason === 'customer_requested' ? 'solicitud del cliente' : 'IA sin respuesta'}). Toma el chat para atenderlo; aún no hay respuesta humana confirmada.</p>}
       <p>Metadatos de mensajes disponibles: {detail.message_count}</p>
       {detail.recent_messages.length === 0 ? <p>No hay metadatos de mensajes guardados.</p> : <ul className="review-messages">{detail.recent_messages.map((message, index) => <li key={index}>{message.direction === 'inbound' ? 'Entrante' : 'Saliente'} · {formatDate(message.occurred_at)}</li>)}</ul>}
       {detail.latest_manual_send && <p>Último envío manual #{detail.latest_manual_send.receipt_id}: {detail.latest_manual_send.status === 'accepted' ? 'aceptado en cola por GreenAPI; entrega no confirmada' : 'pendiente o incierto; requiere revisión antes de reenviar'}.</p>}

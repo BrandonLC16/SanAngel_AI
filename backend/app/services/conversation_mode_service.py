@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 
 from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert
@@ -108,6 +109,8 @@ class ConversationModeService:
                     .values(
                         mode=ConversationMode.HUMAN.value,
                         assigned_admin_user_id=principal.user_id,
+                        help_reason=None,
+                        help_requested_at=None,
                     )
                 )
                 if changed.rowcount != 1:
@@ -175,6 +178,7 @@ class ConversationModeService:
                         ConversationResponderState.conversation_id == conversation_id,
                         ConversationResponderState.branch_id == branch.id,
                         ConversationResponderState.mode == ConversationMode.AI.value,
+                        ConversationResponderState.help_requested_at.is_(None),
                     )
                     .values(ai_reply_count=ConversationResponderState.ai_reply_count + 1)
                 )
@@ -183,6 +187,47 @@ class ConversationModeService:
             return True
         except SQLAlchemyError:
             raise ServiceUnavailableError("conversation AI claim failed") from None
+
+    def request_human_help(
+        self,
+        conversation_id: int,
+        reason: Literal["customer_requested", "ai_unavailable"],
+    ) -> bool:
+        """Persist one panel alert while this conversation owns an AI reply claim."""
+        conversation_id = self._conversation_id(conversation_id)
+        if reason not in {"customer_requested", "ai_unavailable"}:
+            raise InvalidRequestError("invalid human help reason")
+        try:
+            with self._sessions.begin() as session:
+                branch = self._branch(session)
+                self._state_row(session, branch.id, conversation_id)
+                changed = session.execute(
+                    update(ConversationResponderState)
+                    .where(
+                        ConversationResponderState.conversation_id == conversation_id,
+                        ConversationResponderState.branch_id == branch.id,
+                        ConversationResponderState.mode == ConversationMode.AI.value,
+                        ConversationResponderState.ai_reply_count > 0,
+                        ConversationResponderState.help_requested_at.is_(None),
+                    )
+                    .values(help_reason=reason, help_requested_at=datetime.now(UTC))
+                )
+                if changed.rowcount != 1:
+                    state = session.get(ConversationResponderState, conversation_id)
+                    if state is None or state.help_requested_at is None:
+                        raise ConversationModeConflictError()
+                if changed.rowcount == 1:
+                    session.execute(
+                        update(Conversation)
+                        .where(
+                            Conversation.id == conversation_id,
+                            Conversation.branch_id == branch.id,
+                        )
+                        .values(updated_at=datetime.now(UTC))
+                    )
+                return changed.rowcount == 1
+        except SQLAlchemyError:
+            raise ServiceUnavailableError("human help request failed") from None
 
     def finish_ai_reply(self, conversation_id: int) -> None:
         """Clear a claim after a confirmed send or before any send attempt."""
@@ -217,3 +262,10 @@ class PersistentConversationModeGate:
 
     async def finish_ai_reply(self, conversation_id: int) -> None:
         await asyncio.to_thread(self._service.finish_ai_reply, conversation_id)
+
+    async def request_human_help(
+        self,
+        conversation_id: int,
+        reason: Literal["customer_requested", "ai_unavailable"],
+    ) -> bool:
+        return await asyncio.to_thread(self._service.request_human_help, conversation_id, reason)

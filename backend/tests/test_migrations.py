@@ -34,6 +34,7 @@ ADMIN_RBAC_REVISION = "20260924_0009"
 ADMIN_COMMERCIAL_REVISION = "20260924_0010"
 CONVERSATION_MODE_REVISION = "20260925_0011"
 MANUAL_REPLY_REVISION = "20260925_0012"
+HUMAN_HELP_REVISION = "20261012_0013"
 
 
 def sqlite_url(path: Path) -> str:
@@ -48,9 +49,10 @@ def test_migration_history_has_reproducible_conversation_mode_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [MANUAL_REPLY_REVISION]
-    assert len(revisions) == 12
+    assert scripts.get_heads() == [HUMAN_HELP_REVISION]
+    assert len(revisions) == 13
     assert [revision.revision for revision in revisions] == [
+        HUMAN_HELP_REVISION,
         MANUAL_REPLY_REVISION,
         CONVERSATION_MODE_REVISION,
         ADMIN_COMMERCIAL_REVISION,
@@ -64,18 +66,84 @@ def test_migration_history_has_reproducible_conversation_mode_head() -> None:
         BRANCH_REVISION,
         INITIAL_REVISION,
     ]
-    assert revisions[0].down_revision == CONVERSATION_MODE_REVISION
-    assert revisions[1].down_revision == ADMIN_COMMERCIAL_REVISION
-    assert revisions[2].down_revision == ADMIN_RBAC_REVISION
-    assert revisions[3].down_revision == ADMIN_AUTH_REVISION
-    assert revisions[4].down_revision == UNRESOLVED_REVISION
-    assert revisions[5].down_revision == CONVERSATION_REVISION
-    assert revisions[6].down_revision == AUDIT_REVISION
-    assert revisions[7].down_revision == PRICE_REVISION
-    assert revisions[8].down_revision == PRODUCT_REVISION
-    assert revisions[9].down_revision == BRANCH_REVISION
-    assert revisions[10].down_revision == INITIAL_REVISION
-    assert revisions[11].down_revision is None
+    assert revisions[0].down_revision == MANUAL_REPLY_REVISION
+    assert revisions[1].down_revision == CONVERSATION_MODE_REVISION
+    assert revisions[2].down_revision == ADMIN_COMMERCIAL_REVISION
+    assert revisions[3].down_revision == ADMIN_RBAC_REVISION
+    assert revisions[4].down_revision == ADMIN_AUTH_REVISION
+    assert revisions[5].down_revision == UNRESOLVED_REVISION
+    assert revisions[6].down_revision == CONVERSATION_REVISION
+    assert revisions[7].down_revision == AUDIT_REVISION
+    assert revisions[8].down_revision == PRICE_REVISION
+    assert revisions[9].down_revision == PRODUCT_REVISION
+    assert revisions[10].down_revision == BRANCH_REVISION
+    assert revisions[11].down_revision == INITIAL_REVISION
+    assert revisions[12].down_revision is None
+
+
+def test_human_help_migration_preserves_existing_responder_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    database_url = sqlite_url(tmp_path / "existing-responder.db")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_database_settings.cache_clear()
+    config = alembic_config()
+    try:
+        command.upgrade(config, MANUAL_REPLY_REVISION)
+        engine = create_database_engine(database_url)
+        try:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO branches (code, name, address, business_hours) "
+                        "VALUES ('sucursal-uno', 'Uno', 'Prueba', 'Lunes')"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO conversations (branch_id, channel, external_user_key) "
+                        "VALUES (1, 'whatsapp', :external_user_key)"
+                    ),
+                    {"external_user_key": "a" * 64},
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO conversation_responder_states "
+                        "(conversation_id, branch_id, mode, ai_reply_count) "
+                        "VALUES (1, 1, 'AI', 0)"
+                    )
+                )
+        finally:
+            engine.dispose()
+        command.upgrade(config, "head")
+        engine = create_database_engine(database_url)
+        try:
+            with create_database_session_factory(engine)() as session:
+                state = session.get(ConversationResponderState, 1)
+                assert state is not None
+                assert (state.mode, state.help_reason, state.help_requested_at) == (
+                    "AI",
+                    None,
+                    None,
+                )
+        finally:
+            engine.dispose()
+        command.downgrade(config, MANUAL_REPLY_REVISION)
+        engine = create_database_engine(database_url)
+        try:
+            with engine.connect() as connection:
+                assert {
+                    column["name"]
+                    for column in inspect(connection).get_columns("conversation_responder_states")
+                }.isdisjoint({"help_reason", "help_requested_at"})
+                assert (
+                    connection.scalar(text("SELECT mode FROM conversation_responder_states"))
+                    == "AI"
+                )
+        finally:
+            engine.dispose()
+    finally:
+        get_database_settings.cache_clear()
 
 
 def test_admin_rbac_upgrade_defaults_existing_users_and_downgrade_restores_schema(
@@ -191,7 +259,7 @@ def test_commercial_migration_preserves_existing_catalog_and_enforces_faq_scope(
             with engine.connect() as connection:
                 assert (
                     MigrationContext.configure(connection).get_current_revision()
-                    == MANUAL_REPLY_REVISION
+                    == HUMAN_HELP_REVISION
                 )
                 assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
         finally:
@@ -262,7 +330,7 @@ def test_upgrade_head_creates_all_registered_schema(
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == MANUAL_REPLY_REVISION
+        assert current_revision == HUMAN_HELP_REVISION
         assert table_names == [
             "admin_commercial_audits",
             "admin_login_throttles",
@@ -580,7 +648,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            MANUAL_REPLY_REVISION,
+            HUMAN_HELP_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -633,7 +701,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == MANUAL_REPLY_REVISION
+        assert snapshot()[0] == HUMAN_HELP_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -647,7 +715,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            MANUAL_REPLY_REVISION,
+            HUMAN_HELP_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",

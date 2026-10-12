@@ -4,6 +4,7 @@ export type ConversationMode = 'AI' | 'HUMAN'
 export type ConversationItem = {
   id: number; channel: 'whatsapp'; created_at: string; updated_at: string
   mode: ConversationMode; assigned_to_me: boolean
+  help_requested_at: string | null; help_reason: 'customer_requested' | 'ai_unavailable' | null
 }
 export type MessageMetadata = { direction: 'inbound' | 'outbound'; occurred_at: string }
 export type ManualSendSummary = { receipt_id: number; status: 'pending' | 'accepted' | 'uncertain'; created_at: string }
@@ -17,7 +18,7 @@ export type UnresolvedItem = {
   id: number; reason: 'faq_unknown' | 'faq_ambiguous'; occurrences: number
   first_seen_at: string; last_seen_at: string
 }
-export type Page<T> = { items: T[]; has_more: boolean }
+export type Page<T> = { items: T[]; has_more: boolean; pending_help_count?: number }
 export type ResolveFAQInput = {
   category: 'general' | 'servicios' | 'pagos' | 'entregas' | 'politicas'
   question: string; answer: string

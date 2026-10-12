@@ -17,6 +17,7 @@ from backend.app.core.exceptions import (
     AdminAuthorizationError,
     ConversationModeConflictError,
     ConversationNotFoundError,
+    InvalidRequestError,
 )
 from backend.app.db.base import Base
 from backend.app.db.models.admin_user import AdminUser
@@ -122,6 +123,36 @@ def test_handoff_keeps_one_human_owner_and_blocks_ai_while_assigned(
     assert modes.release(principals["owner"], conversation_id).mode is ConversationMode.AI
     assert modes.begin_ai_reply(conversation_id) is True
     modes.finish_ai_reply(conversation_id)
+
+
+def test_help_request_is_scoped_pending_once_and_cleared_only_when_taken(
+    scenario: tuple[sessionmaker[Session], dict[str, AdminSessionInfo], int, int],
+) -> None:
+    sessions, principals, conversation_id, other_id = scenario
+    modes = service(sessions)
+    with pytest.raises(ConversationNotFoundError):
+        modes.request_human_help(other_id, "customer_requested")
+    with pytest.raises(InvalidRequestError):
+        modes.request_human_help(conversation_id, "unauthorized")  # type: ignore[arg-type]
+    with pytest.raises(ConversationModeConflictError):
+        modes.request_human_help(conversation_id, "customer_requested")
+    assert modes.begin_ai_reply(conversation_id) is True
+    assert modes.request_human_help(conversation_id, "customer_requested") is True
+    assert modes.request_human_help(conversation_id, "ai_unavailable") is False
+    with sessions() as session:
+        state = session.get(ConversationResponderState, conversation_id)
+        assert state is not None
+        assert state.help_reason == "customer_requested"
+        assert state.help_requested_at is not None
+    modes.finish_ai_reply(conversation_id)
+    assert modes.begin_ai_reply(conversation_id) is False
+    modes.take(principals["editor"], conversation_id)
+    with sessions() as session:
+        state = session.get(ConversationResponderState, conversation_id)
+        assert state is not None
+        assert state.mode == "HUMAN"
+        assert state.help_reason is None
+        assert state.help_requested_at is None
 
 
 def test_transition_rechecks_role_active_user_expiry_and_branch(

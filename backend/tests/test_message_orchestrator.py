@@ -22,7 +22,9 @@ from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.schemas.whatsapp import InboundMessage
 from backend.app.services.admin_auth_service import AdminSessionInfo
+from backend.app.services.conversation_identity_service import ConversationContext
 from backend.app.services.conversation_mode_service import ConversationModeService
+from backend.app.services.human_handoff_policy import HUMAN_HELP_ACK
 from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
 
@@ -38,6 +40,29 @@ class FakeChatResponder:
         if self.error is not None:
             raise self.error
         return self._answer
+
+
+class FakeContextResolver:
+    async def resolve(self, _message: InboundMessage) -> ConversationContext:
+        return ConversationContext(1, 1, "sucursal-demo")
+
+
+class FakeModeGate:
+    def __init__(self) -> None:
+        self.pending = False
+        self.reasons: list[str] = []
+        self.finished = 0
+
+    async def begin_ai_reply(self, _conversation_id: int) -> bool:
+        return not self.pending
+
+    async def request_human_help(self, _conversation_id: int, reason: str) -> bool:
+        self.pending = True
+        self.reasons.append(reason)
+        return True
+
+    async def finish_ai_reply(self, _conversation_id: int) -> None:
+        self.finished += 1
 
 
 class FakeWhatsAppSender:
@@ -96,6 +121,47 @@ def test_process_message_connects_normalized_input_answer_and_sender() -> None:
     assert result is True
     assert chat_service.messages == ["Pregunta"]
     assert whatsapp_client.calls == [("5215550000001@c.us", "Respuesta del chatbot", False)]
+
+
+@pytest.mark.parametrize(
+    ("message_text", "answer", "error", "expected_reason"),
+    [
+        ("Quiero hablar con una persona", "unused", None, "customer_requested"),
+        ("¿Tienen un producto?", "", None, "ai_unavailable"),
+        ("¿Tienen un producto?", "unused", AIProviderRateLimitError(), "ai_unavailable"),
+    ],
+)
+def test_handoff_persists_before_ack_and_suppresses_later_ai_replies(
+    message_text: str, answer: str, error: Exception | None, expected_reason: str
+) -> None:
+    chat = FakeChatResponder(answer=answer, error=error)
+    sender = FakeWhatsAppSender()
+    gate = FakeModeGate()
+    flow = MessageOrchestrator(
+        chat,
+        sender,
+        InMemoryIdempotencyStore(),
+        conversation_context_resolver=FakeContextResolver(),
+        conversation_mode_gate=gate,
+    )
+
+    async def run() -> tuple[bool, bool]:
+        first = await flow.process_message(inbound_message(text=message_text))
+        second = await flow.process_message(
+            InboundMessage(
+                external_message_id="test-only-followup-id",
+                sender_id="5215550000001@c.us",
+                text="Otra consulta",
+            )
+        )
+        return first, second
+
+    assert asyncio.run(run()) == (True, False)
+    assert gate.reasons == [expected_reason]
+    assert gate.finished == 1
+    assert sender.calls == [("5215550000001@c.us", HUMAN_HELP_ACK, False)]
+    assert "respondio" not in HUMAN_HELP_ACK.lower()
+    assert chat.messages == ([] if expected_reason == "customer_requested" else [message_text])
 
 
 def test_default_factory_wires_cached_chat_and_closes_mocked_whatsapp_client(

@@ -75,6 +75,8 @@ def test_migrated_tables_have_only_minimal_whatsapp_fields(engine: Engine) -> No
         "assigned_admin_user_id",
         "ai_reply_count",
         "manual_send_blocked",
+        "help_reason",
+        "help_requested_at",
     }
     responder_checks = {
         item["name"] for item in inspector.get_check_constraints("conversation_responder_states")

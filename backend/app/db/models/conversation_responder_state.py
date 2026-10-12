@@ -1,6 +1,8 @@
 """One persistent responder state per scoped WhatsApp conversation."""
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKeyConstraint, Integer, String
+from datetime import datetime
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKeyConstraint, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.core.conversation_mode import ConversationMode
@@ -43,3 +45,5 @@ class ConversationResponderState(Base):
     manual_send_blocked: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"
     )
+    help_reason: Mapped[str | None] = mapped_column(String(32))
+    help_requested_at: Mapped[datetime | None] = mapped_column(DateTime())

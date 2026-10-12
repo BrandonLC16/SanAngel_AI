@@ -20,11 +20,14 @@ class ConversationItem(_ReviewModel):
     updated_at: datetime
     mode: ConversationMode
     assigned_to_me: bool
+    help_requested_at: datetime | None
+    help_reason: Literal["customer_requested", "ai_unavailable"] | None
 
 
 class ConversationPage(_ReviewModel):
     items: list[ConversationItem]
     has_more: bool
+    pending_help_count: int
 
 
 class MessageMetadata(_ReviewModel):

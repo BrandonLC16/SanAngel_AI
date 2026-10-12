@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-10-10
+**Última actualización:** 2026-10-12
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`)
-**Subfase activa:** F9.3 — Respuesta humana por WhatsApp (`✅ COMPLETADO`, 2026-10-10)
-**Estado global:** 🟨 EN_PROGRESO — F9.3 completada; F9.4 permanece pendiente y no iniciada
+**Subfase activa:** F9.4 — Handoff automático/manual (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — F9.4 completada; F9.5 permanece pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3286,7 +3286,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que un empleado tome una conversación de WhatsApp y responda sin que la IA compita con él.
 
-**Estado:** ⛔ BLOQUEADO
+**Estado:** 🟨 EN_PROGRESO
 **Fecha de inicio:** 2026-09-25
 
 **Documento guía:** `plan_de_trabajo.md`
@@ -3433,28 +3433,31 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F9.4 — Handoff automático/manual
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de finalización:** 2026-10-12
+**Documento:** `docs/fase_9_handoff.md`
 
 
 ### Alcance
 
-- [ ] request_human_help.
+- [x] request_human_help.
 
-- [ ] fallback IA.
+- [x] fallback IA.
 
-- [ ] reglas.
+- [x] reglas.
 
-- [ ] notificación panel.
+- [x] notificación panel.
 
 
 ### Criterios de aceptación
 
-- [ ] casos sin respuesta se escalan.
+- [x] casos sin respuesta se escalan.
 
 
 ### Seguridad
 
-- [ ] no prometer que humano respondió hasta confirmación.
+- [x] no prometer que humano respondió hasta confirmación.
 
 
 ### Prompt para Codex
@@ -4362,9 +4365,9 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`).
-**Subfase activa:** F9.3 — Respuesta humana por WhatsApp (`⛔ BLOQUEADO`, inicio 2026-09-25).
-**Última subfase completada:** F9.2 — Bandeja de conversaciones.
-**Siguiente subfase recomendada:** F9.4 — Handoff automático/manual (`⬜ PENDIENTE`), no iniciada.
+**Subfase activa:** F9.4 — Handoff automático/manual (`✅ COMPLETADO`, 2026-10-12).
+**Última subfase completada:** F9.4 — Handoff automático/manual.
+**Siguiente subfase recomendada:** F9.5 — Auditoría y cierre (`⬜ PENDIENTE`), no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -9224,6 +9227,54 @@ del envío manual; otros contactos no se procesaron.
 en esta prueba el recibo llegó a `completed`, pero ese límite operativo sigue vigente.
 La URL temporal ya está desactivada. F9.4 es la siguiente subfase recomendada y permanece
 sin iniciar; no se interpreta este cierre de F9.3 como aprobación de despliegue público.
+
+---
+
+## 2026-10-12 — F9.4 Handoff automático/manual
+
+**Fase/subfase:** Fase 9 / F9.4. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO` → `↩️ REABIERTO` (aviso oculto por filtros) →
+`🧪 VALIDACION` → `✅ COMPLETADO`.
+
+**Cambios:** la solicitud `request_human_help` se persiste una sola vez en la conversación
+resuelta por backend cuando el cliente pide explícitamente a una persona o la IA falla/devuelve
+texto vacío. El aviso guarda solo motivo y hora; mensajes nuevos no activan la IA hasta que un
+operador autorizado toma el chat. El acuse fijo confirma la solicitud persistida, sin afirmar que
+alguien respondió. El panel ordena primero los pendientes, muestra el motivo en lista y detalle
+y el total de la sucursal aunque los filtros oculten los chats; permite refresco manual y consulta
+cada 30 segundos. La tool de F6 conserva su contrato de
+propuesta fuera de un contexto de WhatsApp; la ejecución de F9.4 se hace en el orquestador con
+alcance y conversación confiables. Migración `20261012_0013` probada desde la revisión anterior
+con un estado existente y reversión en base temporal.
+
+**Archivos:** `backend/app/db/models/conversation_responder_state.py`,
+`backend/app/schemas/admin_review.py`, `backend/app/services/{admin_review_service,conversation_mode_service,human_handoff_policy,message_orchestrator}.py`,
+`migrations/versions/20261012_0013_human_help_requests.py`, `migrations/README.md`,
+`frontend/src/{ReviewPanel,ReviewPanel.test,reviewApi}.ts*`,
+`backend/tests/{test_admin_review,test_conversation_mode_service,test_conversation_schema,test_fase_7_recovery,test_human_handoff,test_message_orchestrator,test_migrations}.py`,
+`docs/fase_9_handoff.md`, `README.md` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 634 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado; `.venv\Scripts\ruff.exe format --check .` →
+193 archivos correctos; `npm --prefix frontend test -- --run` → 33 aprobadas;
+`npm --prefix frontend run build` → aprobado; `.venv\Scripts\python.exe -m pip check` →
+sin conflictos; `git -c core.safecrlf=false diff --check` → aprobado. Las pruebas focales de
+handoff, modo y migración también pasaron. No se llamaron OpenAI ni GreenAPI reales.
+
+**Seguridad:** solo el backend elige la sucursal y la conversación; prueba negativa de acceso
+cruzado. El panel mantiene sesión y permiso de lectura, sin texto, teléfono, clave HMAC ni token.
+La solicitud se confirma en DB antes del acuse; si no queda persistida, no se informa al cliente.
+El acuse y el panel dicen que no hay respuesta humana confirmada. Los recibos de webhook siguen
+evitando duplicados; un envío ambiguo conserva la reserva y no se reintenta automáticamente.
+
+**Riesgos y pendientes:** no se hizo prueba real con WhatsApp ni despliegue público. Una respuesta
+no vacía pero incierta de la IA no se clasifica automáticamente como ausencia de respuesta; el
+canal aún usa chat simple y la FAQ desconocida no llega a esta regla. La entrega del acuse al
+teléfono no se deduce de la aceptación de GreenAPI. El trabajo de fondo posterior al ACK sigue
+sin cola durable. Antes de aplicar la nueva migración a una instalación con datos se requiere el
+respaldo operativo definido en el README.
+
+**Siguiente:** F9.5 — Auditoría y cierre (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

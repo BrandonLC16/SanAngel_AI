@@ -111,6 +111,8 @@ class AdminReviewService:
             updated_at=row.updated_at,
             mode=state.mode if state is not None else ConversationMode.AI,
             assigned_to_me=state is not None and state.assigned_admin_user_id == user_id,
+            help_requested_at=state.help_requested_at if state is not None else None,
+            help_reason=state.help_reason if state is not None else None,
         )
 
     @staticmethod
@@ -138,6 +140,21 @@ class AdminReviewService:
         if updated_from and updated_to and updated_from > updated_to:
             raise InvalidRequestError()
         with self._context(principal, AdminPermission.COMMERCIAL_READ) as (session, branch):
+            pending_help_count = (
+                session.scalar(
+                    select(func.count(ConversationResponderState.conversation_id))
+                    .join(
+                        Conversation,
+                        Conversation.id == ConversationResponderState.conversation_id,
+                    )
+                    .where(
+                        Conversation.branch_id == branch.id,
+                        ConversationResponderState.branch_id == branch.id,
+                        ConversationResponderState.help_requested_at.is_not(None),
+                    )
+                )
+                or 0
+            )
             query = (
                 select(Conversation, ConversationResponderState)
                 .outerjoin(
@@ -164,7 +181,11 @@ class AdminReviewService:
                     Conversation.updated_at <= datetime.combine(updated_to, time.max)
                 )
             rows = session.execute(
-                query.order_by(Conversation.updated_at.desc(), Conversation.id.desc())
+                query.order_by(
+                    ConversationResponderState.help_requested_at.desc().nulls_last(),
+                    Conversation.updated_at.desc(),
+                    Conversation.id.desc(),
+                )
                 .offset(offset)
                 .limit(limit + 1)
             ).all()
@@ -174,6 +195,7 @@ class AdminReviewService:
                     for row, state in rows[:limit]
                 ],
                 has_more=len(rows) > limit and offset + limit <= MAX_OFFSET,
+                pending_help_count=pending_help_count,
             )
 
     def get_conversation(

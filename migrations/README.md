@@ -49,6 +49,9 @@ conversaciones existentes conservan `recipient_ciphertext=NULL` hasta el siguien
 entrante; no se puede responder manualmente a ellas antes de ese momento. La migración no
 almacena texto ni destinatarios en claro.
 
+`20261012_0013` agrega motivo y hora de la solicitud de ayuda humana al estado de respuesta.
+Los campos anteriores conservan sus valores; no se guarda texto del cliente ni número.
+
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
 crea uno sin sobrescribir otro y comprueba su integridad. Revisar el
