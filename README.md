@@ -523,6 +523,10 @@ latencia, fallos OpenAI/GreenAPI y uso de tokens. El costo se estima solo con ta
 del modelo configurado; un propietario puede consultar los agregados del proceso por una ruta
 administrativa protegida. Los logs usan una referencia opaca en lugar del ID bruto de solicitud.
 
+F10.5 incorpora [escaneo de dependencias y secretos en CI](docs/fase_10_scanning.md) para Python,
+el lockfile del panel y la historia Git. Dependabot propone actualizaciones semanales sin merge
+automático. El escaneo de secretos solo publica un resultado genérico y no conserva hallazgos.
+
 ## Servicio OpenAI y chat interno
 
 `OpenAIService` encapsula el cliente asíncrono oficial de Responses API. El modelo, timeout,

@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.4 — Observabilidad y costos (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.4 cerrada
+**Subfase activa:** F10.5 — Dependency/secret scanning (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.5 cerrada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3726,28 +3726,30 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.5 — Dependency/secret scanning
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de finalización:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] scanner dependencias.
+- [x] scanner dependencias.
 
-- [ ] secret scanning.
+- [x] secret scanning.
 
-- [ ] CI.
+- [x] CI.
 
-- [ ] política actualización.
+- [x] política actualización.
 
 
 ### Criterios de aceptación
 
-- [ ] pipeline detecta riesgos.
+- [x] pipeline detecta riesgos.
 
 
 ### Seguridad
 
-- [ ] no subir hallazgos con secrets reales.
+- [x] no subir hallazgos con secrets reales.
 
 
 ### Prompt para Codex
@@ -9538,6 +9540,56 @@ sus tarifas vigentes. No se hicieron llamadas reales a OpenAI/GreenAPI ni se mid
 La cola de fondo tras ACK sigue sin ser durable.
 
 **Siguiente:** F10.5 — Dependency/secret scanning (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.5 Dependency/secret scanning
+
+**Fase/subfase:** Fase 10 / F10.5. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.6 permanece `⬜ PENDIENTE`.
+
+**Cambios:** CI en pull requests, pushes a `main`, ejecución manual y semanal con tres jobs:
+Gitleaks 8.30.1 sobre historia Git completa, `pip-audit` sobre el entorno Python resuelto y
+`npm audit` sobre el lockfile del panel. CI ejecuta además tests, Ruff, `pip check` y build.
+Gitleaks se instala con SHA-256 fijado y Actions con commits fijados. Un wrapper descarta toda
+salida de hallazgos y falla de forma cerrada. Dependabot propone actualizaciones semanales de
+Python, npm y Actions; la política exige revisión humana y revisión mensual de herramientas del
+workflow. Se corrigió `source-map-js` 1.2.1 → 1.2.2 en el lockfile.
+
+**Archivos:** `.github/{workflows/security.yml,dependabot.yml}`, `scripts/scan_secrets.py`,
+`backend/tests/test_security_scanning.py`, `frontend/package-lock.json`,
+`docs/fase_10_scanning.md`, `README.md` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 697 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado;
+`.venv\Scripts\ruff.exe format --check .` → 214 archivos correctos;
+`.venv\Scripts\python.exe -m pip check` → sin conflictos;
+`.venv\Scripts\python.exe -m pip_audit --local --progress-spinner off` → sin vulnerabilidades
+conocidas en las dependencias instaladas; `npm ci --prefix frontend --ignore-scripts --no-audit`
+→ correcto; `npm audit --prefix frontend` → 0 vulnerabilidades;
+`npm --prefix frontend test` → 34 aprobadas; `npm --prefix frontend run build` → correcto;
+`actionlint .github/workflows/security.yml` → sin errores;
+`git -c core.safecrlf=false diff --check` → correcto. La auditoría del lockfile anterior en
+un directorio temporal devolvió código 1 y un hallazgo alto; el lockfile corregido devolvió 0.
+`pip-audit` detectó el `pip` local 26.1.2 con código 1; tras actualizarlo a 26.2.0 devolvió 0.
+Gitleaks sobre la historia existente devolvió 0. Una regla sintética aislada y un repositorio
+temporal produjeron un fallo de escaneo sin mostrar el marcador en la salida del wrapper.
+
+**Seguridad:** no se usaron credenciales reales en pruebas. El job no recibe secretos de
+aplicación, tiene `contents: read`, desactiva credenciales persistentes del checkout y no
+publica artefactos, reportes ni comentarios de hallazgos. El wrapper descarta stdout/stderr
+del scanner y solo emite estado genérico; `--redact=100` refuerza el control. Los avisos de
+dependencias muestran únicamente paquetes y referencias de vulnerabilidad.
+
+**Riesgos y pendientes:** la ejecución alojada en GitHub Actions se comprobará al integrar el
+workflow; aquí se validaron su sintaxis y los comandos localmente. El propietario debe exigir
+los tres checks en `main` y activar alertas de dependencias en la configuración remota. Python
+no tiene lockfile: CI audita la resolución fresca y cada despliegue debe auditar sus versiones
+exactas. Los scanners requieren acceso a los catálogos externos de avisos; un error de consulta
+debe fallar cerrado. `pip-audit` omite el paquete local no publicado, pero examina sus
+dependencias instaladas. No se cambió la configuración remota ni se publicaron hallazgos.
+
+**Siguiente:** F10.6 — Docker seguro (`⬜ PENDIENTE`), no iniciada.
 
 ---
 
