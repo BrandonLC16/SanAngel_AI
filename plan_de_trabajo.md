@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-10-12
-**Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`)
-**Subfase activa:** F9.4 — Handoff automático/manual (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — F9.4 completada; F9.5 permanece pendiente
+**Fase activa:** Fase 9 — Atención humana desde el panel (`✅ COMPLETADO`)
+**Subfase activa:** F9.5 — Auditoría y cierre (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** ✅ COMPLETADO — Fase 9 cerrada; Fase 10 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3286,8 +3286,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que un empleado tome una conversación de WhatsApp y responda sin que la IA compita con él.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ✅ COMPLETADO
 **Fecha de inicio:** 2026-09-25
+**Fecha de finalización:** 2026-10-12
 
 **Documento guía:** `plan_de_trabajo.md`
 
@@ -3478,30 +3479,33 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F9.5 — Auditoría y cierre
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de finalización:** 2026-10-12
+**Documento:** `docs/fase_9_cierre.md`
 
 
 ### Alcance
 
-- [ ] actor.
+- [x] actor.
 
-- [ ] mensajes.
+- [x] mensajes.
 
-- [ ] tests.
+- [x] tests.
 
-- [ ] docs.
+- [x] docs.
 
-- [ ] plan.
+- [x] plan.
 
 
 ### Criterios de aceptación
 
-- [ ] Fase 9 completa.
+- [x] Fase 9 completa.
 
 
 ### Seguridad
 
-- [ ] retención conforme política.
+- [x] retención conforme política.
 
 
 ### Prompt para Codex
@@ -4364,10 +4368,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`).
-**Subfase activa:** F9.4 — Handoff automático/manual (`✅ COMPLETADO`, 2026-10-12).
-**Última subfase completada:** F9.4 — Handoff automático/manual.
-**Siguiente subfase recomendada:** F9.5 — Auditoría y cierre (`⬜ PENDIENTE`), no iniciada.
+**Fase activa:** Fase 9 — Atención humana desde el panel (`✅ COMPLETADO`).
+**Subfase activa:** F9.5 — Auditoría y cierre (`✅ COMPLETADO`, 2026-10-12).
+**Última subfase completada:** F9.5 — Auditoría y cierre.
+**Siguiente subfase recomendada:** F10.1 — Rate limiting y límites de recursos (`⬜ PENDIENTE`); no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -9275,6 +9279,53 @@ sin cola durable. Antes de aplicar la nueva migración a una instalación con da
 respaldo operativo definido en el README.
 
 **Siguiente:** F9.5 — Auditoría y cierre (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F9.5 Auditoría y cierre
+
+**Fase/subfase:** Fase 9 / F9.5. **Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` →
+`✅ COMPLETADO`. Fase 9 cerrada; F10 sigue `⬜ PENDIENTE`.
+
+**Cambios:** nueva tabla `conversation_audits` y migración `20261012_0014` para registrar,
+en la misma transacción del cambio, actor administrativo o sistema, conversación, acción y hora.
+Incluye solicitud de ayuda, toma/liberación y estados `send_pending`, `send_accepted` y
+`send_uncertain`, vinculados mediante recibo local. El panel de auditoría existente permite
+filtrar por conversación y explica que la aceptación en cola no acredita entrega. La purga
+elimina estos eventos a los 30 días, al borrar una conversación vencida y en el borrado
+individual del remitente. No se crean eventos históricos retroactivos.
+
+**Archivos:** `backend/app/db/models/{conversation_audit,__init__}.py`,
+`migrations/{env.py,README.md,versions/20261012_0014_conversation_audit.py}`,
+`backend/app/services/{conversation_mode_service,manual_reply_service,admin_audit_service,whatsapp_privacy_service}.py`,
+`backend/app/{api/routes/admin_audit.py,schemas/admin_audit.py,cli/purge_whatsapp_metadata.py}`,
+`frontend/src/{AuditPanel.tsx,AuditPanel.test.tsx,auditApi.ts}`,
+`backend/tests/{test_admin_audit,test_conversation_mode_service,test_conversation_schema,test_fase_7_recovery,test_manual_reply,test_migrations,test_whatsapp_privacy_service}.py`,
+`docs/{fase_7_privacidad,fase_9_cierre}.md`, `README.md` y `plan_de_trabajo.md`.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 638 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado;
+`.venv\Scripts\ruff.exe format --check .` → 196 archivos correctos;
+`npm --prefix frontend test -- --run` → 34 aprobadas;
+`npm --prefix frontend run build` → aprobado;
+`.venv\Scripts\python.exe -m pip check` → sin conflictos;
+`git -c core.safecrlf=false diff --check` → aprobado. Las pruebas focales de migración,
+auditoría, modo, envío y retención también pasaron. No se llamaron proveedores reales.
+
+**Seguridad:** auditoría limitada por sucursal mediante claves foráneas compuestas y lectura
+solo por propietario autorizado; un actor de sistema no se presenta como empleado. Se guardan
+solo motivos y estados fijos, sin texto, teléfono, HMAC, destinatario cifrado, ID del proveedor
+ni secretos. Si falla el registro de auditoría, la toma se revierte. Un envío `accepted` sigue
+siendo solo aceptación en cola. Se comprobó la retención de 30 días incluso en conversación
+activa, el borrado junto con la conversación y el borrado individual limitado a la sucursal.
+
+**Riesgos y pendientes:** la migración requiere respaldo verificado antes de aplicarse a una
+instalación con datos. La purga diaria debe programarse por instalación; las copias externas y
+respaldos tienen tratamiento operacional separado. Los recibos manuales `pending` o `uncertain`
+siguen requiriendo conciliación y el ACK del webhook aún precede a una tarea no durable.
+F9.5 se validó sin envío real adicional por WhatsApp.
+
+**Siguiente:** F10.1 — Rate limiting y límites de recursos (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

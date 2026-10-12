@@ -18,6 +18,7 @@ from backend.app.core.config import ConversationIdentitySettings, Settings
 from backend.app.core.exceptions import ServiceUnavailableError
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
@@ -168,6 +169,15 @@ def test_manual_reply_uses_same_chat_and_instance_only_for_assignee(app, session
         assert receipt is not None and receipt.status == "accepted"
         assert receipt.actor_user_id > 0 and receipt.provider_message_id is not None
         assert session.scalar(select(Message.direction)) == "outbound"
+        send_events = session.scalars(
+            select(ConversationAudit)
+            .where(ConversationAudit.manual_send_receipt_id == receipt_id)
+            .order_by(ConversationAudit.id)
+        ).all()
+        assert [event.action for event in send_events] == ["send_pending", "send_accepted"]
+        assert all(event.actor_user_id == receipt.actor_user_id for event in send_events)
+        assert all(event.branch_id == receipt.branch_id for event in send_events)
+        assert all(event.reason is None for event in send_events)
         own = session.get(Conversation, own_id)
         assert own is not None and CHAT_ID not in own.recipient_ciphertext
 
@@ -197,6 +207,17 @@ def test_timeout_is_uncertain_and_blocks_release_or_duplicate_send(app, sessions
         state = session.get(ConversationResponderState, conversation_id)
         assert state is not None and state.manual_send_blocked
         assert session.scalars(select(Message)).all() == []
+        send_events = session.scalars(
+            select(ConversationAudit)
+            .where(ConversationAudit.conversation_id == conversation_id)
+            .order_by(ConversationAudit.id)
+        ).all()
+        assert [event.action for event in send_events] == [
+            "take",
+            "send_pending",
+            "send_uncertain",
+        ]
+        assert send_events[1].manual_send_receipt_id == send_events[2].manual_send_receipt_id
 
 
 def test_missing_recipient_and_mismatched_instance_fail_closed(app, sessions) -> None:

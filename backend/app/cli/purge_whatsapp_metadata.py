@@ -44,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"{action}: conversaciones={result.conversations}, mensajes={result.messages}, "
         f"recibos_completados={result.completed_receipts}, "
+        f"auditorias_conversacion={result.conversation_audits}, "
         f"preguntas_no_resueltas={result.unresolved_questions}; "
         f"reservas_para_revision={result.claimed_for_review}."
     )

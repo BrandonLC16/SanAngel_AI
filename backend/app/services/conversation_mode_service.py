@@ -23,6 +23,7 @@ from backend.app.core.exceptions import (
 from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.services.admin_auth_service import AdminSessionInfo
@@ -115,6 +116,14 @@ class ConversationModeService:
                 )
                 if changed.rowcount != 1:
                     raise ConversationModeConflictError()
+                session.add(
+                    ConversationAudit(
+                        branch_id=branch.id,
+                        conversation_id=conversation_id,
+                        actor_user_id=principal.user_id,
+                        action="take",
+                    )
+                )
                 session.execute(
                     update(Conversation)
                     .where(Conversation.id == conversation_id, Conversation.branch_id == branch.id)
@@ -156,6 +165,14 @@ class ConversationModeService:
                 )
                 if changed.rowcount != 1:
                     raise ConversationModeConflictError()
+                session.add(
+                    ConversationAudit(
+                        branch_id=branch.id,
+                        conversation_id=conversation_id,
+                        actor_user_id=principal.user_id,
+                        action="release",
+                    )
+                )
                 session.execute(
                     update(Conversation)
                     .where(Conversation.id == conversation_id, Conversation.branch_id == branch.id)
@@ -217,6 +234,14 @@ class ConversationModeService:
                     if state is None or state.help_requested_at is None:
                         raise ConversationModeConflictError()
                 if changed.rowcount == 1:
+                    session.add(
+                        ConversationAudit(
+                            branch_id=branch.id,
+                            conversation_id=conversation_id,
+                            action="help_requested",
+                            reason=reason,
+                        )
+                    )
                     session.execute(
                         update(Conversation)
                         .where(

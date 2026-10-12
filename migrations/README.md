@@ -52,6 +52,10 @@ almacena texto ni destinatarios en claro.
 `20261012_0013` agrega motivo y hora de la solicitud de ayuda humana al estado de respuesta.
 Los campos anteriores conservan sus valores; no se guarda texto del cliente ni número.
 
+`20261012_0014` agrega `conversation_audits` para F9.5. Registra actor y acciones de ayuda,
+toma, liberación y envío manual sin texto ni identificador del proveedor. Los datos existentes
+no reciben eventos retroactivos. La purga de metadatos aplica el plazo de 30 días.
+
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
 `upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
 crea uno sin sobrescribir otro y comprueba su integridad. Revisar el

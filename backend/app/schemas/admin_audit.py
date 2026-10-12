@@ -10,10 +10,21 @@ class AuditEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: int
-    source: Literal["commercial", "role"]
-    actor_user_id: int
-    action: Literal["create", "update", "deactivate", "delete"]
-    entity: Literal["branch", "product", "price", "faq", "admin_user"]
+    source: Literal["commercial", "role", "conversation"]
+    actor_user_id: int | None
+    action: Literal[
+        "create",
+        "update",
+        "deactivate",
+        "delete",
+        "take",
+        "release",
+        "help_requested",
+        "send_pending",
+        "send_accepted",
+        "send_uncertain",
+    ]
+    entity: Literal["branch", "product", "price", "faq", "admin_user", "conversation"]
     entity_id: int
     occurred_at: datetime
     product_id: int | None = None

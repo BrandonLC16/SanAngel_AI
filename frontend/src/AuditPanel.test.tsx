@@ -25,3 +25,24 @@ it('muestra actor, entidad, fecha y antes/después de un precio; filtra por prod
   expect(auditApi.events).toHaveBeenLastCalledWith({ entity: 'price', productId: 4, offset: 0 })
   expect(document.body.textContent).not.toContain('password')
 })
+
+it('muestra la solicitud del sistema y evita afirmar entrega humana', async () => {
+  vi.mocked(auditApi.events).mockResolvedValue({
+    has_more: false,
+    items: [
+      { id: 2, source: 'conversation', actor_user_id: 3, action: 'send_accepted',
+        entity: 'conversation', entity_id: 11, occurred_at: '2026-10-12T12:00:00Z',
+        product_id: null, unit: null, before: null, after: { status: 'accepted', receipt_id: '7' } },
+      { id: 1, source: 'conversation', actor_user_id: null, action: 'help_requested',
+        entity: 'conversation', entity_id: 11, occurred_at: '2026-10-12T11:00:00Z',
+        product_id: null, unit: null, before: null, after: { reason: 'ai_unavailable' } },
+    ],
+  })
+  render(<AuditPanel onExpired={vi.fn()} />)
+  expect(await screen.findByText(/Aceptado en cola.*Conversaci/)).toBeTruthy()
+  expect(screen.getByText(/Ayuda solicitada.*Conversaci/)).toBeTruthy()
+  expect(screen.getByText(/Sistema/)).toBeTruthy()
+  expect(screen.getByText(/Aceptado en cola; entrega no confirmada/)).toBeTruthy()
+  expect(screen.getByText(/Recibo #7/)).toBeTruthy()
+  expect(document.body.textContent).not.toContain('Humano respondio')
+})

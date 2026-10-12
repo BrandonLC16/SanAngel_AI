@@ -18,11 +18,13 @@ from backend.app.core.exceptions import (
     ConversationModeConflictError,
     ConversationNotFoundError,
     InvalidRequestError,
+    ServiceUnavailableError,
 )
 from backend.app.db.base import Base
 from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.services.admin_auth_service import AdminSessionInfo
@@ -121,6 +123,13 @@ def test_handoff_keeps_one_human_owner_and_blocks_ai_while_assigned(
         assert state.ai_reply_count == 0
 
     assert modes.release(principals["owner"], conversation_id).mode is ConversationMode.AI
+    with sessions() as session:
+        history = session.scalars(select(ConversationAudit).order_by(ConversationAudit.id)).all()
+        assert [(event.action, event.actor_user_id) for event in history] == [
+            ("take", principals["editor"].user_id),
+            ("release", principals["owner"].user_id),
+        ]
+        assert all(event.branch_id == principals["editor"].branch_id for event in history)
     assert modes.begin_ai_reply(conversation_id) is True
     modes.finish_ai_reply(conversation_id)
 
@@ -144,6 +153,11 @@ def test_help_request_is_scoped_pending_once_and_cleared_only_when_taken(
         assert state is not None
         assert state.help_reason == "customer_requested"
         assert state.help_requested_at is not None
+        history = session.scalars(select(ConversationAudit)).all()
+        assert len(history) == 1
+        assert history[0].action == "help_requested"
+        assert history[0].actor_user_id is None
+        assert history[0].reason == "customer_requested"
     modes.finish_ai_reply(conversation_id)
     assert modes.begin_ai_reply(conversation_id) is False
     modes.take(principals["editor"], conversation_id)
@@ -284,3 +298,21 @@ def test_database_rejects_cross_branch_owner_and_invalid_mode(
                     mode="operator",
                 )
             )
+
+
+def test_failed_audit_rolls_back_human_take(
+    scenario: tuple[sessionmaker[Session], dict[str, AdminSessionInfo], int, int],
+) -> None:
+    sessions, principals, conversation_id, _ = scenario
+    engine = sessions.kw["bind"]
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TRIGGER reject_conversation_audit BEFORE INSERT ON conversation_audits "
+            "BEGIN SELECT RAISE(ABORT, 'test audit unavailable'); END"
+        )
+    with pytest.raises(ServiceUnavailableError):
+        service(sessions).take(principals["editor"], conversation_id)
+    with sessions() as session:
+        state = session.get(ConversationResponderState, conversation_id)
+        assert state is None or state.mode == "AI"
+        assert session.scalars(select(ConversationAudit)).all() == []

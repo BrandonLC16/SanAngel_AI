@@ -10,6 +10,8 @@ from backend.app.core.admin_roles import AdminRole
 from backend.app.db.models.admin_commercial import AdminCommercialAudit
 from backend.app.db.models.admin_user import AdminRoleAudit, AdminUser
 from backend.app.db.models.branch import Branch
+from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.product import Product
 from backend.app.services.admin_audit_service import AdminAuditService
 from backend.app.services.admin_auth_service import AdminAuthService
@@ -157,3 +159,76 @@ def test_foreign_branch_receipts_and_role_revocation_are_not_visible(app, sessio
     with TestClient(app, base_url="https://testserver") as client:
         login(client, "owner")
         assert client.get(BASE).status_code == 403
+
+
+def test_conversation_audit_is_owner_only_scoped_and_content_free(app, sessions) -> None:
+    auth = AdminAuthService(sessions, settings=settings())
+    auth.create_user("owner", PASSWORD, role=AdminRole.OWNER)
+    auth.create_user("editor", PASSWORD, role=AdminRole.EDITOR)
+    with sessions.begin() as session:
+        own_branch = session.scalar(select(Branch).where(Branch.code == "sucursal-uno"))
+        foreign_branch = session.scalar(select(Branch).where(Branch.code == "sucursal-dos"))
+        actor = session.scalar(select(AdminUser).where(AdminUser.username == "editor"))
+        assert own_branch and foreign_branch and actor
+        own = Conversation(branch_id=own_branch.id, external_user_key="a" * 64)
+        foreign = Conversation(branch_id=foreign_branch.id, external_user_key="b" * 64)
+        session.add_all((own, foreign))
+        session.flush()
+        session.add_all(
+            (
+                ConversationAudit(
+                    branch_id=own_branch.id,
+                    conversation_id=own.id,
+                    action="help_requested",
+                    reason="ai_unavailable",
+                ),
+                ConversationAudit(
+                    branch_id=own_branch.id,
+                    conversation_id=own.id,
+                    actor_user_id=actor.id,
+                    action="take",
+                ),
+                ConversationAudit(
+                    branch_id=own_branch.id,
+                    conversation_id=own.id,
+                    actor_user_id=actor.id,
+                    action="send_accepted",
+                    manual_send_receipt_id=7,
+                ),
+                ConversationAudit(
+                    branch_id=foreign_branch.id,
+                    conversation_id=foreign.id,
+                    action="help_requested",
+                    reason="customer_requested",
+                ),
+            )
+        )
+    app.dependency_overrides[get_admin_audit_service] = lambda: AdminAuditService(
+        sessions, settings=settings()
+    )
+    with (
+        TestClient(app, base_url="https://testserver") as owner_client,
+        TestClient(app, base_url="https://testserver") as editor_client,
+    ):
+        login(owner_client, "owner")
+        login(editor_client, "editor")
+        assert editor_client.get(BASE, params={"entity": "conversation"}).status_code == 403
+        response = owner_client.get(BASE, params={"entity": "conversation"})
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-store"
+        items = response.json()["items"]
+        assert [item["action"] for item in items] == [
+            "send_accepted",
+            "take",
+            "help_requested",
+        ]
+        assert all(item["entity_id"] == own.id for item in items)
+        assert items[0]["actor_user_id"] == actor.id
+        assert items[0]["after"] == {"status": "accepted", "receipt_id": "7"}
+        assert items[1]["after"] == {"mode": "HUMAN"}
+        assert items[2]["actor_user_id"] is None
+        assert items[2]["after"] == {"reason": "ai_unavailable"}
+        body = json.dumps(response.json())
+        assert "customer_requested" not in body
+        assert "external_user_key" not in body
+        assert "provider_message_id" not in body

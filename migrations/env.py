@@ -13,6 +13,7 @@ from backend.app.db.models.admin_user import (  # noqa: F401
 )
 from backend.app.db.models.branch import Branch  # noqa: F401
 from backend.app.db.models.conversation import Conversation  # noqa: F401
+from backend.app.db.models.conversation_audit import ConversationAudit  # noqa: F401
 from backend.app.db.models.conversation_responder_state import (
     ConversationResponderState,  # noqa: F401
 )

@@ -3,12 +3,13 @@
 ## Alcance y datos guardados
 
 Esta política cubre las tablas `conversations`, `conversation_responder_states`, `messages`,
-`whatsapp_event_receipts`, `manual_send_receipts` y `unresolved_questions` del backend. No establece una conclusión de
+`whatsapp_event_receipts`, `manual_send_receipts`, `conversation_audits` y `unresolved_questions` del backend. No establece una conclusión de
 cumplimiento legal ni una política para las copias externas de GreenAPI, OpenAI o los respaldos
 operativos.
 
 | Tabla | Campos operativos | No se guarda |
 |---|---|---|
+| `conversation_audits` | Sucursal, conversación, actor administrativo o sistema, acción, motivo fijo, recibo local y hora | Texto, número, ID del proveedor, credenciales |
 | `conversations` | Sucursal, canal, HMAC-SHA256 del `chatId`, destinatario cifrado, creación y última actividad | Número/chat ID en claro, nombre, texto |
 | `conversation_responder_states` | Sucursal, conversación, modo AI/HUMAN, usuario asignado y reservas de IA/envío manual | Número/chat ID, texto, contraseña, token |
 | `messages` | Sucursal, conversación, dirección y hora | Texto, archivos, datos de pago |
@@ -37,6 +38,16 @@ clasifican respuestas libres del modelo como preguntas no resueltas.
 Estos agregados no se vinculan a remitentes, por lo que el borrado individual no puede descontar
 una contribución concreta; la purga de 30 días limita su vida útil.
 
+## Auditoría de atención humana
+
+`conversation_audits` conserva sucursal, conversación, actor administrativo o sistema, acción,
+motivo fijo de solicitud, ID local de recibo manual y hora. No conserva el texto enviado, el
+número del cliente ni el ID de mensaje de GreenAPI. Solo el propietario de la sucursal puede
+consultar estos eventos en el panel. `send_accepted` significa aceptación en cola del proveedor;
+no acredita entrega ni lectura por el cliente. Los eventos se borran a los 30 días de
+`occurred_at`, incluso si la conversación sigue activa, y también al borrar la conversación.
+El borrado individual del remitente elimina sus eventos de auditoría.
+
 ## Plazos
 
 Los plazos siguientes son valores técnicos iniciales y deben revisarse antes de producción con
@@ -44,6 +55,7 @@ el responsable de privacidad y las necesidades reales de reentrega de GreenAPI:
 
 | Dato | Retención y acción |
 |---|---|
+| Evento de auditoría de conversación | Borrar 30 días después de `occurred_at`, aunque el chat siga activo, o al borrar su conversación. |
 | Conversación, destinatario cifrado y estado de responsable | Borrar 30 días después de `updated_at` si no quedan mensajes recientes ni envíos manuales pendientes o inciertos. Cada mensaje entrante que resuelve la conversación actualiza esa fecha. |
 | Metadatos de mensaje | Borrar 30 días después de `occurred_at`, aun si la conversación sigue activa. |
 | Recibo `completed` | Borrar 30 días después de `completed_at`. Un evento repetido después de ese plazo podría procesarse otra vez. |

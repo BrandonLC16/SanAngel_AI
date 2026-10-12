@@ -23,6 +23,7 @@ from backend.app.core.exceptions import (
 )
 from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
@@ -139,6 +140,15 @@ class ManualReplyService:
                 )
                 session.add(receipt)
                 session.flush()
+                session.add(
+                    ConversationAudit(
+                        branch_id=branch_id,
+                        conversation_id=conversation_id,
+                        actor_user_id=principal.user_id,
+                        action="send_pending",
+                        manual_send_receipt_id=receipt.id,
+                    )
+                )
                 result = ManualReplyStatus(receipt.id, receipt.status)
             return result, recipient
         except SQLAlchemyError:
@@ -152,9 +162,27 @@ class ManualReplyService:
                     raise ServiceUnavailableError("manual reply receipt changed")
                 if provider_message_id is None:
                     receipt.status = "uncertain"
+                    session.add(
+                        ConversationAudit(
+                            branch_id=receipt.branch_id,
+                            conversation_id=receipt.conversation_id,
+                            actor_user_id=receipt.actor_user_id,
+                            action="send_uncertain",
+                            manual_send_receipt_id=receipt.id,
+                        )
+                    )
                     return
                 receipt.status = "accepted"
                 receipt.provider_message_id = provider_message_id
+                session.add(
+                    ConversationAudit(
+                        branch_id=receipt.branch_id,
+                        conversation_id=receipt.conversation_id,
+                        actor_user_id=receipt.actor_user_id,
+                        action="send_accepted",
+                        manual_send_receipt_id=receipt.id,
+                    )
+                )
                 changed = session.execute(
                     update(ConversationResponderState)
                     .where(

@@ -1,9 +1,9 @@
 import { AdminApiError } from './api'
 
 export type AuditEvent = {
-  id: number; source: 'commercial' | 'role'; actor_user_id: number
-  action: 'create' | 'update' | 'deactivate' | 'delete'
-  entity: 'branch' | 'product' | 'price' | 'faq' | 'admin_user'
+  id: number; source: 'commercial' | 'role' | 'conversation'; actor_user_id: number | null
+  action: 'create' | 'update' | 'deactivate' | 'delete' | 'take' | 'release' | 'help_requested' | 'send_pending' | 'send_accepted' | 'send_uncertain'
+  entity: 'branch' | 'product' | 'price' | 'faq' | 'admin_user' | 'conversation'
   entity_id: number; occurred_at: string; product_id: number | null; unit: string | null
   before: Record<string, string> | null; after: Record<string, string> | null
 }

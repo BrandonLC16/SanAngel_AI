@@ -4,8 +4,8 @@ import { auditApi, type AuditEvent } from './auditApi'
 
 type Props = { onExpired: () => void }
 const PAGE_SIZE = 25
-const entities = { branch: 'Sucursal', product: 'Producto', price: 'Precio', faq: 'FAQ', admin_user: 'Usuario' }
-const actions = { create: 'Alta', update: 'Cambio', deactivate: 'Desactivación', delete: 'Baja' }
+const entities = { branch: 'Sucursal', product: 'Producto', price: 'Precio', faq: 'FAQ', admin_user: 'Usuario', conversation: 'Conversación' }
+const actions = { create: 'Alta', update: 'Cambio', deactivate: 'Desactivación', delete: 'Baja', take: 'Tomó', release: 'Liberó', help_requested: 'Ayuda solicitada', send_pending: 'Envío iniciado', send_accepted: 'Aceptado en cola', send_uncertain: 'Envío incierto' }
 
 function formatDate(value: string): string {
   const parsed = new Date(value)
@@ -17,6 +17,12 @@ function stateText(event: AuditEvent, state: 'before' | 'after'): string {
   if (!value) return '—'
   if (event.entity === 'price' && value.amount) return `$${value.amount} MXN`
   if (event.entity === 'admin_user' && value.role) return value.role
+  if (event.entity === 'conversation' && value.mode) return value.mode === 'HUMAN' ? 'Personal' : 'IA'
+  if (event.entity === 'conversation' && value.reason) return value.reason === 'customer_requested' ? 'Cliente solicitó ayuda' : 'IA sin respuesta'
+  if (event.entity === 'conversation' && value.status) {
+    const status = value.status === 'accepted' ? 'Aceptado en cola; entrega no confirmada' : value.status === 'uncertain' ? 'Resultado incierto' : 'Pendiente'
+    return value.receipt_id ? `${status} · Recibo #${value.receipt_id}` : status
+  }
   return '—'
 }
 
@@ -55,7 +61,7 @@ export function AuditPanel({ onExpired }: Props) {
   return <div className="commercial review-panel">
     <section className="admin-card">
       <h2>Auditoría administrativa</h2>
-      <p className="muted">Cambios de esta sucursal. Los importes y roles muestran su valor anterior y posterior; otros recursos conservan solo el recibo del cambio.</p>
+      <p className="muted">Cambios de esta sucursal. Los importes, roles y eventos de atención humana muestran solo metadatos. Un envío aceptado en cola no confirma entrega.</p>
       {error && <div role="alert" className="notice notice-error">{error}</div>}
       <form className="review-filters" onSubmit={apply}>
         <label htmlFor="audit-entity">Entidad</label>
@@ -70,7 +76,7 @@ export function AuditPanel({ onExpired }: Props) {
         {items.length === 0 && !busy && <p>No hay cambios con estos filtros.</p>}
         {items.map((item) => <div className="admin-row" key={`${item.source}-${item.id}`}><div>
           <strong>{actions[item.action]} · {entities[item.entity]} #{item.entity_id}{item.unit ? ` · ${item.unit}` : ''}</strong>
-          <small>{formatDate(item.occurred_at)} · Actor #{item.actor_user_id}{item.product_id ? ` · Producto #${item.product_id}` : ''}</small>
+          <small>{formatDate(item.occurred_at)} · {item.actor_user_id === null ? 'Sistema' : `Actor #${item.actor_user_id}`}{item.product_id ? ` · Producto #${item.product_id}` : ''}</small>
           <small>Antes: {stateText(item, 'before')} · Después: {stateText(item, 'after')}</small>
         </div></div>)}
       </div>

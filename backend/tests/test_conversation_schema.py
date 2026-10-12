@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.app.core.config import get_database_settings
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.message import Message
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
@@ -99,6 +100,26 @@ def test_migrated_tables_have_only_minimal_whatsapp_fields(engine: Engine) -> No
         "conversation_id",
         "direction",
         "occurred_at",
+    }
+    assert {column["name"] for column in inspector.get_columns("conversation_audits")} == {
+        "id",
+        "branch_id",
+        "conversation_id",
+        "actor_user_id",
+        "action",
+        "reason",
+        "manual_send_receipt_id",
+        "occurred_at",
+    }
+    assert {item["name"] for item in inspector.get_check_constraints("conversation_audits")} == {
+        "ck_conversation_audits_action_context"
+    }
+    assert {item["name"] for item in inspector.get_foreign_keys("conversation_audits")} == {
+        "fk_conversation_audits_conversation_branch",
+        "fk_conversation_audits_actor_branch",
+    }
+    assert {item["name"] for item in inspector.get_indexes("conversation_audits")} == {
+        "ix_conversation_audits_branch_time"
     }
     assert {column["name"] for column in inspector.get_columns("manual_send_receipts")} == {
         "id",
@@ -241,6 +262,37 @@ def test_message_cannot_reference_a_conversation_in_another_branch(engine: Engin
         messages = session.scalars(select(Message)).all()
         assert len(messages) == 1
         assert messages[0].branch_id == first_branch_id
+
+
+def test_conversation_audit_rejects_cross_branch_and_invalid_actor_context(engine: Engine) -> None:
+    first_branch_id, second_branch_id = create_branches(engine)
+    factory = create_database_session_factory(engine)
+    with factory.begin() as session:
+        conversation = Conversation(branch_id=first_branch_id, external_user_key=USER_KEY)
+        session.add(conversation)
+        session.flush()
+        conversation_id = conversation.id
+    with pytest.raises(IntegrityError):
+        with factory.begin() as session:
+            session.add(
+                ConversationAudit(
+                    branch_id=second_branch_id,
+                    conversation_id=conversation_id,
+                    action="help_requested",
+                    reason="ai_unavailable",
+                )
+            )
+            session.flush()
+    with pytest.raises(IntegrityError):
+        with factory.begin() as session:
+            session.add(
+                ConversationAudit(
+                    branch_id=first_branch_id,
+                    conversation_id=conversation_id,
+                    action="take",
+                )
+            )
+            session.flush()
 
 
 def test_receipt_requires_an_existing_branch_and_valid_completion_time(engine: Engine) -> None:

@@ -16,6 +16,7 @@ from backend.app.db.base import Base
 from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.branch import Branch
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
@@ -85,6 +86,59 @@ def add_conversation(session: Session, branch_id: int, key: str, *, age_days: in
     session.flush()
     session.add(ConversationResponderState(conversation_id=conversation.id, branch_id=branch_id))
     return conversation
+
+
+def test_conversation_audit_expires_after_30_days_and_with_deleted_conversation(
+    sessions: sessionmaker[Session],
+) -> None:
+    first_id, second_id = branch_ids(sessions)
+    with sessions.begin() as session:
+        old_conversation = add_conversation(session, first_id, "a" * 64, age_days=31)
+        active = add_conversation(session, first_id, "b" * 64, age_days=1)
+        foreign = add_conversation(session, second_id, "c" * 64, age_days=31)
+        session.add_all(
+            (
+                ConversationAudit(
+                    branch_id=first_id,
+                    conversation_id=old_conversation.id,
+                    action="help_requested",
+                    reason="ai_unavailable",
+                    occurred_at=NOW - timedelta(days=1),
+                ),
+                ConversationAudit(
+                    branch_id=first_id,
+                    conversation_id=active.id,
+                    action="help_requested",
+                    reason="customer_requested",
+                    occurred_at=NOW - timedelta(days=31),
+                ),
+                ConversationAudit(
+                    branch_id=first_id,
+                    conversation_id=active.id,
+                    action="help_requested",
+                    reason="ai_unavailable",
+                    occurred_at=NOW - timedelta(days=1),
+                ),
+                ConversationAudit(
+                    branch_id=second_id,
+                    conversation_id=foreign.id,
+                    action="help_requested",
+                    reason="ai_unavailable",
+                    occurred_at=NOW - timedelta(days=31),
+                ),
+            )
+        )
+    privacy = WhatsAppPrivacyService(sessions, settings=settings())
+    preview = privacy.purge_expired(now=NOW)
+    assert preview.conversation_audits == 2
+    assert preview.conversations == 1
+    applied = privacy.purge_expired(apply=True, now=NOW)
+    assert applied.conversation_audits == preview.conversation_audits
+    with sessions() as session:
+        remaining = session.scalars(select(ConversationAudit)).all()
+        assert len(remaining) == 2
+        assert {event.branch_id for event in remaining} == {first_id, second_id}
+        assert session.get(Conversation, old_conversation.id) is None
 
 
 def test_preview_and_purge_expired_metadata_only_in_configured_branch(
@@ -281,6 +335,22 @@ def test_erase_sender_removes_only_scoped_conversation_and_omits_id_from_logs(
             Message(branch_id=first_id, conversation_id=own.conversation_id, direction="inbound")
         )
         session.add(
+            ConversationAudit(
+                branch_id=first_id,
+                conversation_id=own.conversation_id,
+                action="help_requested",
+                reason="customer_requested",
+            )
+        )
+        session.add(
+            ConversationAudit(
+                branch_id=second_id,
+                conversation_id=other_branch.conversation_id,
+                action="help_requested",
+                reason="customer_requested",
+            )
+        )
+        session.add(
             Message(
                 branch_id=second_id,
                 conversation_id=other_branch.conversation_id,
@@ -305,10 +375,12 @@ def test_erase_sender_removes_only_scoped_conversation_and_omits_id_from_logs(
         states = session.scalars(select(ConversationResponderState)).all()
         messages = session.scalars(select(Message)).all()
         receipts = session.scalars(select(WhatsAppEventReceipt)).all()
+        audit_events = session.scalars(select(ConversationAudit)).all()
     assert len(conversations) == 1 and conversations[0].branch_id == second_id
     assert len(states) == 1 and states[0].conversation_id == other_branch.conversation_id
     assert len(messages) == 1 and messages[0].branch_id == second_id
     assert len(receipts) == 1
+    assert len(audit_events) == 1 and audit_events[0].branch_id == second_id
     assert SENDER_ID not in caplog.text
     assert "texto privado" not in caplog.text
     assert IDENTITY_KEY not in caplog.text

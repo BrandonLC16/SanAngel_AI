@@ -25,7 +25,8 @@ async def list_audit_events(
     response: Response,
     principal: Annotated[AdminSessionInfo, Depends(require_permission(AdminPermission.AUDIT_READ))],
     service: Annotated[AdminAuditService, Depends(get_admin_audit_service)],
-    entity: Literal["branch", "product", "price", "faq", "admin_user"] | None = None,
+    entity: Literal["branch", "product", "price", "faq", "admin_user", "conversation"]
+    | None = None,
     product_id: Annotated[int | None, Query(ge=1)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     offset: Annotated[int, Query(ge=0, le=5000)] = 0,

@@ -15,6 +15,7 @@ from backend.app.core.exceptions import (
 )
 from backend.app.db.models.admin_commercial import AdminCommercialAudit
 from backend.app.db.models.admin_user import AdminRoleAudit, AdminUser
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.schemas.admin_audit import AuditEvent, AuditPage
 from backend.app.services.admin_auth_service import AdminSessionInfo
@@ -60,39 +61,41 @@ class AdminAuditService:
                     raise AdminAuthorizationError()
 
                 fetch_count = offset + limit + 1
-                commercial = select(AdminCommercialAudit).where(
-                    AdminCommercialAudit.branch_id == branch.id
-                )
-                if entity is not None:
-                    commercial = commercial.where(AdminCommercialAudit.resource == entity)
-                if product_id is not None:
-                    commercial = commercial.where(
-                        AdminCommercialAudit.resource == "price",
-                        AdminCommercialAudit.product_id == product_id,
+                events: list[AuditEvent] = []
+                if entity != "conversation":
+                    commercial = select(AdminCommercialAudit).where(
+                        AdminCommercialAudit.branch_id == branch.id
                     )
-                commercial = commercial.order_by(
-                    AdminCommercialAudit.changed_at.desc(), AdminCommercialAudit.id.desc()
-                ).limit(fetch_count)
-                events = [
-                    AuditEvent(
-                        id=row.id,
-                        source="commercial",
-                        actor_user_id=row.actor_user_id,
-                        action=row.action,
-                        entity=row.resource,
-                        entity_id=row.resource_id,
-                        occurred_at=_utc(row.changed_at),
-                        product_id=row.product_id if row.resource == "price" else None,
-                        unit=row.unit if row.resource == "price" else None,
-                        before={"amount": str(row.old_amount)}
-                        if row.resource == "price" and row.old_amount is not None
-                        else None,
-                        after={"amount": str(row.new_amount)}
-                        if row.resource == "price" and row.new_amount is not None
-                        else None,
+                    if entity is not None:
+                        commercial = commercial.where(AdminCommercialAudit.resource == entity)
+                    if product_id is not None:
+                        commercial = commercial.where(
+                            AdminCommercialAudit.resource == "price",
+                            AdminCommercialAudit.product_id == product_id,
+                        )
+                    commercial = commercial.order_by(
+                        AdminCommercialAudit.changed_at.desc(), AdminCommercialAudit.id.desc()
+                    ).limit(fetch_count)
+                    events.extend(
+                        AuditEvent(
+                            id=row.id,
+                            source="commercial",
+                            actor_user_id=row.actor_user_id,
+                            action=row.action,
+                            entity=row.resource,
+                            entity_id=row.resource_id,
+                            occurred_at=_utc(row.changed_at),
+                            product_id=row.product_id if row.resource == "price" else None,
+                            unit=row.unit if row.resource == "price" else None,
+                            before={"amount": str(row.old_amount)}
+                            if row.resource == "price" and row.old_amount is not None
+                            else None,
+                            after={"amount": str(row.new_amount)}
+                            if row.resource == "price" and row.new_amount is not None
+                            else None,
+                        )
+                        for row in session.scalars(commercial)
                     )
-                    for row in session.scalars(commercial)
-                ]
                 if entity in (None, "admin_user") and product_id is None:
                     roles = (
                         select(AdminRoleAudit)
@@ -113,6 +116,40 @@ class AdminAuditService:
                             after={"role": row.new_role},
                         )
                         for row in session.scalars(roles)
+                    )
+                if entity in (None, "conversation") and product_id is None:
+                    conversation_rows = (
+                        select(ConversationAudit)
+                        .where(ConversationAudit.branch_id == branch.id)
+                        .order_by(ConversationAudit.occurred_at.desc(), ConversationAudit.id.desc())
+                        .limit(fetch_count)
+                    )
+                    events.extend(
+                        AuditEvent(
+                            id=row.id,
+                            source="conversation",
+                            actor_user_id=row.actor_user_id,
+                            action=row.action,
+                            entity="conversation",
+                            entity_id=row.conversation_id,
+                            occurred_at=_utc(row.occurred_at),
+                            before={"mode": "AI"}
+                            if row.action == "take"
+                            else {"mode": "HUMAN"}
+                            if row.action == "release"
+                            else None,
+                            after={"mode": "HUMAN"}
+                            if row.action == "take"
+                            else {"mode": "AI"}
+                            if row.action == "release"
+                            else {"reason": row.reason}
+                            if row.action == "help_requested"
+                            else {
+                                "status": row.action.removeprefix("send_"),
+                                "receipt_id": str(row.manual_send_receipt_id),
+                            },
+                        )
+                        for row in session.scalars(conversation_rows)
                     )
                 events.sort(key=lambda item: (item.occurred_at, item.source, item.id), reverse=True)
                 page = events[offset : offset + limit + 1]

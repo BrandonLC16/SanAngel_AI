@@ -4,13 +4,14 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, exists, func, select
+from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.core.config import AssistantSettings, ConversationIdentitySettings
 from backend.app.core.exceptions import BranchNotConfiguredError, ServiceUnavailableError
 from backend.app.db.models.conversation import Conversation
+from backend.app.db.models.conversation_audit import ConversationAudit
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
 from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
@@ -25,6 +26,7 @@ MESSAGE_RETENTION_DAYS = 30
 COMPLETED_RECEIPT_RETENTION_DAYS = 30
 CLAIM_REVIEW_AFTER_DAYS = 1
 UNRESOLVED_QUESTION_RETENTION_DAYS = 30
+CONVERSATION_AUDIT_RETENTION_DAYS = 30
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ class PurgeResult:
     completed_receipts: int
     claimed_for_review: int
     unresolved_questions: int = 0
+    conversation_audits: int = 0
 
 
 class WhatsAppPrivacyService:
@@ -57,6 +60,7 @@ class WhatsAppPrivacyService:
         receipt_cutoff = instant - timedelta(days=COMPLETED_RECEIPT_RETENTION_DAYS)
         review_cutoff = instant - timedelta(days=CLAIM_REVIEW_AFTER_DAYS)
         unresolved_cutoff = instant - timedelta(days=UNRESOLVED_QUESTION_RETENTION_DAYS)
+        audit_cutoff = instant - timedelta(days=CONVERSATION_AUDIT_RETENTION_DAYS)
         try:
             with self._session_factory.begin() as session:
                 branch_id = self._branch_id(session)
@@ -91,6 +95,15 @@ class WhatsAppPrivacyService:
                     UnresolvedQuestion.branch_id == branch_id,
                     UnresolvedQuestion.last_seen_at < unresolved_cutoff,
                 )
+                old_audits = (
+                    ConversationAudit.branch_id == branch_id,
+                    or_(
+                        ConversationAudit.occurred_at < audit_cutoff,
+                        ConversationAudit.conversation_id.in_(
+                            select(Conversation.id).where(*old_conversations)
+                        ),
+                    ),
+                )
                 claimed_for_review = session.scalar(
                     select(func.count())
                     .select_from(WhatsAppEventReceipt)
@@ -102,6 +115,9 @@ class WhatsAppPrivacyService:
                 )
                 if apply:
                     messages = session.execute(delete(Message).where(*old_messages)).rowcount
+                    conversation_audits = session.execute(
+                        delete(ConversationAudit).where(*old_audits)
+                    ).rowcount
                     session.execute(
                         delete(ManualSendReceipt).where(
                             ManualSendReceipt.branch_id == branch_id,
@@ -140,6 +156,9 @@ class WhatsAppPrivacyService:
                     unresolved_questions = session.scalar(
                         select(func.count()).select_from(UnresolvedQuestion).where(*old_unresolved)
                     )
+                    conversation_audits = session.scalar(
+                        select(func.count()).select_from(ConversationAudit).where(*old_audits)
+                    )
         except SQLAlchemyError:
             raise ServiceUnavailableError("WhatsApp metadata purge failed") from None
         result = PurgeResult(
@@ -148,10 +167,12 @@ class WhatsAppPrivacyService:
             completed_receipts or 0,
             claimed_for_review or 0,
             unresolved_questions or 0,
+            conversation_audits or 0,
         )
         logger.info(
             "whatsapp_metadata_purge branch_code=%s applied=%s conversations=%d messages=%d "
-            "completed_receipts=%d claimed_for_review=%d unresolved_questions=%d",
+            "completed_receipts=%d claimed_for_review=%d unresolved_questions=%d "
+            "conversation_audits=%d",
             self._scope.branch_code,
             apply,
             result.conversations,
@@ -159,6 +180,7 @@ class WhatsAppPrivacyService:
             result.completed_receipts,
             result.claimed_for_review,
             result.unresolved_questions,
+            result.conversation_audits,
         )
         return result
 
@@ -186,6 +208,12 @@ class WhatsAppPrivacyService:
                     delete(Message).where(
                         Message.branch_id == branch_id,
                         Message.conversation_id == conversation_id,
+                    )
+                )
+                session.execute(
+                    delete(ConversationAudit).where(
+                        ConversationAudit.branch_id == branch_id,
+                        ConversationAudit.conversation_id == conversation_id,
                     )
                 )
                 session.execute(

@@ -225,7 +225,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las once revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las catorce revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
@@ -487,6 +487,12 @@ F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. Ope
 ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
 reintentos automáticos. Este mecanismo tampoco es una cola durable: una caída después del ACK
 puede perder trabajo.
+
+F9.5 cierra la [auditoría de atención humana](docs/fase_9_cierre.md): registra actor y eventos
+de solicitud, toma, liberación y envío manual en la misma transacción que sus cambios. El panel
+solo muestra metadatos de la sucursal y distingue aceptación en cola de entrega. La
+[política de privacidad](docs/fase_7_privacidad.md) borra estos eventos a los 30 días o junto
+con su conversación; la purga informa su conteo.
 
 ## Servicio OpenAI y chat interno
 
