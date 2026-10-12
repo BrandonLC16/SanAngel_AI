@@ -56,8 +56,12 @@ Los campos anteriores conservan sus valores; no se guarda texto del cliente ni n
 toma, liberación y envío manual sin texto ni identificador del proveedor. Los datos existentes
 no reciben eventos retroactivos. La purga de metadatos aplica el plazo de 30 días.
 
+`20261012_0015` agrega `whatsapp_inbound_jobs` para F10.8. Guarda un payload cifrado, HMAC de
+remitente y estado por sucursal e ID de mensaje antes del ACK; el worker lo elimina al completar. Los jobs
+`processing`/`uncertain` no se reenvían automáticamente y requieren conciliación.
+
 En una instalación con datos, detener escrituras y obtener un respaldo SQLite verificado antes de
-`upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db>`
+`upgrade head`. `python -m scripts.backup_sqlite --source <archivo.db> --destination <respaldo-nuevo.db> --branch-code <ASSISTANT_BRANCH_CODE>`
 crea uno sin sobrescribir otro y comprueba su integridad. Revisar el
 procedimiento completo de protección y recuperación en la [guía de cierre de Fase 7](../docs/fase_7_cierre.md). Las pruebas recorren
 `upgrade` y `downgrade` solo sobre bases temporales. Un `downgrade` productivo puede borrar tablas

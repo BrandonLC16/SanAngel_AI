@@ -20,7 +20,8 @@ comprueba `integrity_check`, `foreign_key_check`, revisión y filas restauradas;
 
 Esta fase entrega la base persistente. El flujo WhatsApp actual aún usa chat simple: no escribe
 filas `messages` ni llama al dispatcher de FAQ para generar agregados automáticamente. El panel
-administrativo y la cola durable pertenecen a fases posteriores. Estos límites no deben
+administrativo y la cola durable pertenecían a fases posteriores; F10.8 incorporó la
+[cola persistente](fase_10_cola.md). Estos límites no deben
 interpretarse como preparación para producción.
 
 ## Plan de backup y restore por instalación

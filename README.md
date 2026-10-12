@@ -19,7 +19,7 @@ Meta Cloud API a GreenAPI dentro de F2.9. Ya están implementados y probados sin
 - cliente saliente de GreenAPI;
 - flujo WhatsApp -> chatbot -> WhatsApp;
 - idempotencia persistente por sucursal en F7.3;
-- ACK separado del procesamiento externo mediante `BackgroundTasks`.
+- ACK después de persistir trabajo cifrado en SQLite y procesamiento por un worker de sucursal.
 
 F2.9 está `✅ COMPLETADO`: la instancia real quedó autorizada, el webhook registrado y el
 recorrido WhatsApp -> GreenAPI -> backend -> OpenAI -> GreenAPI -> WhatsApp fue confirmado con un
@@ -233,7 +233,7 @@ implícito: cada servicio o repositorio futuro debe definir sus límites transac
 archivos SQLite locales y sus sidecars están ignorados por Git. Cada conexión habilita las claves
 foráneas de SQLite para que el alcance obligatorio de sucursal también se aplique en la base.
 
-Las pruebas de migración crean una base vacía, recorren las catorce revisiones y verifican que el
+Las pruebas de migración crean una base vacía, recorren las quince revisiones y verifican que el
 esquema coincide con los modelos. Comprueban las restricciones de sucursal, producto y precio,
 la reversión de migraciones en una base temporal y el rollback completo de una transacción que
 viola una restricción. Un `downgrade` que elimina tablas también elimina sus datos; se usa solo
@@ -491,10 +491,10 @@ cliente o una respuesta de IA fallida/vacía deja un aviso persistente por conve
 bandeja de la sucursal. La IA se detiene para ese chat hasta que personal autorizado lo tome.
 El acuse al cliente no afirma que alguien haya respondido.
 
-F2.8 programa una única tarea `BackgroundTasks` por notificación aceptada. OpenAI y GreenAPI se
-ejecutan después del ACK HTTP 200, cada mensaje se maneja de forma independiente y no existen
-reintentos automáticos. Este mecanismo tampoco es una cola durable: una caída después del ACK
-puede perder trabajo.
+F2.8 usaba `BackgroundTasks` para separar el procesamiento externo del ACK. F10.8 lo sustituyó
+por un [inbox SQLite cifrado y un worker por sucursal](docs/fase_10_cola.md): el webhook confirma
+solo después del commit, y OpenAI y GreenAPI se ejecutan en el worker. Un envío ambiguo queda
+para conciliación, sin reintento automático.
 
 F9.5 cierra la [auditoría de atención humana](docs/fase_9_cierre.md): registra actor y eventos
 de solicitud, toma, liberación y envío manual en la misma transacción que sus cambios. El panel
@@ -535,6 +535,10 @@ secretos montados y volúmenes fuera de las imágenes.
 F10.7 añade [respaldo y restauración verificados por sucursal](docs/fase_10_continuidad.md),
 con objetivos iniciales RPO de 24 horas y RTO de 4 horas. La guía describe el trabajo diario,
 almacenamiento protegido, ensayo mensual y cambio a una base nueva tras verificarla.
+
+F10.8 mide el webhook y adopta una [cola SQLite con worker](docs/fase_10_cola.md) por instalación.
+Un error al guardar trabajo devuelve 503 para conservar la reentrega; la cola cifra contenido,
+deduplica IDs y acota la capacidad sin añadir Redis.
 
 ## Servicio OpenAI y chat interno
 
@@ -583,10 +587,9 @@ Los placeholders de prueba no son credenciales reales.
 - Un token local que no cumpla la longitud y formato requeridos produce un fallo cerrado. La
   rotación productiva sincroniza el archivo montado y `webhookUrlToken` de GreenAPI según F10.3.
 - CORS usa orígenes explícitos y nunca `*`.
-- La Fase 2 valida el MVP y no declara el sistema production-ready. F7.3 ya persiste recibos;
-  antes de producción faltan, entre otros controles, conciliación de reservas ambiguas, cola
-  durable, HTTPS estable, rate limiting compartido/perimetral, despliegue efectivo del secret
-  manager, agregación de métricas y entrega operativa de alertas.
+- La Fase 2 validó el MVP del canal; F10.8 ya persiste trabajos antes del ACK. Antes de producción
+  siguen pendientes la conciliación operativa de reservas ambiguas, pruebas de carga reales,
+  rate limiting perimetral, despliegue efectivo del secret manager y entrega de alertas.
 - El backend y el túnel temporal están detenidos; la URL `trycloudflare.com` usada en F2.9 ya no
   es válida.
 

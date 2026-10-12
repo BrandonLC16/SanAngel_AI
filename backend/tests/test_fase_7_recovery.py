@@ -20,7 +20,7 @@ from scripts.backup_sqlite import backup_sqlite
 from scripts.restore_sqlite import restore_sqlite
 
 ROOT = Path(__file__).resolve().parents[2]
-HEAD = "20261012_0014"
+HEAD = "20261012_0015"
 
 
 def test_fase_7_migration_from_zero_survives_isolated_backup_restore(

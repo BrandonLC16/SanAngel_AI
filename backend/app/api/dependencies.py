@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Annotated
@@ -24,6 +24,7 @@ from backend.app.services.whatsapp_background_processor import (
     WhatsAppBackgroundProcessor,
 )
 from backend.app.services.whatsapp_client import WhatsAppClient
+from backend.app.services.whatsapp_inbound_queue import PersistentInboundQueue
 
 
 @lru_cache
@@ -86,3 +87,17 @@ def get_whatsapp_background_processor(
     """Compose the in-process processor while keeping provider work out of the route."""
 
     return WhatsAppBackgroundProcessor(orchestrator_factory)
+
+
+def create_inbound_queue(settings: Settings) -> PersistentInboundQueue:
+    """Build the scoped durable inbox after webhook authentication and parsing."""
+
+    return PersistentInboundQueue(
+        get_database_session_factory(),
+        branch_scope=BranchScope.from_settings(settings),
+        identity_settings=get_conversation_identity_settings(),
+    )
+
+
+def get_inbound_queue_factory() -> Callable[[Settings], PersistentInboundQueue]:
+    return create_inbound_queue

@@ -23,6 +23,7 @@ from backend.app.db.models.price_import_audit import PriceImportAudit  # noqa: F
 from backend.app.db.models.product import Product  # noqa: F401
 from backend.app.db.models.unresolved_question import UnresolvedQuestion  # noqa: F401
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt  # noqa: F401
+from backend.app.db.models.whatsapp_inbound_job import WhatsAppInboundJob  # noqa: F401
 from backend.app.db.session import create_database_engine
 
 config = context.config

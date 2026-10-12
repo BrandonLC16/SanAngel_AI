@@ -1,9 +1,10 @@
 import hmac
+from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
-from backend.app.api.dependencies import get_whatsapp_background_processor
+from backend.app.api.dependencies import get_inbound_queue_factory
 from backend.app.api.resource_limits import (
     MAX_WEBHOOK_BODY_BYTES,
     BodyTooLargeError,
@@ -12,7 +13,8 @@ from backend.app.api.resource_limits import (
     read_limited_body,
 )
 from backend.app.core.config import Settings, get_settings
-from backend.app.services.whatsapp_background_processor import WhatsAppBackgroundProcessor
+from backend.app.core.exceptions import ApplicationError
+from backend.app.services.whatsapp_inbound_queue import PersistentInboundQueue
 from backend.app.services.whatsapp_webhook_service import WhatsAppWebhookService
 
 router = APIRouter(prefix="/api/v1/whatsapp", tags=["whatsapp"])
@@ -47,11 +49,10 @@ def _has_valid_green_api_authorization(
 )
 async def receive_whatsapp_webhook(
     request: Request,
-    background_tasks: BackgroundTasks,
     settings: Annotated[Settings, Depends(get_settings)],
-    background_processor: Annotated[
-        WhatsAppBackgroundProcessor,
-        Depends(get_whatsapp_background_processor),
+    queue_factory: Annotated[
+        Callable[[Settings], PersistentInboundQueue],
+        Depends(get_inbound_queue_factory),
     ],
 ) -> Response:
     """Authenticate GREEN-API before parsing an incoming webhook body."""
@@ -94,11 +95,10 @@ async def receive_whatsapp_webhook(
     )
     inbound_messages = webhook_service.parse_messages(raw_body)
     if inbound_messages:
-        background_tasks.add_task(
-            background_processor.process_messages,
-            inbound_messages,
-            settings,
-            request.state.request_id,
-        )
+        try:
+            await queue_factory(settings).enqueue(inbound_messages)
+        except ApplicationError:
+            request.state.error_category = "service_unavailable"
+            return Response(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     return Response(status_code=status.HTTP_200_OK)

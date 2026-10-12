@@ -17,6 +17,7 @@ from backend.app.db.models.manual_send_receipt import ManualSendReceipt
 from backend.app.db.models.message import Message
 from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
+from backend.app.db.models.whatsapp_inbound_job import WhatsAppInboundJob
 from backend.app.repositories.branch_repository import BranchRepository
 from backend.app.services.branch_scope import BranchScope
 from backend.app.services.conversation_identity_service import ConversationIdentityService
@@ -195,6 +196,24 @@ class WhatsAppPrivacyService:
                 external_user_key = ConversationIdentityService(
                     session, settings=self._identity_settings
                 ).external_user_key(external_user_id)
+                in_flight = session.scalar(
+                    select(WhatsAppInboundJob.id).where(
+                        WhatsAppInboundJob.branch_id == branch_id,
+                        WhatsAppInboundJob.sender_key == external_user_key,
+                        WhatsAppInboundJob.status != "pending",
+                    )
+                )
+                if in_flight is not None:
+                    raise ServiceUnavailableError(
+                        "inbound job requires reconciliation before erasure"
+                    )
+                removed_jobs = session.execute(
+                    delete(WhatsAppInboundJob).where(
+                        WhatsAppInboundJob.branch_id == branch_id,
+                        WhatsAppInboundJob.sender_key == external_user_key,
+                        WhatsAppInboundJob.status == "pending",
+                    )
+                ).rowcount
                 conversation_id = session.scalar(
                     select(Conversation.id).where(
                         Conversation.branch_id == branch_id,
@@ -203,7 +222,7 @@ class WhatsAppPrivacyService:
                     )
                 )
                 if conversation_id is None:
-                    return False
+                    return bool(removed_jobs)
                 session.execute(
                     delete(Message).where(
                         Message.branch_id == branch_id,

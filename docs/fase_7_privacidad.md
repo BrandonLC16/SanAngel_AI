@@ -60,6 +60,7 @@ el responsable de privacidad y las necesidades reales de reentrega de GreenAPI:
 | Metadatos de mensaje | Borrar 30 días después de `occurred_at`, aun si la conversación sigue activa. |
 | Recibo `completed` | Borrar 30 días después de `completed_at`. Un evento repetido después de ese plazo podría procesarse otra vez. |
 | Recibo `claimed` | No borrar automáticamente. Si lleva más de un día, contarlo para conciliación. Borrarlo sin resolver un envío ambiguo podría causar una segunda respuesta. |
+| Job entrante cifrado F10.8 | Borrar al completar. El borrado individual elimina `pending` por HMAC de remitente y sucursal; `processing`/`uncertain` bloquean el borrado hasta conciliación. Revisar a diario y resolver/borrar dentro de 30 días; no reencolar automáticamente un envío ambiguo. |
 | Recibo manual | Borrar los `accepted` junto con su conversación al vencer el plazo. Conservar `pending` y `uncertain` para conciliación; no reenviar automáticamente. El borrado explícito del remitente elimina sus recibos. |
 | Pregunta no resuelta agregada | Borrar 30 días después de `last_seen_at`; un registro posterior crea un contador nuevo. |
 

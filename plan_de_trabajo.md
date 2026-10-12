@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.7 — Backup/restore y continuidad (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.7 completada
+**Subfase activa:** F10.8 — Cola/worker — decisión y adaptación (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.8 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3865,30 +3865,33 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.8 — Cola/worker — decisión y adaptación
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de validación:** 2026-10-12
+**Fecha de cierre:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] medir webhook.
+- [x] medir webhook.
 
-- [ ] decidir si BackgroundTasks basta.
+- [x] decidir si BackgroundTasks basta.
 
-- [ ] si no Redis/worker.
+- [x] si no Redis/worker.
 
-- [ ] idempotencia.
+- [x] idempotencia.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] arquitectura adecuada al volumen.
+- [x] arquitectura adecuada al volumen.
 
 
 ### Seguridad
 
-- [ ] no añadir infraestructura sin evidencia.
+- [x] no añadir infraestructura sin evidencia.
 
 
 ### Prompt para Codex
@@ -9704,6 +9707,66 @@ F10.7 podrían requerir ajuste controlado de modo. La conciliación de recibos e
 incidente sigue siendo una acción operativa obligatoria antes de reanudar webhooks.
 
 **Siguiente:** F10.8 — Cola/worker — decisión y adaptación (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.8 Cola/worker — decisión y adaptación
+
+**Fase/subfase:** Fase 10 / F10.8. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.9 permanece `⬜ PENDIENTE`.
+
+**Cambios:** Se midió el webhook autenticado con 50 mensajes sintéticos. La ruta anterior con
+`BackgroundTasks` dio p50 3,39 ms, p95 4,26 ms y 264,3 req/s sin E/S de proveedor; podía
+perder trabajo tras ACK. La nueva ruta confirma HTTP 200 solo después de cifrar y confirmar un
+job único por sucursal e ID en SQLite. Un fallo de commit o cola llena devuelve 503. La cola
+admite 5000 jobs por instalación; un worker separado y sin puerto reclama uno a la vez y usa el
+recibo idempotente existente. `pending` sobrevive reinicios; `processing` interrumpido y
+`uncertain` no se reenvían automáticamente. La CLI informa conteos seguros. El borrado individual
+elimina jobs pendientes del remitente mediante HMAC; trabajos reclamados exigen conciliación.
+Se eligió la SQLite ya existente y un worker por sucursal; no se añadió Redis. La medición final
+con commit SQLite y HMAC dio p50 9,12 ms, p95 11,85 ms y 97,4 req/s en esta máquina, por
+encima del ritmo aproximado de 50 notificaciones/s documentado por GreenAPI; no equivale a
+capacidad productiva sostenida.
+
+**Archivos:** `backend/app/api/{dependencies.py,routes/whatsapp.py}`;
+`backend/app/db/models/{__init__.py,whatsapp_inbound_job.py}`;
+`backend/app/services/{whatsapp_inbound_queue.py,whatsapp_inbound_worker.py,whatsapp_privacy_service.py}`;
+`backend/app/cli/run_whatsapp_worker.py`; `migrations/{env.py,README.md,versions/20261012_0015_whatsapp_inbound_jobs.py}`;
+`backend/tests/{test_whatsapp_inbound_queue.py,test_whatsapp_webhook.py,test_whatsapp_privacy_service.py,test_resource_limits.py,test_migrations.py,test_fase_7_recovery.py}`;
+`scripts/measure_webhook.py`; `deploy/compose.branch.yml`; `docs/{fase_10_cola.md,fase_10_docker.md,fase_10_limites.md,fase_2_whatsapp.md,fase_7_cierre.md,fase_7_privacidad.md,fase_9_cierre.md}`;
+`README.md` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 722 aprobadas, 1 omitida
+por permisos POSIX en Windows; `ruff check .` → sin hallazgos; `ruff format --check .` →
+229 archivos conformes; `python -m pip check` → sin conflictos; `git diff --check` → sin
+errores de whitespace (avisos LF/CRLF). `pip-audit --local` y `pip-audit --require-hashes -r
+requirements-prod.lock` → sin vulnerabilidades conocidas; el paquete local no publicado se
+omite de la primera consulta. `npm --prefix frontend test` → 34 aprobadas;
+`npm --prefix frontend run build` → correcto; `npm audit --prefix frontend` → 0
+vulnerabilidades. `.venv\Scripts\python.exe -m scripts.measure_webhook` → 50 ACK 200 y 50 jobs
+persistidos, p50 9,12 ms, p95 11,85 ms, 97,4 req/s. `docker build --build-arg
+SOURCE_DATE_EPOCH=0 --platform linux/amd64 -f Dockerfile -t sanangel-backend:f108 .` →
+correcto. `docker run --rm --read-only --network none` con `/data` temporal y credenciales
+sintéticas → migración, `--status`, enqueue y worker simulado correctos. `docker compose -f
+deploy/compose.branch.yml config --format json` → worker y backend comparten imagen, alcance y
+DB; worker sin puerto publicado.
+
+**Seguridad:** autenticación y límite de body preceden a la lectura/encolado; solo se confirma
+después del commit. El job cifra remitente y texto con subclave separada de
+`CONVERSATION_IDENTITY_KEY`; el HMAC de remitente permite borrado acotado por sucursal. No se
+registran payloads, números ni secretos. El reclamo es atómico, el recibo persistente impide
+duplicados y los resultados ambiguos no se reintentan. Sin Redis ni nueva dependencia; el
+worker corre con UID 10001, raíz de solo lectura y el volumen/secretos de su propia sucursal.
+
+**Riesgos/Pendientes:** las medidas son sintéticas de una máquina Windows, no un ensayo sostenido
+de las siete instalaciones ni de latencia OpenAI/GreenAPI. Supervisar backlog, 503, jobs
+`processing` antiguos y `uncertain`; conciliarlos y borrarlos dentro de la política de 30 días.
+El healthcheck comprueba DB, no avance del worker. Un crash después de reclamar puede requerir
+respuesta humana y no garantiza entrega exactamente una vez. Para migrar una instalación en
+`20261012_0014`, respaldar primero con la imagen antigua, luego desplegar la nueva y migrar.
+La entrega externa de alertas y la operación real siguen pendientes del despliegue.
+
+**Siguiente:** F10.9 — Checklist producción (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

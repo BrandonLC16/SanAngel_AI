@@ -76,6 +76,14 @@ tener credenciales propias. La configuración de sucursal queda en el entorno **
 del backend. Compose crea un volumen SQLite exclusivo por nombre de proyecto; no compartir ese
 volumen entre instalaciones. La rotación de secretos sigue el procedimiento de F10.3.
 
+Desde F10.8, cada proyecto Compose incluye un `worker` sin puerto publicado que usa exactamente
+la imagen backend, el volumen SQLite y el montaje de secretos de **esa** sucursal. El webhook
+confirma solo después del commit de un job cifrado y el worker lo procesa fuera de la solicitud.
+Aplicar la migración `20261012_0015` antes de levantar esta versión. El healthcheck del worker
+comprueba acceso a su cola, pero se deben vigilar además profundidad y jobs inciertos conforme a
+la [guía de F10.8](fase_10_cola.md). No añadir una segunda instancia del worker a una sucursal
+sin medir la carga; el reclamo atómico preserva la idempotencia si hubiera concurrencia.
+
 ## Red y comprobación
 
 Caddy y backend comparten solo el espacio de red de la instalación. FastAPI escucha en

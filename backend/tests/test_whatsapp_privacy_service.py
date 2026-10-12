@@ -1,5 +1,6 @@
 """F7.4 retention, scoped erasure, and redacted operational output."""
 
+import asyncio
 import logging
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
@@ -23,7 +24,9 @@ from backend.app.db.models.message import Message
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.schemas.whatsapp import InboundMessage
+from backend.app.services.branch_scope import BranchScope
 from backend.app.services.conversation_identity_service import ConversationIdentityService
+from backend.app.services.whatsapp_inbound_queue import PersistentInboundQueue
 from backend.app.services.whatsapp_privacy_service import WhatsAppPrivacyService
 
 NOW = datetime(2026, 9, 24, 12, tzinfo=UTC)
@@ -384,6 +387,35 @@ def test_erase_sender_removes_only_scoped_conversation_and_omits_id_from_logs(
     assert SENDER_ID not in caplog.text
     assert "texto privado" not in caplog.text
     assert IDENTITY_KEY not in caplog.text
+
+
+def test_sender_erasure_removes_pending_jobs_only_in_scope_and_blocks_in_flight(
+    sessions: sessionmaker[Session],
+) -> None:
+    own_queue = PersistentInboundQueue(
+        sessions, branch_scope=BranchScope("sucursal-uno"), identity_settings=settings()
+    )
+    other_queue = PersistentInboundQueue(
+        sessions,
+        branch_scope=BranchScope("sucursal-dos"),
+        identity_settings=settings("sucursal-dos"),
+    )
+    message = InboundMessage(
+        external_message_id="event-pending", sender_id=SENDER_ID, text="texto privado"
+    )
+    asyncio.run(own_queue.enqueue((message,)))
+    asyncio.run(other_queue.enqueue((message,)))
+
+    privacy = WhatsAppPrivacyService(sessions, settings=settings())
+    assert privacy.erase_sender(SENDER_ID)
+    assert asyncio.run(own_queue.counts())["pending"] == 0
+    assert asyncio.run(other_queue.counts())["pending"] == 1
+
+    asyncio.run(own_queue.enqueue((message,)))
+    assert asyncio.run(own_queue.claim_next()) is not None
+    with pytest.raises(ServiceUnavailableError):
+        privacy.erase_sender(SENDER_ID)
+    assert asyncio.run(own_queue.counts())["processing"] == 1
 
 
 def test_invalid_sender_and_naive_time_fail_without_deleting(

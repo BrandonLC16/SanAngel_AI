@@ -161,7 +161,8 @@ def test_authenticated_webhook_burst_retries_and_invalid_tokens_do_not_spend_quo
     assert invalid == [403, 403, 403]
     assert valid == [200, 200, 429]
     assert retry_after == "1"
-    assert len(orchestrator.messages) == 2
+    assert orchestrator.messages == []
+    assert len(app.state.test_queue.pending) == 1
 
 
 def test_oversized_authenticated_webhook_is_acked_without_processing_or_content_logs(

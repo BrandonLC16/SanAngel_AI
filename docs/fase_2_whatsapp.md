@@ -45,7 +45,7 @@ WhatsAppWebhookService
         |
         | InboundMessage
         v
-BackgroundTasks -> MessageOrchestrator
+SQLite inbox -> worker -> MessageOrchestrator
                        |              |
                        v              v
                  OpenAIService   WhatsAppClient
@@ -171,16 +171,17 @@ transporte.
 
 ## 7. ACK y procesamiento
 
-Una notificación autenticada y parseada responde HTTP 200 sin esperar OpenAI o GreenAPI. El lote
-se entrega a una única tarea `BackgroundTasks`, donde se construyen y cierran los adaptadores.
+Desde F10.8, una notificación autenticada y parseada responde HTTP 200 después de confirmar un
+job cifrado en SQLite, sin esperar OpenAI o GreenAPI. El worker independiente construye y cierra
+los adaptadores.
 
 Cada mensaje se procesa de forma independiente. Un fallo no detiene los restantes. No existen
 reintentos automáticos en esta capa, porque un resultado ambiguo del envío podría duplicar la
 respuesta.
 
-Limitación: `BackgroundTasks` vive en el proceso. Una caída después del ACK puede perder trabajo.
-Antes de producción se debe evaluar una cola durable con backpressure, apagado ordenado,
-recuperación y métricas.
+F2.8 usaba `BackgroundTasks`, que podía perder trabajo tras el ACK. La
+[decisión F10.8](fase_10_cola.md) documenta medición, backpressure, recuperación y los estados
+que exigen conciliación manual antes de cualquier reenvío.
 
 ## 8. Idempotencia
 

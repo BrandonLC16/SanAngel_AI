@@ -6,17 +6,19 @@ from contextlib import asynccontextmanager
 
 import httpx
 import pytest
-from fastapi import BackgroundTasks, FastAPI, Request
+from fastapi import FastAPI, Request
 
-from backend.app.api.dependencies import get_message_orchestrator_factory
+from backend.app.api.dependencies import get_inbound_queue_factory, get_message_orchestrator_factory
 from backend.app.api.routes.whatsapp import receive_whatsapp_webhook
 from backend.app.core.config import HttpSettings, Settings, get_settings
-from backend.app.core.exceptions import AIProviderRateLimitError
-from backend.app.core.logging import HTTP_LOGGER_NAME, WHATSAPP_BACKGROUND_LOGGER_NAME
+from backend.app.core.exceptions import AIProviderRateLimitError, ServiceUnavailableError
+from backend.app.core.logging import HTTP_LOGGER_NAME
 from backend.app.main import create_app
 from backend.app.schemas.whatsapp import InboundMessage
 from backend.app.services.idempotency_store import InMemoryIdempotencyStore
 from backend.app.services.message_orchestrator import MessageOrchestrator
+from backend.app.services.whatsapp_inbound_queue import ClaimedInboundJob
+from backend.app.services.whatsapp_inbound_worker import WhatsAppInboundWorker
 
 WEBHOOK_PATH = "/api/v1/whatsapp/webhook"
 WEBHOOK_TOKEN = "test-only-green-api-webhook-token"
@@ -32,17 +34,31 @@ class RecordingMessageOrchestrator:
         return True
 
 
-class RecordingBackgroundProcessor:
+class RecordingInboundQueue:
     def __init__(self) -> None:
-        self.calls: list[tuple[tuple[InboundMessage, ...], Settings, str]] = []
+        self.pending: list[ClaimedInboundJob] = []
+        self.uncertain: list[int] = []
+        self._seen: set[str] = set()
+        self._next_id = 1
 
-    async def process_messages(
-        self,
-        messages: tuple[InboundMessage, ...],
-        settings: Settings,
-        request_id: str,
-    ) -> None:
-        self.calls.append((messages, settings, request_id))
+    async def enqueue(self, messages: tuple[InboundMessage, ...]) -> int:
+        accepted = 0
+        for message in messages:
+            if message.external_message_id not in self._seen:
+                self.pending.append(ClaimedInboundJob(self._next_id, message))
+                self._seen.add(message.external_message_id)
+                self._next_id += 1
+                accepted += 1
+        return accepted
+
+    async def claim_next(self) -> ClaimedInboundJob | None:
+        return self.pending.pop(0) if self.pending else None
+
+    async def complete(self, job_id: int) -> None:
+        assert job_id not in self.uncertain
+
+    async def mark_uncertain(self, job_id: int) -> None:
+        self.uncertain.append(job_id)
 
 
 class FakeChatResponder:
@@ -87,6 +103,10 @@ def make_application(
         _env_file=None,
     )
     application.dependency_overrides[get_settings] = lambda: settings
+    queue = RecordingInboundQueue()
+    application.dependency_overrides[get_inbound_queue_factory] = lambda: lambda _settings: queue
+    application.state.test_queue = queue
+    application.state.test_settings = settings
 
     selected_orchestrator = orchestrator or RecordingMessageOrchestrator()
 
@@ -97,7 +117,17 @@ def make_application(
     application.dependency_overrides[get_message_orchestrator_factory] = lambda: (
         use_test_orchestrator
     )
+    application.state.test_orchestrator_factory = use_test_orchestrator
     return application
+
+
+async def process_queued(application: FastAPI) -> bool:
+    worker = WhatsAppInboundWorker(
+        application.state.test_queue,
+        application.state.test_orchestrator_factory,
+        application.state.test_settings,
+    )
+    return await worker.run_once()
 
 
 def text_message_payload(
@@ -210,16 +240,17 @@ def test_authenticated_text_message_completes_chat_and_outbound_flow_with_mocks(
 
     assert response.status_code == 200
     assert response.content == b""
+    assert chat_service.messages == []
+    assert asyncio.run(process_queued(application)) is True
     assert chat_service.messages == [inbound_text]
     assert whatsapp_client.calls == [(chat_id, answer, False)]
 
 
-def test_authenticated_route_queues_work_without_awaiting_external_processing() -> None:
-    request_id = "background-scheduling-request-id"
+def test_authenticated_route_persists_work_without_awaiting_external_processing() -> None:
+    request_id = "durable-queue-request-id"
     raw_body = text_message_payload("5215550000001@c.us", "mensaje diferido")
     request = make_direct_request(raw_body, WEBHOOK_TOKEN, request_id)
-    background_tasks = BackgroundTasks()
-    background_processor = RecordingBackgroundProcessor()
+    queue = RecordingInboundQueue()
     settings = Settings(
         assistant_branch_code="sucursal-demo",
         openai_api_key="test-only-openai-credential-placeholder",
@@ -228,30 +259,20 @@ def test_authenticated_route_queues_work_without_awaiting_external_processing() 
         _env_file=None,
     )
 
-    async def schedule_then_run() -> tuple[object, int, int]:
+    async def enqueue_before_ack() -> tuple[object, int]:
         response = await receive_whatsapp_webhook(
             request,
-            background_tasks,
             settings,
-            background_processor,  # type: ignore[arg-type]
+            lambda _settings: queue,  # type: ignore[arg-type]
         )
-        calls_before_response = len(background_processor.calls)
-        queued_tasks = len(background_tasks.tasks)
-        await background_tasks()
-        return response, calls_before_response, queued_tasks
+        return response, len(queue.pending)
 
-    response, calls_before_response, queued_tasks = asyncio.run(schedule_then_run())
+    response, queued_jobs = asyncio.run(enqueue_before_ack())
 
     assert response.status_code == 200
     assert response.body == b""
-    assert calls_before_response == 0
-    assert queued_tasks == 1
-    assert len(background_processor.calls) == 1
-    messages, received_settings, received_request_id = background_processor.calls[0]
-    assert len(messages) == 1
-    assert messages[0].text == "mensaje diferido"
-    assert received_settings is settings
-    assert received_request_id == request_id
+    assert queued_jobs == 1
+    assert queue.pending[0].message.text == "mensaje diferido"
 
 
 def test_duplicate_authenticated_message_id_is_acked_without_a_second_response() -> None:
@@ -270,7 +291,9 @@ def test_duplicate_authenticated_message_id_is_acked_without_a_second_response()
 
     async def send_twice() -> tuple[httpx.Response, httpx.Response]:
         first = await send_webhook(application, raw_body, authorization_headers())
+        assert await process_queued(application) is True
         second = await send_webhook(application, raw_body, authorization_headers())
+        assert await process_queued(application) is False
         return first, second
 
     first_response, duplicate_response = asyncio.run(send_twice())
@@ -282,7 +305,7 @@ def test_duplicate_authenticated_message_id_is_acked_without_a_second_response()
     assert whatsapp_client.calls == [(chat_id, answer, False)]
 
 
-def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leaking_data(
+def test_worker_chat_failure_keeps_ack_and_logs_safe_category_without_leaking_data(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     chat_id = "5215550000001@c.us"
@@ -304,6 +327,7 @@ def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leakin
 
     with caplog.at_level(logging.INFO):
         response = asyncio.run(send_webhook(application, raw_body, authorization_headers()))
+        assert asyncio.run(process_queued(application)) is True
 
     assert response.status_code == 200
     assert response.content == b""
@@ -313,9 +337,9 @@ def test_background_chat_failure_keeps_ack_and_logs_safe_category_without_leakin
     assert inbound_text not in rendered
     assert answer not in rendered
     assert internal_detail not in rendered
-    assert "background_message_processing_failed" in caplog.text
-    assert "error_category=message_processing_failed" in caplog.text
-    assert WHATSAPP_BACKGROUND_LOGGER_NAME in caplog.text
+    assert "inbound_job_uncertain" in caplog.text
+    assert "error_category=processing_failed" in caplog.text
+    assert application.state.test_queue.uncertain == [1]
 
 
 def test_unauthenticated_payload_is_rejected_before_body_is_read(
@@ -349,12 +373,32 @@ def test_unauthenticated_payload_is_rejected_before_body_is_read(
 def test_unauthenticated_text_does_not_build_provider_adapters() -> None:
     application = make_application()
     application.dependency_overrides.pop(get_message_orchestrator_factory)
+    application.dependency_overrides.pop(get_inbound_queue_factory)
     raw_body = text_message_payload("5215550000001@c.us", "texto no autenticado")
 
     response = asyncio.run(send_webhook(application, raw_body, authorization_headers("wrong")))
 
     assert response.status_code == 403
     assert response.content == b""
+
+
+def test_failed_durable_enqueue_returns_retryable_503_without_ack() -> None:
+    application = make_application()
+
+    class UnavailableQueue:
+        async def enqueue(self, messages: tuple[InboundMessage, ...]) -> int:
+            raise ServiceUnavailableError("private database detail")
+
+    application.dependency_overrides[get_inbound_queue_factory] = lambda: (
+        lambda _settings: UnavailableQueue()
+    )
+    body = text_message_payload("5215550000001@c.us", "private text")
+
+    response = asyncio.run(send_webhook(application, body, authorization_headers()))
+
+    assert response.status_code == 503
+    assert response.content == b""
+    assert "private" not in response.text
 
 
 @pytest.mark.parametrize(

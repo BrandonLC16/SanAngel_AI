@@ -36,6 +36,7 @@ CONVERSATION_MODE_REVISION = "20260925_0011"
 MANUAL_REPLY_REVISION = "20260925_0012"
 HUMAN_HELP_REVISION = "20261012_0013"
 CONVERSATION_AUDIT_REVISION = "20261012_0014"
+INBOUND_QUEUE_REVISION = "20261012_0015"
 
 
 def sqlite_url(path: Path) -> str:
@@ -50,9 +51,10 @@ def test_migration_history_has_reproducible_conversation_mode_head() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     revisions = list(scripts.walk_revisions())
 
-    assert scripts.get_heads() == [CONVERSATION_AUDIT_REVISION]
-    assert len(revisions) == 14
+    assert scripts.get_heads() == [INBOUND_QUEUE_REVISION]
+    assert len(revisions) == 15
     assert [revision.revision for revision in revisions] == [
+        INBOUND_QUEUE_REVISION,
         CONVERSATION_AUDIT_REVISION,
         HUMAN_HELP_REVISION,
         MANUAL_REPLY_REVISION,
@@ -69,6 +71,7 @@ def test_migration_history_has_reproducible_conversation_mode_head() -> None:
         INITIAL_REVISION,
     ]
     assert [revision.down_revision for revision in revisions] == [
+        CONVERSATION_AUDIT_REVISION,
         HUMAN_HELP_REVISION,
         MANUAL_REPLY_REVISION,
         CONVERSATION_MODE_REVISION,
@@ -264,7 +267,7 @@ def test_commercial_migration_preserves_existing_catalog_and_enforces_faq_scope(
             with engine.connect() as connection:
                 assert (
                     MigrationContext.configure(connection).get_current_revision()
-                    == CONVERSATION_AUDIT_REVISION
+                    == INBOUND_QUEUE_REVISION
                 )
                 assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
         finally:
@@ -331,11 +334,16 @@ def test_upgrade_head_creates_all_registered_schema(
                 admin_session_foreign_keys = inspector.get_foreign_keys("admin_sessions")
                 admin_role_audit_foreign_keys = inspector.get_foreign_keys("admin_role_audits")
                 admin_role_audit_checks = inspector.get_check_constraints("admin_role_audits")
+                inbound_job_columns = {
+                    column["name"] for column in inspector.get_columns("whatsapp_inbound_jobs")
+                }
+                inbound_job_uniques = inspector.get_unique_constraints("whatsapp_inbound_jobs")
+                inbound_job_checks = inspector.get_check_constraints("whatsapp_inbound_jobs")
         finally:
             engine.dispose()
 
         assert database_path.is_file()
-        assert current_revision == CONVERSATION_AUDIT_REVISION
+        assert current_revision == INBOUND_QUEUE_REVISION
         assert table_names == [
             "admin_commercial_audits",
             "admin_login_throttles",
@@ -355,7 +363,22 @@ def test_upgrade_head_creates_all_registered_schema(
             "products",
             "unresolved_questions",
             "whatsapp_event_receipts",
+            "whatsapp_inbound_jobs",
         ]
+        assert inbound_job_columns == {
+            "id",
+            "branch_id",
+            "provider_message_id",
+            "sender_key",
+            "payload_ciphertext",
+            "status",
+            "enqueued_at",
+            "claimed_at",
+        }
+        assert {item["name"] for item in inbound_job_uniques} == {
+            "uq_whatsapp_inbound_jobs_branch_message"
+        }
+        assert {item["name"] for item in inbound_job_checks} == {"ck_whatsapp_inbound_jobs_status"}
         assert admin_user_columns == {
             "id",
             "branch_id",
@@ -654,7 +677,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            CONVERSATION_AUDIT_REVISION,
+            INBOUND_QUEUE_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -674,6 +697,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "products",
                 "unresolved_questions",
                 "whatsapp_event_receipts",
+                "whatsapp_inbound_jobs",
             ],
         )
 
@@ -708,7 +732,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
             engine.dispose()
 
         command.upgrade(config, "head")
-        assert snapshot()[0] == CONVERSATION_AUDIT_REVISION
+        assert snapshot()[0] == INBOUND_QUEUE_REVISION
 
         engine = create_database_engine(database_url)
         try:
@@ -722,7 +746,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
 
         command.upgrade(config, "head")
         assert snapshot() == (
-            CONVERSATION_AUDIT_REVISION,
+            INBOUND_QUEUE_REVISION,
             [
                 "admin_commercial_audits",
                 "admin_login_throttles",
@@ -742,6 +766,7 @@ def test_migrations_round_trip_from_empty_database_preserves_earlier_data(
                 "products",
                 "unresolved_questions",
                 "whatsapp_event_receipts",
+                "whatsapp_inbound_jobs",
             ],
         )
     finally:

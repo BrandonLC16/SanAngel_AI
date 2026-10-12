@@ -37,5 +37,5 @@ Antes de aplicar la migración `20261012_0014` a una instalación con datos, det
 crear un respaldo SQLite verificado según la [guía de recuperación](fase_7_cierre.md). La
 migración añade una tabla nueva y no reconstruye conversaciones anteriores; por ello el historial
 comienza con eventos posteriores a su aplicación. La retención de respaldos y copias externas
-sigue siendo una responsabilidad operacional separada. El ACK del webhook antes de la tarea de
-fondo sigue sin cola durable y requiere atención en una fase posterior.
+sigue siendo una responsabilidad operacional separada. Al cierre de F9.5, el ACK precedía a
+`BackgroundTasks`; F10.8 incorporó la [cola durable](fase_10_cola.md).

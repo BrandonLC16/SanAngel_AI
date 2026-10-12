@@ -45,5 +45,6 @@ timeout HTTP general una transacción o envío manual en curso.
 `WEBHOOK_REQUESTS_PER_SECOND` y `HTTP_BODY_READ_TIMEOUT_SECONDS` permiten ajustar el despliegue
 sin cambiar código. Todos se validan al iniciar. Una cuota demasiado baja puede retrasar
 tráfico real; antes de cambiarla se deben observar 429 y tiempos de reentrega. El límite de
-memoria por proceso y el ACK previo a tareas de fondo no sustituyen un control perimetral ni
-una cola durable.
+memoria por proceso no sustituye un control perimetral. F10.8 confirma el webhook solo después
+del commit de una [cola durable](fase_10_cola.md); cuando esta se satura responde 503 para
+permitir la reentrega.
