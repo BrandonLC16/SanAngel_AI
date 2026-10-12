@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.1 — Rate limiting y límites de recursos (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — F10.1 completada; F10.2 pendiente
+**Subfase activa:** F10.2 — HTTPS, proxy y headers (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — F10.2 completada; F10.3 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3583,30 +3583,33 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.2 — HTTPS, proxy y headers
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-10-12
+**Fecha de finalización:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] TLS.
+- [x] TLS.
 
-- [ ] reverse proxy.
+- [x] reverse proxy.
 
-- [ ] trusted proxies.
+- [x] trusted proxies.
 
-- [ ] security headers.
+- [x] security headers.
 
-- [ ] CSP panel.
+- [x] CSP panel.
 
 
 ### Criterios de aceptación
 
-- [ ] HTTPS obligatorio.
+- [x] HTTPS obligatorio.
 
 
 ### Seguridad
 
-- [ ] no confiar X-Forwarded-* indiscriminadamente.
+- [x] no confiar X-Forwarded-* indiscriminadamente.
 
 
 ### Prompt para Codex
@@ -9377,6 +9380,57 @@ antes de ajustar el umbral. El ACK del webhook continúa precediendo a una tarea
 durable. No se realizó prueba real con GreenAPI ni despliegue público en F10.1.
 
 **Siguiente:** F10.2 — HTTPS, proxy y headers (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.2 HTTPS, proxy y headers
+
+**Fase/subfase:** Fase 10 / F10.2. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.3 sigue `⬜ PENDIENTE`.
+
+**Cambios:** middleware productivo que rechaza HTTP con 403 antes de leer el webhook y solo
+acepta TLS directo o un único `X-Forwarded-Proto: https` desde una IP de proxy exacta y
+configurada. El arranque de Uvicorn desactiva la lectura automática de cabeceras de proxy y
+exige bind loopback en producción. Un Caddyfile termina TLS, redirige HTTP a HTTPS, entrega
+API y panel bajo un mismo origen y aplica HSTS y CSP restrictiva al panel. Las respuestas
+FastAPI, incluso errores de middleware, reciben cabeceras de seguridad y las rutas admin no se
+cachean. Se añadió una sonda local reproducible con CA temporal y documentación de despliegue.
+
+**Archivos:** `backend/app/{api/middleware.py,api/transport_security.py,core/config.py,main.py}`,
+`backend/tests/{test_config.py,test_transport_security.py}`, `scripts/{run_backend.py,f102_tls_smoke.py}`,
+`deploy/Caddyfile`, `.env.example`, `README.md`, `frontend/README.md`,
+`docs/fase_10_https.md` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 668 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado;
+`.venv\Scripts\ruff.exe format --check .` → 204 archivos correctos;
+`.venv\Scripts\python.exe -m pip check` → sin conflictos;
+`npm --prefix frontend test -- --run` → 34 aprobadas;
+`npm --prefix frontend run build` → aprobado;
+`git -c core.safecrlf=false diff --check` → aprobado. Las pruebas focales de transporte,
+seguridad HTTP y configuración pasaron (71). Con Caddy 2.11.7 descargado del release oficial
+y SHA-256 cotejado con su digest publicado, `caddy validate --config deploy/Caddyfile
+--adapter caddyfile` → configuración válida con HTTPS y redirección automáticos;
+`python -m scripts.f102_tls_smoke --caddy <binario verificado>` → TLS local con CA validada,
+HTTP 308, HTTP directo al backend 403, `/health` 200 y CSP del panel correctos. Los puertos
+de la sonda quedaron sin listeners.
+
+**Seguridad:** `TRUSTED_PROXY_IPS` está vacío por defecto y solo acepta IP exactas, sin rangos ni
+comodines. Se ignoran `X-Forwarded-For`, `X-Forwarded-Host` y `Forwarded` para esquema y cliente;
+las pruebas rechazan origen no permitido y encabezados duplicados, falsos o ambiguos. Caddy
+sobrescribe `X-Forwarded-Proto`; el ensayo también probó encabezados falsos en ambos lados del
+proxy. El backend no redirige webhooks HTTP y no lee su body al rechazarlos. No se versionaron
+certificados, llaves o tokens ni se hicieron llamadas reales a GreenAPI/OpenAI.
+
+**Riesgos y pendientes:** no se probó un dominio ni un certificado público; cada instalación
+debe configurar DNS, Caddy, puerto protegido, almacenamiento de certificados y la URL HTTPS
+de GreenAPI antes de exponerse. El backend confía en los procesos del host loopback indicado;
+no se debe arrancar producción con Uvicorn directo ni situar otro proxy delante de Caddy sin
+revisar la cadena de confianza. Los límites por IP de F10.1 ven la IP del proxy, por lo que se
+agregan para solicitudes administrativas; hace falta una política perimetral compartida al
+escalar. La cola de fondo tras el ACK del webhook sigue sin ser durable.
+
+**Siguiente:** F10.3 — Secrets y rotación (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import Request, Response
 
 from backend.app.api.errors import REQUEST_ID_HEADER, create_error_response
+from backend.app.api.transport_security import apply_security_headers
 from backend.app.core.logging import http_logger
 
 RequestHandler = Callable[[Request], Awaitable[Response]]
@@ -73,6 +74,7 @@ async def request_context_middleware(request: Request, call_next: RequestHandler
             public_message="Ocurrió un error interno.",
         )
 
+    apply_security_headers(request, response)
     response.headers[REQUEST_ID_HEADER] = request.state.request_id
     log_request(
         request,

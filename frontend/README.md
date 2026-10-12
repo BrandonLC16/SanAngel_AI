@@ -53,6 +53,6 @@ abierta y lo envía en `X-CSRF-Token` al cerrar sesión. No usa `localStorage`, 
 API keys, secretos de GreenAPI ni variables `VITE_` de credenciales. Los errores muestran mensajes
 fijos; no imprimen el body del servidor. React inserta nombres como texto y no usa HTML dinámico.
 
-El bundle de producción requiere un servidor HTTPS con cabeceras de seguridad apropiadas,
-incluida CSP; el servidor estático de Vite es solo de desarrollo. `npm run build` verifica tipos
-y genera los archivos estáticos en `frontend/dist/`, que Git ignora.
+El bundle de producción se sirve con el [Caddyfile de F10.2](../docs/fase_10_https.md), que
+aplica HTTPS y CSP al panel. El servidor estático de Vite es solo de desarrollo. `npm run build`
+verifica tipos y genera los archivos estáticos en `frontend/dist/`, que Git ignora.

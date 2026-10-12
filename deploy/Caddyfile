@@ -1,0 +1,28 @@
+# One Caddy instance and domain per branch. PUBLIC_DOMAIN is a DNS name, not a URL.
+{$PUBLIC_DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	@backend path /api/* /health
+	handle @backend {
+		reverse_proxy 127.0.0.1:8000 {
+			header_up X-Forwarded-Proto https
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -Forwarded
+		}
+	}
+
+	handle {
+		header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+		root * "{$PANEL_DIST}"
+		try_files {path} /index.html
+		file_server
+	}
+}

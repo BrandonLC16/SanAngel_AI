@@ -18,6 +18,7 @@ from backend.app.api.routes.admin_review import router as admin_review_router
 from backend.app.api.routes.chat import router as chat_router
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.whatsapp import router as whatsapp_router
+from backend.app.api.transport_security import transport_security_middleware
 from backend.app.core.config import HttpSettings, get_http_settings
 from backend.app.core.exceptions import ApplicationError
 from backend.app.core.logging import configure_logging
@@ -31,6 +32,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
     configure_logging(http_settings.log_level)
 
     application = FastAPI(title=http_settings.app_name)
+    application.state.http_settings = http_settings
     application.state.price_import_pending = AdminPriceImportPendingStore()
     application.state.resource_limits = ResourceLimits(http_settings)
     application.add_exception_handler(ApplicationError, application_error_handler)
@@ -45,6 +47,7 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
         expose_headers=[REQUEST_ID_HEADER],
     )
+    application.middleware("http")(transport_security_middleware)
     application.middleware("http")(request_context_middleware)
     application.include_router(health_router)
     application.include_router(chat_router)

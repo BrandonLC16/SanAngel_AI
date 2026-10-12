@@ -1,5 +1,6 @@
 import re
 from functools import lru_cache
+from ipaddress import ip_address
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -9,6 +10,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
 CorsOrigins = Annotated[tuple[str, ...], NoDecode]
+TrustedProxyIps = Annotated[tuple[str, ...], NoDecode]
 DEFAULT_GREEN_API_URL = "https://api.green-api.com"
 DEFAULT_DATABASE_URL = "sqlite+pysqlite:///./carniceria.db"
 BRANCH_CODE_PATTERN = re.compile(r"[a-z][a-z0-9-]{1,47}")
@@ -37,6 +39,7 @@ class HttpSettings(BaseSettings):
     app_host: str = Field(default="127.0.0.1", min_length=1, max_length=255)
     app_port: int = Field(default=8000, ge=1, le=65535)
     cors_allowed_origins: CorsOrigins = ()
+    trusted_proxy_ips: TrustedProxyIps = ()
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     admin_requests_per_minute: int = Field(default=120, ge=1, le=10_000)
     internal_requests_per_minute: int = Field(default=30, ge=1, le=10_000)
@@ -101,6 +104,29 @@ class HttpSettings(BaseSettings):
             normalized_origins.append(normalized_origin)
 
         return tuple(normalized_origins)
+
+    @field_validator("trusted_proxy_ips", mode="before")
+    @classmethod
+    def parse_trusted_proxy_ips(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(","))
+        return value
+
+    @field_validator("trusted_proxy_ips")
+    @classmethod
+    def validate_trusted_proxy_ips(cls, peers: tuple[str, ...]) -> tuple[str, ...]:
+        if len(peers) > 16:
+            raise ValueError("too many trusted proxy IPs")
+        normalized: list[str] = []
+        for peer in peers:
+            try:
+                address = ip_address(peer)
+            except ValueError as exc:
+                raise ValueError("trusted proxies must be exact IP addresses") from exc
+            if address.is_unspecified or address.is_multicast or str(address) in normalized:
+                raise ValueError("trusted proxies must be unique unicast IP addresses")
+            normalized.append(str(address))
+        return tuple(normalized)
 
 
 class DatabaseSettings(BaseSettings):

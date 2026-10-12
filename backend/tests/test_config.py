@@ -33,6 +33,7 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.webhook_requests_per_second == 100
     assert settings.http_body_read_timeout_seconds == 10
     assert settings.cors_allowed_origins == ()
+    assert settings.trusted_proxy_ips == ()
     assert settings.assistant_branch_code == BRANCH_CODE
     assert settings.openai_model == "gpt-5.6"
     assert settings.openai_store_responses is False

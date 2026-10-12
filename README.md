@@ -183,6 +183,7 @@ Variables relevantes:
 - `ADMIN_REQUESTS_PER_MINUTE`, `INTERNAL_REQUESTS_PER_MINUTE` y
   `WEBHOOK_REQUESTS_PER_SECOND`: cuotas HTTP por instalación;
 - `HTTP_BODY_READ_TIMEOUT_SECONDS`: plazo máximo para leer un cuerpo HTTP;
+- `TRUSTED_PROXY_IPS`: lista de IP exactas del proxy conectado directamente; vacía por defecto;
 - `CHAT_MAX_MESSAGE_CHARS`: entre 1 y 10000, con 2000 por defecto;
 - `CORS_ALLOWED_ORIGINS`: lista separada por comas de orígenes HTTP/HTTPS exactos.
 
@@ -501,6 +502,12 @@ F10.1 añade [límites de solicitudes y cuerpos](docs/fase_10_limites.md) para w
 panel y chat interno. La lectura HTTP tiene timeout; GreenAPI conserva reentrega cuando recibe
 429 o 503 y el envío saliente no se reintenta automáticamente. Las cuotas son locales a cada
 proceso y no usan encabezados de proxy no confiables.
+
+F10.2 añade [TLS y proxy inverso](docs/fase_10_https.md). En producción, FastAPI rechaza HTTP
+antes de leer cuerpos o ejecutar rutas; solo acepta el esquema HTTPS de TLS directo o una única
+declaración `X-Forwarded-Proto: https` desde una IP de proxy configurada. Caddy termina TLS y
+sirve el panel con CSP bajo el mismo origen. El arranque productivo desactiva la interpretación
+automática de cabeceras de proxy de Uvicorn y mantiene el backend en loopback.
 
 ## Servicio OpenAI y chat interno
 
