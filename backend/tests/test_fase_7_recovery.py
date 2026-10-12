@@ -17,6 +17,7 @@ from backend.app.db.models.unresolved_question import UnresolvedQuestion
 from backend.app.db.models.whatsapp_event_receipt import WhatsAppEventReceipt
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from scripts.backup_sqlite import backup_sqlite
+from scripts.restore_sqlite import restore_sqlite
 
 ROOT = Path(__file__).resolve().parents[2]
 HEAD = "20261012_0014"
@@ -73,9 +74,9 @@ def test_fase_7_migration_from_zero_survives_isolated_backup_restore(
         finally:
             engine.dispose()
 
-        backup_sqlite(source, backup)
+        backup_sqlite(source, backup, "sucursal-prueba")
         assert not restored.exists()
-        backup_sqlite(backup, restored)
+        restore_sqlite(backup, restored, "sucursal-prueba")
         monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{restored.as_posix()}")
         get_database_settings.cache_clear()
         command.check(config)

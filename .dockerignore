@@ -10,6 +10,9 @@
 !scripts/__init__.py
 !scripts/run_backend.py
 !scripts/container_healthcheck.py
+!scripts/backup_sqlite.py
+!scripts/restore_sqlite.py
+!scripts/sqlite_validation.py
 !migrations/
 !migrations/**
 !frontend/

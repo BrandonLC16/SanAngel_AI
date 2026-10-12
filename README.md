@@ -249,20 +249,20 @@ un directorio protegido fuera del repositorio. Por ejemplo, adaptando ambas ruta
 ```powershell
 $sourceDb = "C:\datos\sucursal-1.db"
 $backupDb = "D:\respaldos-protegidos\sucursal-1-$(Get-Date -Format yyyyMMdd-HHmmss).db"
-python -m scripts.backup_sqlite --source $sourceDb --destination $backupDb
+$branchCode = "sucursal-1"
+python -m scripts.backup_sqlite --source $sourceDb --destination $backupDb --branch-code $branchCode
 ```
 
 El comando usa la API de respaldo de SQLite para incluir datos confirmados aun si existe un WAL,
-rechaza un origen inexistente y nunca reemplaza un respaldo previo. Exige que
-`PRAGMA integrity_check` devuelva `ok` antes de informar éxito. Si falla, no ejecutar la migración. Verificar
-además que el respaldo se puede abrir, que corresponde a la sucursal y que la recuperación funciona
-en una copia aislada; conservarlo con acceso restringido y según la política de retención antes de
+rechaza un origen inexistente y nunca reemplaza un respaldo previo. Exige integridad, claves
+foráneas, sucursal y revisión esperada antes de informar éxito. Si falla, no ejecutar la migración.
+Verificar además que la recuperación funciona en una copia aislada; conservarlo con acceso
+restringido y según la política de retención antes de
 ejecutar `python -m alembic upgrade head`. Después comprobar `current`, `check` y lecturas de
 datos representativas antes de reanudar escrituras. Ante un fallo productivo, detener escrituras
 y recuperar el respaldo verificado mediante el procedimiento operativo; no usar `downgrade` como
-sustituto del respaldo. La automatización de respaldos y restauraciones periódicas pertenece a la
-preparación para producción. La [guía de cierre de Fase 7](docs/fase_7_cierre.md) detalla el
-ensayo de recuperación y la conciliación antes de reanudar webhooks.
+sustituto del respaldo. La [guía de continuidad F10.7](docs/fase_10_continuidad.md) define el
+RPO/RTO inicial, la protección de copias, el ensayo y la conciliación antes de reanudar webhooks.
 
 ## Catálogo de productos
 
@@ -531,6 +531,10 @@ F10.6 añade [imágenes Docker comunes y despliegue por sucursal](docs/fase_10_d
 panel/Caddy corren sin root, con healthchecks, bases fijadas por digest, dependencias bloqueadas y
 contexto de build restringido. Cada una de las siete instalaciones aporta su propia configuración,
 secretos montados y volúmenes fuera de las imágenes.
+
+F10.7 añade [respaldo y restauración verificados por sucursal](docs/fase_10_continuidad.md),
+con objetivos iniciales RPO de 24 horas y RTO de 4 horas. La guía describe el trabajo diario,
+almacenamiento protegido, ensayo mensual y cambio a una base nueva tras verificarla.
 
 ## Servicio OpenAI y chat interno
 

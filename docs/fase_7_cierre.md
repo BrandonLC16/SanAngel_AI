@@ -40,6 +40,7 @@ Preparar rutas únicas en directorios existentes y con acceso restringido, por e
 $sourceDb = "C:\datos\sucursal-1.db"
 $backupDb = "D:\respaldos-protegidos\sucursal-1-$(Get-Date -Format yyyyMMdd-HHmmss).db"
 $restoreDb = "D:\ensayo-aislado\sucursal-1-$(Get-Date -Format yyyyMMdd-HHmmss).db"
+$branchCode = "sucursal-1"
 ```
 
 1. Detener webhooks, tareas de fondo y demás escrituras de **esa** instalación; registrar versión
@@ -48,14 +49,14 @@ $restoreDb = "D:\ensayo-aislado\sucursal-1-$(Get-Date -Format yyyyMMdd-HHmmss).d
 3. Crear un respaldo nuevo en una ruta protegida, sin sobrescribir otro archivo:
 
    ```powershell
-   python -m scripts.backup_sqlite --source $sourceDb --destination $backupDb
+   python -m scripts.backup_sqlite --source $sourceDb --destination $backupDb --branch-code $branchCode
    ```
 
-4. Ensayar la recuperación en una ruta **nueva y aislada** con la misma API de SQLite, que vuelve
-   a verificar integridad y rechaza un destino existente:
+4. Ensayar la recuperación en una ruta **nueva y aislada**. La herramienta verifica integridad,
+   claves foráneas, sucursal y revisión y rechaza un destino existente:
 
    ```powershell
-   python -m scripts.backup_sqlite --source $backupDb --destination $restoreDb
+   python -m scripts.restore_sqlite --backup $backupDb --destination $restoreDb --branch-code $branchCode
    $env:DATABASE_URL = "sqlite+pysqlite:///" + ($restoreDb -replace '\\', '/')
    python -m alembic current
    python -m alembic check
@@ -71,7 +72,6 @@ $restoreDb = "D:\ensayo-aislado\sucursal-1-$(Get-Date -Format yyyyMMdd-HHmmss).d
    los `claimed` antes de permitir reentregas: restaurar puede perder recibos recientes y una
    reentrega sin conciliación podría duplicar una respuesta. Nunca usar `downgrade` como restore.
 
-Programar un respaldo diario más uno previo a cada migración y un ensayo de restauración
-periódico en un entorno aislado. Medir el tiempo real de recuperación y acordar RPO/RTO con la
-operación antes de producción. La automatización, el almacenamiento protegido y la conciliación
-de eventos externos siguen siendo tareas operativas pendientes.
+La [guía F10.7](fase_10_continuidad.md) fija los objetivos iniciales, protección, frecuencia,
+ensayos y pasos de recuperación. La programación, el almacenamiento externo protegido y la
+conciliación de eventos externos requieren ejecución y verificación operativa por instalación.

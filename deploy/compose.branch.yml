@@ -15,7 +15,7 @@ services:
       CORS_ALLOWED_ORIGINS: ""
       ASSISTANT_BRANCH_CODE: ${ASSISTANT_BRANCH_CODE:?set the assigned branch code}
       GREEN_API_INSTANCE_ID: ${GREEN_API_INSTANCE_ID:?set the assigned instance}
-      DATABASE_URL: sqlite+pysqlite:////data/assistant.db
+      DATABASE_URL: ${DATABASE_URL:-sqlite+pysqlite:////data/assistant.db}
       SECRETS_DIR: /run/secrets
     volumes:
       - branch_data:/data

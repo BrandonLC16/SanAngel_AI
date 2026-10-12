@@ -24,13 +24,14 @@ ENV APP_ENV=production \
 
 RUN groupadd --system --gid 10001 sanangel \
     && useradd --system --uid 10001 --gid sanangel --home-dir /app --no-create-home sanangel \
-    && install -d -o 10001 -g 10001 /app /data
+    && install -d -o 10001 -g 10001 /app \
+    && install -d -m 0700 -o 10001 -g 10001 /data
 
 COPY --from=dependencies /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=10001:10001 backend/app /app/backend/app
 COPY --chown=10001:10001 backend/__init__.py /app/backend/__init__.py
-COPY --chown=10001:10001 scripts/__init__.py scripts/run_backend.py scripts/container_healthcheck.py /app/scripts/
+COPY --chown=10001:10001 scripts/__init__.py scripts/run_backend.py scripts/container_healthcheck.py scripts/backup_sqlite.py scripts/restore_sqlite.py scripts/sqlite_validation.py /app/scripts/
 COPY --chown=10001:10001 migrations /app/migrations
 COPY --chown=10001:10001 alembic.ini /app/alembic.ini
 

@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.6 — Docker seguro (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.7 pendiente
+**Subfase activa:** F10.7 — Backup/restore y continuidad (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.7 completada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3820,28 +3820,31 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.7 — Backup/restore y continuidad
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de validación:** 2026-10-12
+**Fecha de cierre:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] backup DB.
+- [x] backup DB.
 
-- [ ] restore probado.
+- [x] restore probado.
 
-- [ ] RPO/RTO inicial.
+- [x] RPO/RTO inicial.
 
-- [ ] procedimiento.
+- [x] procedimiento.
 
 
 ### Criterios de aceptación
 
-- [ ] restore verificado.
+- [x] restore verificado.
 
 
 ### Seguridad
 
-- [ ] backups protegidos.
+- [x] backups protegidos.
 
 
 ### Prompt para Codex
@@ -9646,6 +9649,61 @@ valores **sintéticos** en
 `C:\Users\brand\AppData\Local\Temp\sanangel-f106-smoke`; permanecen fuera del repositorio.
 
 **Siguiente:** F10.7 — Backup/restore y continuidad (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.7 Backup/restore y continuidad
+
+**Fase/subfase:** Fase 10 / F10.7. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.8 permanece `⬜ PENDIENTE`.
+
+**Cambios:** El respaldo SQLite conserva la API de instantánea online y ahora verifica también
+claves foráneas; con `--branch-code` comprueba la única sucursal y la revisión Alembic de la
+imagen. Exige destino nuevo fuera del repositorio y directorio privado en POSIX. El nuevo
+`restore_sqlite` crea una base en otra ruta, repite esas comprobaciones, no reemplaza el archivo
+activo y retira solo el nuevo archivo si la verificación falla. La imagen backend incluye ambos
+comandos; `/data` nace con modo `0700`. Compose permite elegir por configuración externa el
+archivo restaurado. La guía de continuidad fija RPO inicial de 24 horas y RTO inicial de 4 horas,
+respaldo diario, ensayo mensual, protección y procedimiento de conciliación.
+
+**Archivos:** `.dockerignore`, `Dockerfile`, `deploy/compose.branch.yml`,
+`scripts/{backup_sqlite,restore_sqlite,sqlite_validation}.py`,
+`backend/tests/{test_backup_sqlite,test_restore_sqlite,test_fase_7_recovery}.py`,
+`docs/{fase_10_continuidad,fase_7_cierre}.md`, `README.md` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 710 aprobadas, 1 omitida
+por ser una prueba de permisos POSIX en Windows; `ruff check .` → sin hallazgos;
+`ruff format --check .` → 221 archivos conformes; `python -m pip check` → dependencias
+consistentes; `git diff --check` → sin errores de whitespace (avisos de conversión LF/CRLF).
+`pip-audit --local` y `pip-audit --require-hashes -r requirements-prod.lock` → sin
+vulnerabilidades conocidas; el paquete local no publicado se omite en la primera consulta.
+`npm --prefix frontend test` → 34 aprobadas; `npm --prefix frontend run build` → correcto;
+`npm audit --prefix frontend` → 0 vulnerabilidades. `docker build --build-arg
+SOURCE_DATE_EPOCH=0 --platform linux/amd64 -f Dockerfile -t sanangel-backend:f107 .` →
+imagen construida; `docker image inspect` → UID/GID 10001 y healthcheck presentes.
+`docker compose -f deploy/compose.branch.yml config --format json` → URL SQLite predeterminada
+y override de restauración correctos. Ensayo en `docker run --rm --read-only --network none`
+con volúmenes temporales privados: `alembic upgrade head`, respaldo CLI, restore CLI,
+`alembic check` y consulta de datos → correctos en 7,46 s; respaldo modo `0600`. Ensayo Linux
+con directorio de respaldo `0755` → rechazado y sin copia. Un primer intento del ensayo falló
+por comillas de PowerShell en `python -c`; se corrigió la invocación y pasó.
+
+**Seguridad:** las copias nuevas no se sobrescriben ni se escriben en el repositorio. En POSIX
+el directorio debe ser propiedad del proceso y `0700`, y el archivo se crea `0600`; el ensayo
+Linux ejercitó aceptación y rechazo. Restore verifica integridad, FK, sucursal y revisión antes
+del cambio de `DATABASE_URL`. Errores CLI genéricos evitan exponer rutas o datos. La guía exige
+cifrado y copia separada del host, ACL restringidas, retención de siete copias diarias sujeta a
+la política de privacidad y mantener `CONVERSATION_IDENTITY_KEY` aparte. No se montaron secretos
+ni se usaron credenciales reales en las pruebas.
+
+**Riesgos/Pendientes:** no se desplegó un programador, almacenamiento cifrado externo ni alertas
+en las siete instalaciones reales; el operador debe configurarlos y verificar cada copia. RPO/RTO
+son objetivos iniciales, no tiempos demostrados en producción. En Windows las ACL dependen del
+operador; los permisos POSIX se comprobaron en Docker Linux. Volúmenes `/data` creados antes de
+F10.7 podrían requerir ajuste controlado de modo. La conciliación de recibos externos tras un
+incidente sigue siendo una acción operativa obligatoria antes de reanudar webhooks.
+
+**Siguiente:** F10.8 — Cola/worker — decisión y adaptación (`⬜ PENDIENTE`), no iniciada.
 
 ---
 
