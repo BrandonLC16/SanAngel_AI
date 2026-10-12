@@ -1,4 +1,7 @@
 import logging
+import sys
+
+from backend.app.core.observability import operations_logger
 
 HTTP_LOGGER_NAME = "backend.app.http"
 WHATSAPP_BACKGROUND_LOGGER_NAME = "backend.app.whatsapp_background"
@@ -18,3 +21,9 @@ def configure_logging(log_level: str) -> None:
     http_logger.setLevel(log_level)
     whatsapp_background_logger.setLevel(log_level)
     tool_audit_logger.setLevel(log_level)
+    if not operations_logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        operations_logger.addHandler(handler)
+    operations_logger.setLevel(logging.INFO)
+    operations_logger.propagate = False

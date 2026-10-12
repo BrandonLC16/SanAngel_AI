@@ -16,6 +16,7 @@ from backend.app.core.exceptions import (
     WhatsAppProviderStatusError,
     WhatsAppProviderTimeoutError,
 )
+from backend.app.core.observability import get_operational_metrics
 from backend.app.services.whatsapp_client import MAX_OUTBOUND_TEXT_CHARS, WhatsAppClient
 
 TOKEN_INSTANCE_MARKER = "test-only-green-api-token-instance-marker"
@@ -82,6 +83,31 @@ def test_send_text_uses_configured_url_timeout_and_green_api_payload() -> None:
     }
     assert set(request.extensions["timeout"].values()) == {17.5}
     assert TOKEN_INSTANCE_MARKER.encode() not in request.content
+
+
+def test_greenapi_calls_increment_success_and_error_metrics_without_recipient() -> None:
+    get_operational_metrics.cache_clear()
+
+    def success(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"idMessage": "test-only-id"})
+
+    def failure(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"code": 429})
+
+    try:
+        run_with_mock_transport(
+            success, lambda client: client.send_text(RECIPIENT, "texto privado")
+        )
+        with pytest.raises(WhatsAppProviderRateLimitError):
+            run_with_mock_transport(
+                failure, lambda client: client.send_text(RECIPIENT, "texto privado")
+            )
+        snapshot = get_operational_metrics().snapshot()
+        assert snapshot["provider_outcomes"]["greenapi"] == {"ok": 1, "rate_limit": 1}
+        assert RECIPIENT not in json.dumps(snapshot)
+        assert TOKEN_INSTANCE_MARKER not in json.dumps(snapshot)
+    finally:
+        get_operational_metrics.cache_clear()
 
 
 @pytest.mark.parametrize(

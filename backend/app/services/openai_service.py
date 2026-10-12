@@ -4,6 +4,7 @@ import re
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from importlib.resources import files
+from time import perf_counter
 from typing import Any, Protocol
 
 from openai import (
@@ -27,6 +28,7 @@ from backend.app.core.exceptions import (
     BranchNotConfiguredError,
     InvalidRequestError,
 )
+from backend.app.core.observability import get_operational_metrics
 from backend.app.services.tool_contracts import ToolCallValidationError, get_tool_schemas
 from backend.app.services.tool_dispatcher import ToolDispatcher, ToolResult
 
@@ -89,6 +91,14 @@ class OpenAIService:
         self._assistant_branch_code = settings.assistant_branch_code
         self._max_message_chars = settings.chat_max_message_chars
         self._system_prompt = system_prompt or load_base_system_prompt()
+        self._metrics = get_operational_metrics()
+        self._usage_rates = (
+            settings.observability_input_usd_per_million,
+            settings.observability_cached_input_usd_per_million,
+            settings.observability_cache_write_usd_per_million,
+            settings.observability_output_usd_per_million,
+        )
+        self._daily_cost_alert_usd = settings.observability_daily_cost_alert_usd
         self._client = (
             client
             if client is not None
@@ -169,18 +179,72 @@ class OpenAIService:
         raise AIProviderResponseError("tool call round limit exceeded")
 
     async def _create_response(self, **kwargs: Any) -> ResponseResult:
+        started_at = perf_counter()
         try:
-            return await self._client.responses.create(**kwargs)
+            response = await self._client.responses.create(**kwargs)
         except APITimeoutError as exc:
+            self._record_call("timeout", started_at)
             raise AIProviderTimeoutError("AI provider timeout") from exc
         except RateLimitError as exc:
+            self._record_call("rate_limit", started_at)
             raise AIProviderRateLimitError("AI provider rate limit") from exc
         except APIConnectionError as exc:
+            self._record_call("connection", started_at)
             raise AIProviderConnectionError("AI provider connection failure") from exc
         except APIStatusError as exc:
+            self._record_call("status", started_at)
             raise AIProviderStatusError("AI provider HTTP failure") from exc
         except APIError as exc:
+            self._record_call("other", started_at)
             raise AIProviderError("AI provider failure") from exc
+        except Exception:
+            self._record_call("other", started_at)
+            raise
+        self._record_call("ok", started_at, usage=_response_usage(response))
+        return response
+
+    def _record_call(
+        self, outcome: str, started_at: float, *, usage: tuple[int, int, int, int] | None = None
+    ) -> None:
+        self._metrics.record_provider(
+            "openai",
+            outcome,
+            (perf_counter() - started_at) * 1000,
+            usage=usage,
+            rates=self._usage_rates,
+            daily_cost_alert_usd=self._daily_cost_alert_usd,
+        )
+
+
+def _response_usage(response: ResponseResult) -> tuple[int, int, int, int] | None:
+    """Read bounded numeric totals only; never retain provider content or object dumps."""
+
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+
+    def number(source: object, name: str) -> int | None:
+        value = source.get(name) if isinstance(source, dict) else getattr(source, name, None)
+        return value if type(value) is int and 0 <= value <= 1_000_000_000 else None
+
+    input_tokens = number(usage, "input_tokens")
+    output_tokens = number(usage, "output_tokens")
+    details = (
+        usage.get("input_tokens_details")
+        if isinstance(usage, dict)
+        else getattr(usage, "input_tokens_details", None)
+    )
+    cached_tokens = number(details, "cached_tokens") if details is not None else 0
+    write_tokens = number(details, "cache_write_tokens") if details is not None else 0
+    if (
+        input_tokens is None
+        or output_tokens is None
+        or cached_tokens is None
+        or write_tokens is None
+        or cached_tokens + write_tokens > input_tokens
+    ):
+        return None
+    return input_tokens, cached_tokens, write_tokens, output_tokens
 
 
 def _read_response(response: ResponseResult) -> tuple[list[object], tuple[_FunctionCall, ...]]:

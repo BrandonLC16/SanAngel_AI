@@ -1,12 +1,13 @@
 import os
 import re
+from decimal import Decimal
 from functools import lru_cache
 from ipaddress import ip_address
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -275,6 +276,14 @@ class Settings(HttpSettings):
     openai_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     openai_max_retries: int = Field(default=2, ge=0, le=5)
 
+    observability_input_usd_per_million: Decimal | None = Field(default=None, ge=0, le=10_000)
+    observability_cached_input_usd_per_million: Decimal | None = Field(
+        default=None, ge=0, le=10_000
+    )
+    observability_cache_write_usd_per_million: Decimal | None = Field(default=None, ge=0, le=10_000)
+    observability_output_usd_per_million: Decimal | None = Field(default=None, ge=0, le=10_000)
+    observability_daily_cost_alert_usd: Decimal | None = Field(default=None, gt=0, le=1_000_000)
+
     chat_max_message_chars: int = Field(default=2000, ge=1, le=10_000)
 
     green_api_instance_id: str | None = Field(default=None, repr=False)
@@ -282,6 +291,21 @@ class Settings(HttpSettings):
     green_api_webhook_token: SecretStr | None = Field(default=None, repr=False)
     green_api_api_url: str = DEFAULT_GREEN_API_URL
     whatsapp_request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
+
+    @model_validator(mode="after")
+    def validate_observability_pricing(self) -> Self:
+        rates = (
+            self.observability_input_usd_per_million,
+            self.observability_cached_input_usd_per_million,
+            self.observability_cache_write_usd_per_million,
+            self.observability_output_usd_per_million,
+        )
+        configured = sum(rate is not None for rate in rates)
+        if configured not in {0, len(rates)}:
+            raise ValueError("all observability rates must be configured together")
+        if self.observability_daily_cost_alert_usd is not None and configured == 0:
+            raise ValueError("observability cost alert requires all rates")
+        return self
 
     @field_validator("assistant_branch_code")
     @classmethod

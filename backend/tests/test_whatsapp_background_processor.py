@@ -8,6 +8,7 @@ import pytest
 from backend.app.core.config import Settings
 from backend.app.core.exceptions import MessageProcessingError
 from backend.app.core.logging import WHATSAPP_BACKGROUND_LOGGER_NAME
+from backend.app.core.observability import request_reference
 from backend.app.schemas.whatsapp import InboundMessage
 from backend.app.services.whatsapp_background_processor import WhatsAppBackgroundProcessor
 
@@ -84,7 +85,8 @@ def test_background_processor_continues_batch_after_failure_without_retrying(
     assert "source_error_category=none" in caplog.text
     assert "provider_code=none provider_subcode=none" in caplog.text
     assert "message_count=2 failed_count=1" in caplog.text
-    assert "safe-background-request-id" in caplog.text
+    assert f"request_ref={request_reference('safe-background-request-id')}" in caplog.text
+    assert "safe-background-request-id" not in caplog.text
     assert failing_id not in caplog.text
     assert successful_id not in caplog.text
     assert private_text not in caplog.text
@@ -125,6 +127,32 @@ def test_background_processor_logs_only_safe_provider_diagnostics(
     assert "texto privado" not in caplog.text
 
 
+def test_background_diagnostics_reject_private_categories_and_codes(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    marker = "test-only-private-source-token-marker"
+
+    class PrivateDiagnosticOrchestrator(RecordingOrchestrator):
+        async def process_message(self, message: InboundMessage) -> bool:
+            raise MessageProcessingError(
+                "private detail",
+                source_error_code=marker,
+                provider_code=marker,  # type: ignore[arg-type]
+            )
+
+    with caplog.at_level(logging.ERROR, logger=WHATSAPP_BACKGROUND_LOGGER_NAME):
+        asyncio.run(
+            processor_for(PrivateDiagnosticOrchestrator()).process_messages(
+                (make_message("wamid.test-only-id", "private text"),),
+                make_settings(),
+                marker,
+            )
+        )
+
+    assert marker not in caplog.text
+    assert "source_error_category=none provider_code=none" in caplog.text
+
+
 def test_background_factory_failure_is_swallowed_and_logged_without_private_detail(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -149,7 +177,8 @@ def test_background_factory_failure_is_swallowed_and_logged_without_private_deta
     assert result is None
     assert "background_message_batch_failed" in caplog.text
     assert "error_category=unhandled_exception" in caplog.text
-    assert "safe-factory-request-id" in caplog.text
+    assert f"request_ref={request_reference('safe-factory-request-id')}" in caplog.text
+    assert "safe-factory-request-id" not in caplog.text
     assert private_detail not in caplog.text
     assert "texto privado" not in caplog.text
 
@@ -177,6 +206,7 @@ def test_background_cancellation_is_logged_and_propagated(
         asyncio.run(cancel_processing())
 
     assert "background_message_batch_cancelled" in caplog.text
-    assert "safe-cancelled-request-id" in caplog.text
+    assert f"request_ref={request_reference('safe-cancelled-request-id')}" in caplog.text
+    assert "safe-cancelled-request-id" not in caplog.text
     assert "wamid.test-only-id" not in caplog.text
     assert "texto privado" not in caplog.text

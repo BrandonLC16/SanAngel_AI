@@ -1,6 +1,7 @@
 import logging
 import re
 from collections.abc import Mapping
+from time import perf_counter
 from typing import Protocol, Self
 
 import httpx
@@ -16,6 +17,7 @@ from backend.app.core.exceptions import (
     WhatsAppProviderStatusError,
     WhatsAppProviderTimeoutError,
 )
+from backend.app.core.observability import get_operational_metrics
 from backend.app.schemas.whatsapp import GREEN_API_CHAT_ID_PATTERN, WhatsAppSendResponse
 
 MAX_OUTBOUND_TEXT_CHARS = 20_000
@@ -74,6 +76,7 @@ class WhatsAppClient:
             f"{token_instance.get_secret_value()}"
         )
         self._timeout = settings.whatsapp_request_timeout_seconds
+        self._metrics = get_operational_metrics()
 
         if http_client is None:
             owned_client = httpx.AsyncClient(follow_redirects=False)
@@ -115,12 +118,39 @@ class WhatsAppClient:
         if not normalized_text:
             raise WhatsAppClientInputError("WhatsApp text must not be blank")
 
-        headers = {"Content-Type": "application/json"}
         payload = {
             "chatId": recipient,
             "message": normalized_text,
             "linkPreview": preview_url,
         }
+
+        started_at = perf_counter()
+        try:
+            result = await self._send_payload(payload)
+        except (
+            WhatsAppProviderTimeoutError,
+            WhatsAppProviderConnectionError,
+            WhatsAppProviderRateLimitError,
+            WhatsAppProviderStatusError,
+            WhatsAppProviderResponseError,
+        ) as exc:
+            outcome = {
+                WhatsAppProviderTimeoutError: "timeout",
+                WhatsAppProviderConnectionError: "connection",
+                WhatsAppProviderRateLimitError: "rate_limit",
+                WhatsAppProviderStatusError: "status",
+                WhatsAppProviderResponseError: "response",
+            }.get(type(exc), "other")
+            self._metrics.record_provider("greenapi", outcome, (perf_counter() - started_at) * 1000)
+            raise
+        except Exception:
+            self._metrics.record_provider("greenapi", "other", (perf_counter() - started_at) * 1000)
+            raise
+        self._metrics.record_provider("greenapi", "ok", (perf_counter() - started_at) * 1000)
+        return result
+
+    async def _send_payload(self, payload: dict[str, object]) -> str:
+        headers = {"Content-Type": "application/json"}
 
         try:
             response = await self._http_client.post(

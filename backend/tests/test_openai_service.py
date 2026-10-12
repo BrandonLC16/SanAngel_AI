@@ -15,6 +15,7 @@ from backend.app.core.exceptions import (
     AIProviderStatusError,
     AIProviderTimeoutError,
 )
+from backend.app.core.observability import get_operational_metrics
 from backend.app.services import openai_service
 from backend.app.services.openai_service import OpenAIService, load_base_system_prompt
 
@@ -22,6 +23,7 @@ from backend.app.services.openai_service import OpenAIService, load_base_system_
 @dataclass
 class FakeResponse:
     output_text: str
+    usage: object | None = None
 
 
 class FakeResponsesAPI:
@@ -105,6 +107,53 @@ def test_generate_reply_uses_responses_api_with_configurable_store_without_netwo
     assert input_marker not in caplog.text
     assert output_marker not in caplog.text
     assert system_prompt not in caplog.text
+
+
+def test_openai_response_usage_is_counted_without_response_content() -> None:
+    get_operational_metrics.cache_clear()
+    response = FakeResponse(
+        "private-model-output",
+        usage={
+            "input_tokens": 1_000,
+            "input_tokens_details": {"cached_tokens": 200, "cache_write_tokens": 100},
+            "output_tokens": 500,
+        },
+    )
+    service = OpenAIService(
+        make_settings(
+            observability_input_usd_per_million="1",
+            observability_cached_input_usd_per_million="0.5",
+            observability_cache_write_usd_per_million="2",
+            observability_output_usd_per_million="4",
+        ),
+        client=FakeOpenAIClient(FakeResponsesAPI(response=response)),
+        system_prompt="private-prompt",
+    )
+    try:
+        assert asyncio.run(service.generate_reply("private-input")) == "private-model-output"
+        snapshot = get_operational_metrics().snapshot()
+        assert snapshot["provider_outcomes"]["openai"] == {"ok": 1}
+        assert snapshot["openai_estimated_cost_usd"] == "0.003"
+    finally:
+        get_operational_metrics.cache_clear()
+
+
+def test_openai_rate_limit_updates_error_counter() -> None:
+    get_operational_metrics.cache_clear()
+    error = RateLimitError("private error", response=make_sdk_response(429), body=None)
+    service = OpenAIService(
+        make_settings(),
+        client=FakeOpenAIClient(FakeResponsesAPI(error=error)),
+        system_prompt="private prompt",
+    )
+    try:
+        with pytest.raises(AIProviderRateLimitError):
+            asyncio.run(service.generate_reply("private input"))
+        assert get_operational_metrics().snapshot()["provider_outcomes"]["openai"] == {
+            "rate_limit": 1
+        }
+    finally:
+        get_operational_metrics.cache_clear()
 
 
 def test_real_client_factory_receives_secret_timeout_and_bounded_retries(

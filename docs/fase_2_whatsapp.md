@@ -279,6 +279,10 @@ No se registra:
 
 Los identificadores y números de WhatsApp son datos personales.
 
+F10.4 agrega métricas de latencia y errores del cliente GreenAPI y eventos JSON acotados, sin
+`chatId`, texto ni URL con token. La [guía operativa](fase_10_observabilidad.md) describe el
+endpoint administrativo y las alertas; Meta permanece solo en el historial.
+
 ## 11. Pruebas
 
 Las pruebas comunes no usan internet. Deben cubrir:

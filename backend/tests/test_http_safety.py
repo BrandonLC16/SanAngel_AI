@@ -65,7 +65,8 @@ def test_request_id_is_propagated_and_logs_exclude_sensitive_request_data(
     log_output = caplog.text
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] == request_id
-    assert f"request_id={request_id}" in log_output
+    assert "request_ref=" in log_output
+    assert request_id not in log_output
     assert "method=POST" in log_output
     assert "endpoint=/logging-check" in log_output
     assert "status_code=200" in log_output

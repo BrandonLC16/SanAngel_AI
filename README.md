@@ -518,6 +518,11 @@ repositorio y de la imagen](docs/fase_10_secrets.md). El arranque falla si falta
 rotación exige reiniciar los procesos y revocar la versión anterior. El procedimiento incluye
 OpenAI, GreenAPI y sesiones administrativas, además de la revocación de tokens Meta históricos.
 
+F10.4 agrega [métricas operativas y alertas JSON](docs/fase_10_observabilidad.md) de solicitudes,
+latencia, fallos OpenAI/GreenAPI y uso de tokens. El costo se estima solo con tarifas explícitas
+del modelo configurado; un propietario puede consultar los agregados del proceso por una ruta
+administrativa protegida. Los logs usan una referencia opaca en lugar del ID bruto de solicitud.
+
 ## Servicio OpenAI y chat interno
 
 `OpenAIService` encapsula el cliente asíncrono oficial de Responses API. El modelo, timeout,
@@ -568,7 +573,7 @@ Los placeholders de prueba no son credenciales reales.
 - La Fase 2 valida el MVP y no declara el sistema production-ready. F7.3 ya persiste recibos;
   antes de producción faltan, entre otros controles, conciliación de reservas ambiguas, cola
   durable, HTTPS estable, rate limiting compartido/perimetral, despliegue efectivo del secret
-  manager y observabilidad.
+  manager, agregación de métricas y entrega operativa de alertas.
 - El backend y el túnel temporal están detenidos; la URL `trycloudflare.com` usada en F2.9 ya no
   es válida.
 

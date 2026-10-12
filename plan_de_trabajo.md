@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.3 — Secrets y rotación (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.3 cerrada
+**Subfase activa:** F10.4 — Observabilidad y costos (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.4 cerrada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3676,32 +3676,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.4 — Observabilidad y costos
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-10-12
+
+**Fecha de finalización:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] structured logs.
+- [x] structured logs.
 
-- [ ] metrics.
+- [x] metrics.
 
-- [ ] latencia.
+- [x] latencia.
 
-- [ ] errores Meta/OpenAI.
+- [x] errores Meta/OpenAI.
 
-- [ ] uso/costo.
+- [x] uso/costo.
 
-- [ ] alertas.
+- [x] alertas.
 
 
 ### Criterios de aceptación
 
-- [ ] operación medible.
+- [x] operación medible.
 
 
 ### Seguridad
 
-- [ ] PII/tokens redactados.
+- [x] PII/tokens redactados.
 
 
 ### Prompt para Codex
@@ -9484,6 +9488,56 @@ La rotación de `CONVERSATION_IDENTITY_KEY` requiere una migración específica 
 identidad y descifrado. La cola de webhook tras ACK sigue sin ser durable.
 
 **Siguiente:** F10.4 — Observabilidad y costos (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.4 Observabilidad y costos
+
+**Fase/subfase:** Fase 10 / F10.4. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.5 permanece `⬜ PENDIENTE`.
+
+**Cambios:** eventos JSON de solicitudes HTTP y llamadas OpenAI/GreenAPI con campos cerrados;
+contadores y histogramas de latencia acotados por proceso; lectura de agregados por
+`GET /api/v1/admin/operations/metrics` solo para propietarios autenticados. Cada respuesta
+Responses con `usage` válido suma tokens de entrada, caché, escritura de caché y salida. Las
+tarifas USD por millón se configuran juntas y permiten una estimación parcial, sin precios
+incrustados. Alertas JSON para lentitud, cinco errores de proveedor por minuto, uso/tarifa
+faltante y umbral diario de costo estimado. El proveedor activo de WhatsApp es GreenAPI; Meta
+permanece histórico y no se reintrodujo un adaptador. La referencia de solicitud se deriva por
+HMAC efímero y los diagnósticos de fondo validan categorías y códigos.
+
+**Archivos:** `.env.example`, `README.md`,
+`backend/app/{core/config.py,core/logging.py,core/observability.py,api/middleware.py,api/routes/admin_operations.py,main.py,services/openai_service.py,services/whatsapp_client.py,services/whatsapp_background_processor.py}`,
+`backend/tests/{test_observability.py,test_openai_service.py,test_whatsapp_client.py,test_http_safety.py,test_whatsapp_background_processor.py}`,
+`docs/{fase_10_observabilidad.md,fase_2_whatsapp.md}` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 692 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado;
+`.venv\Scripts\ruff.exe format --check .` → 211 archivos correctos;
+`.venv\Scripts\python.exe -m pip check` → sin conflictos;
+`npm --prefix frontend test -- --run` → 34 aprobadas;
+`npm --prefix frontend run build` → aprobado;
+`git -c core.safecrlf=false diff --check` → aprobado;
+`.venv\Scripts\python.exe -m scripts.f102_tls_smoke --caddy <binario Caddy verificado>` →
+TLS, redirección, rechazo backend, health y CSP correctos. Las pruebas focales de
+observabilidad/configuración/servicios pasaron (110).
+
+**Seguridad:** eventos y métricas solo contienen categorías cerradas, plantilla de ruta,
+estado, duración y conteos; no incluyen texto, remitente, cuerpo, URL con token ni credenciales.
+El ID de solicitud controlado por cliente se HMAC antes de registrarlo. La ruta de métricas
+exige HTTPS, sesión y `AUDIT_READ` (solo rol `owner`), y responde `no-store`; los tests verifican
+rechazo anónimo y de `viewer`, así como ausencia de marcadores privados. Los diagnósticos de
+fondo descartan categorías ajenas y códigos no numéricos.
+
+**Riesgos y pendientes:** los contadores, histogramas, alertas y umbral diario de costo estimado
+viven en memoria de un proceso; varios workers requieren agregación externa. Las alertas se
+emiten en stdout JSON, pero no se probó entrega a un operador; el despliegue debe configurar
+colector, reglas, retención y prueba de notificación. La estimación excluye llamadas sin `usage`,
+fallos posiblemente facturados y otros cargos: debe conciliarse con costos reales de OpenAI y
+sus tarifas vigentes. No se hicieron llamadas reales a OpenAI/GreenAPI ni se midió una factura.
+La cola de fondo tras ACK sigue sin ser durable.
+
+**Siguiente:** F10.5 — Dependency/secret scanning (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

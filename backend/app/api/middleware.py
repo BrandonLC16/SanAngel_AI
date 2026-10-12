@@ -9,6 +9,7 @@ from fastapi import Request, Response
 from backend.app.api.errors import REQUEST_ID_HEADER, create_error_response
 from backend.app.api.transport_security import apply_security_headers
 from backend.app.core.logging import http_logger
+from backend.app.core.observability import get_operational_metrics, request_reference
 
 RequestHandler = Callable[[Request], Awaitable[Response]]
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -45,10 +46,10 @@ def log_request(
     http_logger.log(
         log_level,
         (
-            "request_complete request_id=%s method=%s endpoint=%s "
+            "request_complete request_ref=%s method=%s endpoint=%s "
             "status_code=%d duration_ms=%.2f error_category=%s"
         ),
-        request.state.request_id,
+        request_reference(request.state.request_id),
         request.method,
         get_route_template(request),
         status_code,
@@ -76,11 +77,20 @@ async def request_context_middleware(request: Request, call_next: RequestHandler
 
     apply_security_headers(request, response)
     response.headers[REQUEST_ID_HEADER] = request.state.request_id
+    duration_ms = (perf_counter() - started_at) * 1000
     log_request(
         request,
         status_code=response.status_code,
-        duration_ms=(perf_counter() - started_at) * 1000,
+        duration_ms=duration_ms,
         error_category=getattr(request.state, "error_category", "none"),
+    )
+    get_operational_metrics().record_http(
+        method=request.method,
+        endpoint=get_route_template(request),
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+        error_category=getattr(request.state, "error_category", "none"),
+        request_id=request.state.request_id,
     )
     return response
 
