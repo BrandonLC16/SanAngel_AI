@@ -66,6 +66,9 @@ purgan en el siguiente login de la sucursal. Estas medidas siguen la recomendaci
 Las sesiones son revocables y no deslizantes: expiran ocho horas después del login. Desactivar
 un `AdminUser` impide usar sus sesiones existentes. Rotar `ADMIN_AUTH_KEY` cambia los tokens CSRF
 y las claves de throttling; la sesión opaca sigue válida hasta su vencimiento o revocación.
+Para una rotación o incidente, `python -m backend.app.cli.revoke_admin_sessions --apply` revoca
+atómicamente las sesiones activas de la sucursal configurada antes de reiniciar con la nueva
+clave. El [procedimiento de F10.3](fase_10_secrets.md) cubre la secuencia completa.
 
 ## Límites
 

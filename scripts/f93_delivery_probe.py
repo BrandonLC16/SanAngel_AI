@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pydantic import ValidationError
 
-from backend.app.core.config import Settings
+from backend.app.core.config import get_settings
 
 WEBHOOK_PATH = "/api/v1/whatsapp/webhook"
 MAX_BODY_BYTES = 65_536
@@ -146,7 +146,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        settings = Settings()
+        settings = get_settings()
         if settings.green_api_webhook_token is None or settings.green_api_instance_id is None:
             raise ValueError("missing webhook configuration")
         handler = make_handler(

@@ -1,6 +1,8 @@
+import os
 import re
 from functools import lru_cache
 from ipaddress import ip_address
+from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -14,6 +16,50 @@ TrustedProxyIps = Annotated[tuple[str, ...], NoDecode]
 DEFAULT_GREEN_API_URL = "https://api.green-api.com"
 DEFAULT_DATABASE_URL = "sqlite+pysqlite:///./carniceria.db"
 BRANCH_CODE_PATTERN = re.compile(r"[a-z][a-z0-9-]{1,47}")
+SECRET_FILE_NAMES = (
+    "OPENAI_API_KEY",
+    "GREEN_API_TOKEN_INSTANCE",
+    "GREEN_API_WEBHOOK_TOKEN",
+    "ADMIN_AUTH_KEY",
+    "CONVERSATION_IDENTITY_KEY",
+)
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _managed_secrets_dir(required_names: tuple[str, ...]) -> Path:
+    """Require production credentials from an external, manager-mounted directory."""
+
+    raw_dir = os.environ.get("SECRETS_DIR", "")
+    directory = Path(raw_dir)
+    if not raw_dir or not directory.is_absolute():
+        raise ValueError("production requires an absolute SECRETS_DIR")
+    try:
+        resolved = directory.resolve(strict=True)
+        if not resolved.is_dir() or resolved.is_relative_to(REPOSITORY_ROOT):
+            raise ValueError("invalid production secrets directory")
+        for name in required_names:
+            if os.environ.get(name):
+                raise ValueError(
+                    f"production secret {name} must not come from an environment variable"
+                )
+            candidate = resolved / name
+            target = candidate.resolve(strict=True)
+            if not target.is_relative_to(resolved) or not candidate.is_file():
+                raise ValueError(f"invalid managed secret file: {name}")
+            if not 1 <= candidate.stat().st_size <= 4096:
+                raise ValueError(f"invalid managed secret file size: {name}")
+            content = candidate.read_bytes()
+            if content != content.strip() or any(byte < 32 or byte == 127 for byte in content):
+                raise ValueError(f"invalid managed secret file content: {name}")
+    except OSError:
+        raise ValueError("production secrets are unavailable") from None
+    return resolved
+
+
+def _production_settings_options(required_names: tuple[str, ...]) -> dict[str, object]:
+    """Disable dotenv and require every production secret before model validation."""
+
+    return {"_env_file": None, "_secrets_dir": _managed_secrets_dir(required_names)}
 
 
 def validate_branch_code(value: str) -> str:
@@ -357,6 +403,10 @@ def get_assistant_settings() -> AssistantSettings:
 def get_conversation_identity_settings() -> ConversationIdentitySettings:
     """Load a fixed branch and an independent identity key for this process."""
 
+    if get_http_settings().app_env == "production":
+        return ConversationIdentitySettings(
+            **_production_settings_options(("CONVERSATION_IDENTITY_KEY",))
+        )
     return ConversationIdentitySettings()
 
 
@@ -364,6 +414,8 @@ def get_conversation_identity_settings() -> ConversationIdentitySettings:
 def get_admin_auth_settings() -> AdminAuthSettings:
     """Load admin authentication only for its private route or provisioning CLI."""
 
+    if get_http_settings().app_env == "production":
+        return AdminAuthSettings(**_production_settings_options(("ADMIN_AUTH_KEY",)))
     return AdminAuthSettings()
 
 
@@ -371,4 +423,21 @@ def get_admin_auth_settings() -> AdminAuthSettings:
 def get_settings() -> Settings:
     """Return one validated settings instance per application process."""
 
+    if get_http_settings().app_env == "production":
+        return Settings(
+            app_env="production",
+            **_production_settings_options(
+                ("OPENAI_API_KEY", "GREEN_API_TOKEN_INSTANCE", "GREEN_API_WEBHOOK_TOKEN")
+            ),
+        )
     return Settings()
+
+
+def validate_runtime_secrets() -> None:
+    """Fail production startup before accepting traffic if any credential is unavailable."""
+
+    if get_http_settings().app_env == "production":
+        _managed_secrets_dir(SECRET_FILE_NAMES)
+        get_settings()
+        get_admin_auth_settings()
+        get_conversation_identity_settings()

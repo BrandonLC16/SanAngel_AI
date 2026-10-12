@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.2 — HTTPS, proxy y headers (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — F10.2 completada; F10.3 pendiente
+**Subfase activa:** F10.3 — Secrets y rotación (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.3 cerrada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3630,28 +3630,32 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.3 — Secrets y rotación
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+
+**Fecha de inicio:** 2026-10-12
+
+**Fecha de finalización:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] secret manager.
+- [x] secret manager.
 
-- [ ] rotación OpenAI/Meta/admin.
+- [x] rotación OpenAI/Meta/admin.
 
-- [ ] procedimiento.
+- [x] procedimiento.
 
-- [ ] tests/config.
+- [x] tests/config.
 
 
 ### Criterios de aceptación
 
-- [ ] secretos fuera de imagen/repositorio.
+- [x] secretos fuera de imagen/repositorio.
 
 
 ### Seguridad
 
-- [ ] revocar credencial comprometida.
+- [x] revocar credencial comprometida.
 
 
 ### Prompt para Codex
@@ -9431,6 +9435,55 @@ agregan para solicitudes administrativas; hace falta una política perimetral co
 escalar. La cola de fondo tras el ACK del webhook sigue sin ser durable.
 
 **Siguiente:** F10.3 — Secrets y rotación (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.3 Secrets y rotación
+
+**Fase/subfase:** Fase 10 / F10.3. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.4 permanece `⬜ PENDIENTE`.
+
+**Cambios:** `SECRETS_DIR` obliga en producción a cargar cinco credenciales desde archivos de
+un gestor montado fuera del repositorio; se rechazan secretos en variables de entorno, rutas
+internas, archivos faltantes, demasiado grandes o con controles/saltos de línea. El runner
+comprueba el montaje antes de escuchar y las sondas usan la misma configuración. `.dockerignore`
+excluye archivos locales de secretos del contexto de imagen. Se agregó revocación local y atómica
+de todas las sesiones administrativas activas de la sucursal configurada con `--apply`. El
+procedimiento cubre rotación normal e incidente de OpenAI, GreenAPI y admin; la mención Meta es
+histórica y su token antiguo, si existe, debe revocarse en Meta. No se reintrodujo Meta al runtime.
+
+**Archivos:** `.dockerignore`, `.env.example`, `README.md`,
+`backend/app/{core/config.py,services/admin_auth_service.py,cli/create_admin_user.py,cli/revoke_admin_sessions.py}`,
+`backend/tests/{test_managed_secrets.py,test_admin_auth.py,test_repository_security.py}`,
+`scripts/{run_backend.py,f102_tls_smoke.py,f93_delivery_probe.py,f93_target_gate.py}`,
+`docs/{fase_10_secrets.md,fase_10_https.md,fase_8_auth.md}` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 680 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado;
+`.venv\Scripts\ruff.exe format --check .` → 207 archivos correctos;
+`.venv\Scripts\python.exe -m pip check` → sin conflictos;
+`npm --prefix frontend test -- --run` → 34 aprobadas;
+`npm --prefix frontend run build` → aprobado;
+`git -c core.safecrlf=false diff --check` → aprobado;
+`.venv\Scripts\python.exe -m scripts.f102_tls_smoke --caddy <binario Caddy verificado>` →
+TLS, redirección, rechazo backend, health y CSP correctos. `git ls-files` mostró solo
+`.env.example` entre `.env*`, sin archivos secretos versionados.
+
+**Seguridad:** el arranque productivo falla sin las cinco credenciales externas, no vuelve a
+`.env` y nunca imprime sus valores. Los destinos del montaje no pueden salir de ese directorio.
+La revocación admin filtra por sucursal y las pruebas demuestran que otra sucursal conserva sus
+sesiones. Ante compromiso se revoca primero la clave en OpenAI/GreenAPI o las sesiones locales;
+un simple cambio de `ADMIN_AUTH_KEY` no invalida cookies existentes. El webhook no acepta el
+token anterior durante la rotación y no confirma solicitudes con credenciales inválidas.
+
+**Riesgos y pendientes:** no existe Dockerfile ni imagen de producción en F10.3; se probó el
+contexto excluido estáticamente, y la comprobación de una imagen reproducible corresponde a
+F10.6. No se usaron cuentas reales de OpenAI, GreenAPI o Meta ni se verificó revocación remota;
+cada despliegue debe ejecutar el procedimiento con su gestor y confirmar tráfico y sesiones.
+La rotación de `CONVERSATION_IDENTITY_KEY` requiere una migración específica para preservar
+identidad y descifrado. La cola de webhook tras ACK sigue sin ser durable.
+
+**Siguiente:** F10.4 — Observabilidad y costos (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

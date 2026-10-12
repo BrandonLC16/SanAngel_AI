@@ -17,8 +17,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.api.routes.admin_auth import COOKIE_NAME, get_admin_auth_service
 from backend.app.cli.create_admin_user import main as create_admin_main
+from backend.app.cli.revoke_admin_sessions import main as revoke_admin_main
 from backend.app.core.admin_roles import AdminRole
-from backend.app.core.config import AdminAuthSettings, HttpSettings, get_database_settings
+from backend.app.core.config import (
+    AdminAuthSettings,
+    HttpSettings,
+    get_admin_auth_settings,
+    get_database_settings,
+    get_http_settings,
+)
 from backend.app.core.exceptions import AdminAuthenticationError, AdminRateLimitError
 from backend.app.db.models.admin_user import (
     AdminLoginThrottle,
@@ -477,6 +484,62 @@ def test_local_cli_can_explicitly_provision_branch_owner(
     with sessions() as session:
         user = session.scalar(select(AdminUser).where(AdminUser.username == "owner"))
         assert user is not None and user.role == AdminRole.OWNER
+
+
+def test_local_revoke_invalidates_only_configured_branch_sessions(
+    sessions: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    first = AdminAuthService(sessions, settings=settings("sucursal-uno"))
+    second = AdminAuthService(sessions, settings=settings("sucursal-dos"))
+    first.create_user("owner", PASSWORD)
+    second.create_user("owner", PASSWORD)
+    first_token = first.login("owner", PASSWORD, peer="test-one").token
+    second_token = second.login("owner", PASSWORD, peer="test-two").token
+
+    monkeypatch.setenv("ASSISTANT_BRANCH_CODE", "sucursal-uno")
+    monkeypatch.setenv("ADMIN_AUTH_KEY", AUTH_KEY)
+    get_http_settings.cache_clear()
+    get_admin_auth_settings.cache_clear()
+    try:
+        assert revoke_admin_main([]) == 2
+        first.get_session(first_token)
+        second.get_session(second_token)
+        assert revoke_admin_main(["--apply"]) == 0
+        assert "Sesiones administrativas revocadas: 1." in capsys.readouterr().out
+        with pytest.raises(AdminAuthenticationError):
+            first.get_session(first_token)
+        second.get_session(second_token)
+        assert revoke_admin_main(["--apply"]) == 0
+        assert "Sesiones administrativas revocadas: 0." in capsys.readouterr().out
+    finally:
+        get_http_settings.cache_clear()
+        get_admin_auth_settings.cache_clear()
+
+
+def test_production_revoke_cli_uses_mounted_admin_key(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = AdminAuthService(sessions, settings=settings())
+    service.create_user("owner", PASSWORD)
+    token = service.login("owner", PASSWORD, peer="test-peer").token
+    mount = tmp_path / "manager-mount"
+    mount.mkdir()
+    (mount / "ADMIN_AUTH_KEY").write_text(AUTH_KEY, encoding="utf-8")
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ASSISTANT_BRANCH_CODE", "sucursal-uno")
+    monkeypatch.setenv("SECRETS_DIR", str(mount))
+    monkeypatch.delenv("ADMIN_AUTH_KEY", raising=False)
+    get_http_settings.cache_clear()
+    get_admin_auth_settings.cache_clear()
+    try:
+        assert revoke_admin_main(["--apply"]) == 0
+        with pytest.raises(AdminAuthenticationError):
+            service.get_session(token)
+    finally:
+        get_http_settings.cache_clear()
+        get_admin_auth_settings.cache_clear()
 
 
 def test_role_update_rolls_back_if_audit_receipt_cannot_be_written(

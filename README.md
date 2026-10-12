@@ -124,7 +124,9 @@ python -m pip install -e ".[dev]"
 Copy-Item .env.example .env
 ```
 
-Completa las credenciales solamente en `.env`. Ese archivo está ignorado por Git; nunca guardes
+Para desarrollo local, completa las credenciales solamente en `.env`, ignorado por Git. En
+producción, usa el [montaje de un secret manager y el procedimiento de rotación](docs/fase_10_secrets.md):
+`SECRETS_DIR` apunta a cinco archivos externos al repositorio y a la imagen. Nunca guardes
 tokens reales en archivos versionados, comandos compartidos, logs o documentación.
 
 En cada una de las siete instalaciones configura valores propios para:
@@ -145,7 +147,8 @@ de 43 caracteres:
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Copia el resultado directamente a `GREEN_API_WEBHOOK_TOKEN` y al `webhookUrlToken` de GreenAPI.
+Copia el resultado a `GREEN_API_WEBHOOK_TOKEN` en `.env` local o al archivo homónimo del gestor
+en producción, y al `webhookUrlToken` de GreenAPI. No lo guardes en el historial del shell.
 No lo reutilices como token de instancia ni lo compartas. Un valor anterior de menos de 32
 caracteres debe rotarse antes del próximo arranque.
 
@@ -156,11 +159,12 @@ conversaciones anteriores sin una migración; un mensaje entrante posterior inic
 
 ## Configuración
 
-`backend.app.core.config` es el único punto de lectura de variables de entorno. Las credenciales
+`backend.app.core.config` centraliza la configuración y los secretos montados. Las credenciales
 se representan con `SecretStr` y no aparecen en `repr`, serializaciones ni errores de validación.
 
 Variables relevantes:
 
+- `SECRETS_DIR`: ruta absoluta al montaje del gestor en producción;
 - `ASSISTANT_BRANCH_CODE`: código inmutable de la única sucursal atendida por esta instalación;
 - `CONVERSATION_IDENTITY_KEY`: secreto backend-only para derivar la identidad externa opaca y
   cifrar el destinatario de respuestas humanas;
@@ -509,6 +513,11 @@ declaración `X-Forwarded-Proto: https` desde una IP de proxy configurada. Caddy
 sirve el panel con CSP bajo el mismo origen. El arranque productivo desactiva la interpretación
 automática de cabeceras de proxy de Uvicorn y mantiene el backend en loopback.
 
+F10.3 carga en producción cinco credenciales desde un [secret manager montado fuera del
+repositorio y de la imagen](docs/fase_10_secrets.md). El arranque falla si falta alguna; la
+rotación exige reiniciar los procesos y revocar la versión anterior. El procedimiento incluye
+OpenAI, GreenAPI y sesiones administrativas, además de la revocación de tokens Meta históricos.
+
 ## Servicio OpenAI y chat interno
 
 `OpenAIService` encapsula el cliente asíncrono oficial de Responses API. El modelo, timeout,
@@ -553,13 +562,13 @@ Los placeholders de prueba no son credenciales reales.
   WhatsApp sin redactar.
 - La URL configurable de GreenAPI tiene allowlist HTTPS para reducir riesgo SSRF.
 - El token del webhook es independiente del token de instancia.
-- Un token local que no cumpla la longitud y formato requeridos produce un fallo cerrado; se debe
-  rotar el mismo valor en `.env` y en `webhookUrlToken` de GreenAPI antes de reiniciar.
+- Un token local que no cumpla la longitud y formato requeridos produce un fallo cerrado. La
+  rotación productiva sincroniza el archivo montado y `webhookUrlToken` de GreenAPI según F10.3.
 - CORS usa orígenes explícitos y nunca `*`.
 - La Fase 2 valida el MVP y no declara el sistema production-ready. F7.3 ya persiste recibos;
   antes de producción faltan, entre otros controles, conciliación de reservas ambiguas, cola
-  durable, HTTPS estable, rate limiting compartido/perimetral, secret manager, rotación operativa
-  de secretos y observabilidad.
+  durable, HTTPS estable, rate limiting compartido/perimetral, despliegue efectivo del secret
+  manager y observabilidad.
 - El backend y el túnel temporal están detenidos; la URL `trycloudflare.com` usada en F2.9 ya no
   es válida.
 

@@ -6,6 +6,8 @@ SENSITIVE_ENV_NAMES = {
     "OPENAI_API_KEY",
     "GREEN_API_TOKEN_INSTANCE",
     "GREEN_API_WEBHOOK_TOKEN",
+    "ADMIN_AUTH_KEY",
+    "CONVERSATION_IDENTITY_KEY",
 }
 
 
@@ -44,6 +46,17 @@ def test_gitignore_protects_local_environment_without_hiding_example() -> None:
     assert ".env" in ignore_rules
     assert ".env.*" in ignore_rules
     assert "!.env.example" in ignore_rules
+    assert "*.assistant-profile.json" in ignore_rules
+
+
+def test_docker_context_excludes_local_secrets() -> None:
+    ignore_rules = {
+        line.strip()
+        for line in (REPOSITORY_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    assert {".env", ".env.*", "**/.env", "**/.env.*", "secrets/", "**/secrets/"} <= ignore_rules
     assert "*.assistant-profile.json" in ignore_rules
 
 

@@ -70,12 +70,35 @@ def run(caddy: Path) -> None:
         config_path = test_dir / "Caddyfile"
         config_path.write_text(caddyfile, encoding="utf-8")
 
+        secret_dir = test_dir / "managed-secrets"
+        secret_dir.mkdir()
+        for name in (
+            "OPENAI_API_KEY",
+            "GREEN_API_TOKEN_INSTANCE",
+            "GREEN_API_WEBHOOK_TOKEN",
+            "ADMIN_AUTH_KEY",
+            "CONVERSATION_IDENTITY_KEY",
+        ):
+            (secret_dir / name).write_text(
+                f"test-only-f102-{name.lower()}-placeholder", encoding="utf-8"
+            )
+
         environment = os.environ.copy()
+        for name in (
+            "OPENAI_API_KEY",
+            "GREEN_API_TOKEN_INSTANCE",
+            "GREEN_API_WEBHOOK_TOKEN",
+            "ADMIN_AUTH_KEY",
+            "CONVERSATION_IDENTITY_KEY",
+        ):
+            environment.pop(name, None)
         environment.update(
             APP_ENV="production",
             APP_HOST="127.0.0.1",
             APP_PORT=str(BACKEND_PORT),
             TRUSTED_PROXY_IPS="127.0.0.1",
+            ASSISTANT_BRANCH_CODE="sucursal-prueba",
+            SECRETS_DIR=str(secret_dir),
             XDG_DATA_HOME=str(test_dir),
             XDG_CONFIG_HOME=str(test_dir),
         )

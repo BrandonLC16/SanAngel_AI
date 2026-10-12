@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from backend.app.core.config import Settings, get_conversation_identity_settings
+from backend.app.core.config import get_conversation_identity_settings, get_settings
 from backend.app.db.models.admin_user import AdminUser
 from backend.app.db.models.conversation import Conversation
 from backend.app.db.models.conversation_responder_state import ConversationResponderState
@@ -240,7 +240,7 @@ def main() -> None:
     if re.fullmatch(r"[0-9a-f]{64}", args.expected_text_sha256) is None:
         raise SystemExit("Invalid test message digest")
     try:
-        settings = Settings()
+        settings = get_settings()
         if settings.green_api_webhook_token is None or settings.green_api_instance_id is None:
             raise ValueError("missing webhook configuration")
         target, eligible = _target_and_eligibility(args.conversation_id, args.operator)

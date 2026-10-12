@@ -22,6 +22,9 @@ $env:APP_ENV = 'production'
 $env:APP_HOST = '127.0.0.1'
 $env:APP_PORT = '8000'
 $env:TRUSTED_PROXY_IPS = '127.0.0.1'
+$env:ASSISTANT_BRANCH_CODE = 'sucursal-ejemplo'  # reemplazar por el código asignado
+$env:GREEN_API_INSTANCE_ID = '1234567890'  # reemplazar por la instancia asignada
+$env:SECRETS_DIR = 'C:/ruta/gestor/secretos'  # montaje externo con cinco archivos
 $env:PUBLIC_DOMAIN = 'panel.ejemplo.invalid'  # reemplazar por DNS real
 $env:PANEL_DIST = 'C:/ruta/instalacion/frontend/dist'
 caddy validate --config deploy/Caddyfile --adapter caddyfile
@@ -29,7 +32,10 @@ python -m scripts.run_backend
 # En otro proceso o servicio: caddy run --config deploy/Caddyfile --adapter caddyfile
 ```
 
-La configuración productiva de la aplicación se guarda en el `.env` local ignorado por Git;
+La configuración productiva no secreta de la aplicación se entrega como variables de entorno;
+los cinco secretos se montan desde un gestor externo conforme al
+[procedimiento de F10.3](fase_10_secrets.md). `SECRETS_DIR` debe apuntar al montaje y el
+arranque falla si falta una credencial. En desarrollo puede usarse el `.env` local ignorado por Git.
 `PUBLIC_DOMAIN` y `PANEL_DIST` se entregan al proceso de Caddy. La URL de GreenAPI debe ser
 `https://<dominio>/api/v1/whatsapp/webhook`; el proxy conserva `Authorization` y la ruta.
 Mantener las dos aplicaciones como servicios supervisados. No usar el servidor de Vite para

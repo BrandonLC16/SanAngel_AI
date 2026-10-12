@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.app.core.admin_roles import AdminRole
-from backend.app.core.config import AdminAuthSettings, DatabaseSettings
+from backend.app.core.config import get_admin_auth_settings, get_database_settings
 from backend.app.core.exceptions import ApplicationError
 from backend.app.db.session import create_database_engine, create_database_session_factory
 from backend.app.services.admin_auth_service import AdminAuthService
@@ -25,8 +25,8 @@ def main(argv: list[str] | None = None) -> int:
         confirmation = getpass.getpass("Confirmar contraseña: ")
         if password != confirmation:
             raise ValueError("password confirmation mismatch")
-        settings = AdminAuthSettings()
-        database = DatabaseSettings()
+        settings = get_admin_auth_settings()
+        database = get_database_settings()
         engine = create_database_engine(database.database_url.get_secret_value())
         AdminAuthService(create_database_session_factory(engine), settings=settings).create_user(
             args.username, password, role=AdminRole(args.role)

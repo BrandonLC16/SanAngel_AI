@@ -4,7 +4,7 @@ from ipaddress import ip_address
 
 import uvicorn
 
-from backend.app.core.config import HttpSettings, get_http_settings
+from backend.app.core.config import HttpSettings, get_http_settings, validate_runtime_secrets
 
 
 def server_config(settings: HttpSettings) -> uvicorn.Config:
@@ -25,6 +25,7 @@ def server_config(settings: HttpSettings) -> uvicorn.Config:
 
 
 def main() -> None:
+    validate_runtime_secrets()
     uvicorn.Server(server_config(get_http_settings())).run()
 
 

@@ -367,6 +367,26 @@ class AdminAuthService:
         except SQLAlchemyError:
             raise ServiceUnavailableError("admin session revocation failed") from None
 
+    def revoke_all_sessions(self) -> int:
+        """Local incident operation: invalidate active sessions of this installation only."""
+
+        now = datetime.now(UTC)
+        try:
+            with self._sessions.begin() as session:
+                branch_id = self._branch_id(session)
+                result = session.execute(
+                    update(AdminSession)
+                    .where(
+                        AdminSession.branch_id == branch_id,
+                        AdminSession.revoked_at.is_(None),
+                        AdminSession.expires_at > now,
+                    )
+                    .values(revoked_at=now)
+                )
+                return result.rowcount
+        except SQLAlchemyError:
+            raise ServiceUnavailableError("admin session revocation failed") from None
+
     def _increment_bucket(
         self, session: Session, branch_id: int, kind: str, value: str, now: datetime
     ) -> int:
