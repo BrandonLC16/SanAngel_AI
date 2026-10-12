@@ -7,6 +7,7 @@ from urllib.parse import unquote_to_bytes
 
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict
+from starlette.requests import ClientDisconnect
 
 from backend.app.api.admin_authorization import require_admin_csrf, require_permission
 from backend.app.core.admin_roles import AdminPermission
@@ -35,6 +36,12 @@ class PriceImportTooLarge(ApplicationError):
     error_code = "price_import_too_large"
     public_message = "El archivo supera el límite de 2 MiB."
     status_code = 413
+
+
+class PriceImportReadTimeout(ApplicationError):
+    error_code = "price_import_read_timeout"
+    public_message = "La carga del archivo tardó demasiado."
+    status_code = 408
 
 
 class PriceImportReviewUnavailable(ApplicationError):
@@ -77,11 +84,15 @@ async def _bounded_workbook(request: Request) -> bytes:
             raise InvalidRequestError() from None
     chunks: list[bytes] = []
     size = 0
-    async for chunk in request.stream():
-        size += len(chunk)
-        if size > MAX_PRICE_IMPORT_BYTES:
-            raise PriceImportTooLarge()
-        chunks.append(chunk)
+    try:
+        async with asyncio.timeout(request.app.state.resource_limits.body_timeout_seconds):
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > MAX_PRICE_IMPORT_BYTES:
+                    raise PriceImportTooLarge()
+                chunks.append(chunk)
+    except (TimeoutError, ClientDisconnect):
+        raise PriceImportReadTimeout() from None
     return b"".join(chunks)
 
 

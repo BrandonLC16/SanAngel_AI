@@ -2,9 +2,9 @@
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
 **Última actualización:** 2026-10-12
-**Fase activa:** Fase 9 — Atención humana desde el panel (`✅ COMPLETADO`)
-**Subfase activa:** F9.5 — Auditoría y cierre (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** ✅ COMPLETADO — Fase 9 cerrada; Fase 10 pendiente
+**Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
+**Subfase activa:** F10.1 — Rate limiting y límites de recursos (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — F10.1 completada; F10.2 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3528,37 +3528,41 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Preparar el sistema para exposición pública con controles de seguridad, operación, costos y recuperación.
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-10-12
 
 **Documento guía:** `plan_de_trabajo.md`
 
 
 ## F10.1 — Rate limiting y límites de recursos
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de finalización:** 2026-10-12
+**Documento:** `docs/fase_10_limites.md`
 
 
 ### Alcance
 
-- [ ] webhook/admin/internal endpoints.
+- [x] webhook/admin/internal endpoints.
 
-- [ ] body limits.
+- [x] body limits.
 
-- [ ] timeouts.
+- [x] timeouts.
 
-- [ ] retries.
+- [x] retries.
 
-- [ ] tests.
+- [x] tests.
 
 
 ### Criterios de aceptación
 
-- [ ] abuso básico mitigado.
+- [x] abuso básico mitigado.
 
 
 ### Seguridad
 
-- [ ] no bloquear webhooks legítimos por diseño deficiente.
+- [x] no bloquear webhooks legítimos por diseño deficiente.
 
 
 ### Prompt para Codex
@@ -4368,10 +4372,10 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 
 # 18. Checkpoint actual
 
-**Fase activa:** Fase 9 — Atención humana desde el panel (`✅ COMPLETADO`).
-**Subfase activa:** F9.5 — Auditoría y cierre (`✅ COMPLETADO`, 2026-10-12).
-**Última subfase completada:** F9.5 — Auditoría y cierre.
-**Siguiente subfase recomendada:** F10.1 — Rate limiting y límites de recursos (`⬜ PENDIENTE`); no iniciada.
+**Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`).
+**Subfase activa:** F10.1 — Rate limiting y límites de recursos (`✅ COMPLETADO`, 2026-10-12).
+**Última subfase completada:** F10.1 — Rate limiting y límites de recursos.
+**Siguiente subfase recomendada:** F10.2 — HTTPS, proxy y headers (`⬜ PENDIENTE`); no iniciada.
 **WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
 `sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
 
@@ -9326,6 +9330,53 @@ siguen requiriendo conciliación y el ACK del webhook aún precede a una tarea n
 F9.5 se validó sin envío real adicional por WhatsApp.
 
 **Siguiente:** F10.1 — Rate limiting y límites de recursos (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.1 Rate limiting y límites de recursos
+
+**Fase/subfase:** Fase 10 / F10.1. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.2 sigue `⬜ PENDIENTE`.
+
+**Cambios:** cuotas de token bucket por proceso para administración (120/min por conexión
+directa), chat interno (30/min por conexión directa) y webhook autenticado (100/s sostenidas,
+ráfaga 200 por proceso). El webhook comprueba Bearer antes de consumir cuota o leer cuerpo;
+un 429 no confirma recepción. Los cuerpos JSON se acotan a 64 KiB en administración y 16 KiB
+en chat interno; el webhook a 1 MiB. Una notificación autenticada que excede el límite recibe
+ACK 200 sin procesarse para no retener indefinidamente la cola; un timeout de lectura devuelve
+503 y permite reentrega. La importación Excel conserva su límite de 2 MiB después de sesión y
+CSRF, ahora con plazo de lectura. `HTTP_BODY_READ_TIMEOUT_SECONDS` y las tres cuotas son
+configurables y validadas. No se añadieron reintentos salientes: OpenAI mantiene timeout y
+reintentos acotados; GreenAPI sigue con un intento por envío ambiguo.
+
+**Archivos:** `backend/app/api/resource_limits.py`,
+`backend/app/api/routes/{whatsapp,admin_price_import}.py`, `backend/app/{main.py,core/config.py}`,
+`backend/tests/{test_resource_limits,test_whatsapp_webhook,test_whatsapp_client,test_config}.py`,
+`.env.example`, `README.md`, `docs/{fase_2_whatsapp,fase_10_limites}.md` y este plan.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 654 aprobadas;
+`.venv\Scripts\ruff.exe check .` → aprobado;
+`.venv\Scripts\ruff.exe format --check .` → 199 archivos correctos;
+`npm --prefix frontend test -- --run` → 34 aprobadas;
+`npm --prefix frontend run build` → aprobado;
+`.venv\Scripts\python.exe -m pip check` → sin conflictos;
+`git -c core.safecrlf=false diff --check` → aprobado. Pruebas focales de webhook, panel,
+chat, configuración, timeout y proveedor también pasaron sin internet.
+
+**Seguridad:** la cuota del webhook no usa IP y admite el doble del ritmo sostenido aproximado
+de 50/s descrito por GreenAPI; solicitudes sin token no gastan esa cuota. Exceso temporal
+devuelve 429 para reentrega, no ACK 200. No se confía en `X-Forwarded-For`. Los límites de
+cuerpo cubren `Content-Length` y carga por fragmentos, con plazo de lectura y categorías de
+log sin contenido, IP ni secretos. El login conserva además su bloqueo persistente. Las
+pruebas verifican que errores ambiguos de GreenAPI realizan un solo intento saliente.
+
+**Riesgos y pendientes:** cuotas locales a cada proceso, con hasta 4096 claves por grupo; varios
+workers necesitarán límite compartido en el perímetro. Una notificación autenticada mayor de
+1 MiB se descarta con ACK para impedir que bloquee la cola; su volumen debe medirse en operación
+antes de ajustar el umbral. El ACK del webhook continúa precediendo a una tarea de fondo no
+durable. No se realizó prueba real con GreenAPI ni despliegue público en F10.1.
+
+**Siguiente:** F10.2 — HTTPS, proxy y headers (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

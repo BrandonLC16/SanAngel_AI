@@ -154,6 +154,7 @@ def make_direct_request(raw_body: bytes, webhook_token: str, request_id: str) ->
         "scheme": "http",
         "server": ("testserver", 80),
         "client": ("127.0.0.1", 12345),
+        "app": make_application(),
     }
     body_available = True
 
@@ -327,7 +328,13 @@ def test_unauthenticated_payload_is_rejected_before_body_is_read(
         body_was_read = True
         return b"{}"
 
+    async def track_stream_access(request: Request):
+        nonlocal body_was_read
+        body_was_read = True
+        yield b"{}"
+
     monkeypatch.setattr(Request, "body", track_body_access)
+    monkeypatch.setattr(Request, "stream", track_stream_access)
     application = make_application()
 
     response = asyncio.run(

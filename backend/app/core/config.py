@@ -38,6 +38,10 @@ class HttpSettings(BaseSettings):
     app_port: int = Field(default=8000, ge=1, le=65535)
     cors_allowed_origins: CorsOrigins = ()
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    admin_requests_per_minute: int = Field(default=120, ge=1, le=10_000)
+    internal_requests_per_minute: int = Field(default=30, ge=1, le=10_000)
+    webhook_requests_per_second: int = Field(default=100, ge=1, le=1_000)
+    http_body_read_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -350,3 +350,6 @@ de F2 persistían estos riesgos (la idempotencia en memoria se reemplazó en F7.
   despliegue previstos en fases posteriores;
 - el token local corto utilizado para la prueba debe rotarse tanto en `.env` como en GreenAPI
   antes del próximo arranque; la aplicación falla de forma cerrada mientras no cumpla el formato.
+
+F10.1 incorporó cuotas y límites HTTP por proceso sin modificar el contrato de entrega de
+GreenAPI; su [guía de límites](fase_10_limites.md) documenta 429, reentrega, tamaño y timeout.

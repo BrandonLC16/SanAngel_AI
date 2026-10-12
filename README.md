@@ -180,6 +180,9 @@ Variables relevantes:
 - `GREEN_API_WEBHOOK_TOKEN`: secreto independiente, aleatorio y URL-safe de 32 a 256 caracteres
   para autenticar el webhook;
 - `WHATSAPP_REQUEST_TIMEOUT_SECONDS`: mayor que 0 y hasta 120 segundos, con 15 por defecto;
+- `ADMIN_REQUESTS_PER_MINUTE`, `INTERNAL_REQUESTS_PER_MINUTE` y
+  `WEBHOOK_REQUESTS_PER_SECOND`: cuotas HTTP por instalación;
+- `HTTP_BODY_READ_TIMEOUT_SECONDS`: plazo máximo para leer un cuerpo HTTP;
 - `CHAT_MAX_MESSAGE_CHARS`: entre 1 y 10000, con 2000 por defecto;
 - `CORS_ALLOWED_ORIGINS`: lista separada por comas de orígenes HTTP/HTTPS exactos.
 
@@ -494,6 +497,11 @@ solo muestra metadatos de la sucursal y distingue aceptación en cola de entrega
 [política de privacidad](docs/fase_7_privacidad.md) borra estos eventos a los 30 días o junto
 con su conversación; la purga informa su conteo.
 
+F10.1 añade [límites de solicitudes y cuerpos](docs/fase_10_limites.md) para webhook autenticado,
+panel y chat interno. La lectura HTTP tiene timeout; GreenAPI conserva reentrega cuando recibe
+429 o 503 y el envío saliente no se reintenta automáticamente. Las cuotas son locales a cada
+proceso y no usan encabezados de proxy no confiables.
+
 ## Servicio OpenAI y chat interno
 
 `OpenAIService` encapsula el cliente asíncrono oficial de Responses API. El modelo, timeout,
@@ -543,8 +551,8 @@ Los placeholders de prueba no son credenciales reales.
 - CORS usa orígenes explícitos y nunca `*`.
 - La Fase 2 valida el MVP y no declara el sistema production-ready. F7.3 ya persiste recibos;
   antes de producción faltan, entre otros controles, conciliación de reservas ambiguas, cola
-  durable, HTTPS estable, rate limiting, secret manager, rotación operativa de secretos y
-  observabilidad.
+  durable, HTTPS estable, rate limiting compartido/perimetral, secret manager, rotación operativa
+  de secretos y observabilidad.
 - El backend y el túnel temporal están detenidos; la URL `trycloudflare.com` usada en F2.9 ya no
   es válida.
 

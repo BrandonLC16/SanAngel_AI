@@ -4,6 +4,13 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 
 from backend.app.api.dependencies import get_whatsapp_background_processor
+from backend.app.api.resource_limits import (
+    MAX_WEBHOOK_BODY_BYTES,
+    BodyTooLargeError,
+    InvalidBodyLengthError,
+    ResourceLimits,
+    read_limited_body,
+)
 from backend.app.core.config import Settings, get_settings
 from backend.app.services.whatsapp_background_processor import WhatsAppBackgroundProcessor
 from backend.app.services.whatsapp_webhook_service import WhatsAppWebhookService
@@ -61,7 +68,26 @@ async def receive_whatsapp_webhook(
     ):
         return Response(status_code=status.HTTP_403_FORBIDDEN)
 
-    raw_body = await request.body()
+    limits: ResourceLimits = request.app.state.resource_limits
+    if not limits.webhook.allow("configured-instance"):
+        request.state.error_category = "webhook_rate_limited"
+        return Response(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": "1"},
+        )
+    try:
+        raw_body = await read_limited_body(
+            request,
+            maximum=MAX_WEBHOOK_BODY_BYTES,
+            timeout=limits.body_timeout_seconds,
+        )
+    except (BodyTooLargeError, InvalidBodyLengthError):
+        # A non-200 response would retry the same unusable notification ahead of the queue.
+        request.state.error_category = "webhook_body_rejected"
+        return Response(status_code=status.HTTP_200_OK)
+    except TimeoutError:
+        request.state.error_category = "webhook_body_timeout"
+        return Response(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
     webhook_service = WhatsAppWebhookService(
         max_text_chars=settings.chat_max_message_chars,
         expected_instance_id=configured_instance_id,

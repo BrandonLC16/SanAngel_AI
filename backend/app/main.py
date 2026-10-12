@@ -8,6 +8,7 @@ from backend.app.api.errors import (
     request_validation_error_handler,
 )
 from backend.app.api.middleware import request_context_middleware, safe_exception_middleware
+from backend.app.api.resource_limits import ResourceLimits, resource_limit_middleware
 from backend.app.api.routes.admin import router as admin_router
 from backend.app.api.routes.admin_audit import router as admin_audit_router
 from backend.app.api.routes.admin_auth import router as admin_auth_router
@@ -31,9 +32,11 @@ def create_app(settings: HttpSettings | None = None) -> FastAPI:
 
     application = FastAPI(title=http_settings.app_name)
     application.state.price_import_pending = AdminPriceImportPendingStore()
+    application.state.resource_limits = ResourceLimits(http_settings)
     application.add_exception_handler(ApplicationError, application_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.middleware("http")(safe_exception_middleware)
+    application.middleware("http")(resource_limit_middleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=list(http_settings.cors_allowed_origins),

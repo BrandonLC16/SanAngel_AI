@@ -97,7 +97,11 @@ def test_green_api_status_errors_are_mapped(
     status_code: int,
     expected_error: type[Exception],
 ) -> None:
+    calls = 0
+
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
         return httpx.Response(status_code, json={"code": status_code, "description": "private"})
 
     with pytest.raises(expected_error) as exc_info:
@@ -105,6 +109,7 @@ def test_green_api_status_errors_are_mapped(
 
     assert "private" not in str(exc_info.value)
     assert TOKEN_INSTANCE_MARKER not in str(exc_info.value)
+    assert calls == 1
 
 
 def test_green_api_status_error_retains_only_numeric_diagnostics() -> None:
@@ -164,7 +169,11 @@ def test_transport_errors_are_mapped(
     provider_error: httpx.RequestError,
     expected_error: type[Exception],
 ) -> None:
+    calls = 0
+
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
         provider_error.request = request
         raise provider_error
 
@@ -173,6 +182,7 @@ def test_transport_errors_are_mapped(
 
     assert "test timeout" not in str(exc_info.value)
     assert "test connection" not in str(exc_info.value)
+    assert calls == 1
 
 
 @pytest.mark.parametrize(

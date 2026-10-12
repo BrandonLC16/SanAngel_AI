@@ -28,6 +28,10 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.app_env == "development"
     assert settings.app_host == "127.0.0.1"
     assert settings.app_port == 8000
+    assert settings.admin_requests_per_minute == 120
+    assert settings.internal_requests_per_minute == 30
+    assert settings.webhook_requests_per_second == 100
+    assert settings.http_body_read_timeout_seconds == 10
     assert settings.cors_allowed_origins == ()
     assert settings.assistant_branch_code == BRANCH_CODE
     assert settings.openai_model == "gpt-5.6"
@@ -204,6 +208,11 @@ def test_invalid_provider_secret_error_does_not_reveal_value(field_name: str) ->
         ("chat_max_message_chars", 10_001),
         ("whatsapp_request_timeout_seconds", 0),
         ("whatsapp_request_timeout_seconds", 121),
+        ("admin_requests_per_minute", 0),
+        ("internal_requests_per_minute", 0),
+        ("webhook_requests_per_second", 0),
+        ("http_body_read_timeout_seconds", 0),
+        ("http_body_read_timeout_seconds", 121),
     ),
 )
 def test_settings_reject_unsafe_numeric_limits(field_name: str, invalid_value: int) -> None:
