@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
+
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --fund=false
+COPY frontend/index.html frontend/tsconfig.json frontend/vite.config.js ./
+COPY frontend/src ./src
+RUN npm run build
+
+FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+
+ENV PANEL_DIST=/srv \
+    XDG_CONFIG_HOME=/config \
+    XDG_DATA_HOME=/data
+
+# The upstream binary carries a low-port file capability; the copy drops it.
+RUN addgroup -S -g 10001 sanangel \
+    && adduser -S -D -u 10001 -G sanangel sanangel \
+    && mkdir -p /srv /data /config \
+    && cp /usr/bin/caddy /usr/local/bin/caddy-unprivileged \
+    && chown -R 10001:10001 /srv /data /config
+
+COPY --from=build --chown=10001:10001 /build/dist /srv
+COPY deploy/Caddyfile /etc/caddy/Caddyfile.site
+COPY deploy/Caddyfile.container /etc/caddy/Caddyfile
+
+USER 10001:10001
+EXPOSE 8080 8443
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD ["sh", "-c", "nc -z -w 2 127.0.0.1 8443"]
+CMD ["/usr/local/bin/caddy-unprivileged", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

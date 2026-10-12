@@ -3,8 +3,8 @@
 
 **Última actualización:** 2026-10-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.5 — Dependency/secret scanning (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.5 cerrada
+**Subfase activa:** F10.6 — Docker seguro (`✅ COMPLETADO`, 2026-10-12)
+**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.7 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3770,34 +3770,36 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.6 — Docker seguro
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-12
+**Fecha de finalización:** 2026-10-12
 
 
 ### Alcance
 
-- [ ] Dockerfile backend.
+- [x] Dockerfile backend.
 
-- [ ] frontend si existe.
+- [x] frontend si existe.
 
-- [ ] non-root.
+- [x] non-root.
 
-- [ ] healthcheck.
+- [x] healthcheck.
 
-- [ ] .dockerignore.
+- [x] .dockerignore.
 
-- [ ] una imagen común y siete configuraciones externas de despliegue.
+- [x] una imagen común y siete configuraciones externas de despliegue.
 
 
 ### Criterios de aceptación
 
-- [ ] imagen reproducible.
+- [x] imagen reproducible.
 
 
 ### Seguridad
 
-- [ ] secrets no baked.
+- [x] secrets no baked.
 
-- [ ] perfiles/DB de sucursal no incluidos en la imagen común.
+- [x] perfiles/DB de sucursal no incluidos en la imagen común.
 
 
 ### Prompt para Codex
@@ -9590,6 +9592,60 @@ debe fallar cerrado. `pip-audit` omite el paquete local no publicado, pero exami
 dependencias instaladas. No se cambió la configuración remota ni se publicaron hallazgos.
 
 **Siguiente:** F10.6 — Docker seguro (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-12 — F10.6 Docker seguro
+
+**Fase/subfase:** Fase 10 / F10.6. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.7 permanece `⬜ PENDIENTE`.
+
+**Cambios:** Dockerfiles de backend y panel/Caddy con bases y frontend de Docker fijados por
+digest, lock Python con hashes y `npm ci`; Uvicorn pasó a dependencia de ejecución. Ambas
+imágenes usan UID/GID 10001 y healthcheck. `.dockerignore` permite solo contexto necesario. Una
+plantilla Compose reutiliza el mismo par de imágenes para siete proyectos, con alcance,
+credenciales y volúmenes independientes por sucursal. Caddy comparte la red del backend para
+preservar el bind loopback y termina TLS en puertos internos altos. CI compila ambas imágenes,
+comprueba usuario/healthcheck y audita el lock Python.
+
+**Archivos:** `Dockerfile`, `Dockerfile.frontend`, `.dockerignore`, `requirements-prod.lock`,
+`pyproject.toml`, `scripts/container_healthcheck.py`, `backend/tests/test_container_healthcheck.py`,
+`deploy/{compose.branch.yml,Caddyfile.container}`, `.github/workflows/security.yml`,
+`docs/fase_10_docker.md`, `README.md` y este plan.
+
+**Comandos y resultados:** `pytest -q` → 702 aprobadas; `ruff check .` y
+`ruff format --check .` → aprobados (217 archivos); `python -m pip check` → sin conflictos;
+`npm --prefix frontend test` → 34 aprobadas; `npm --prefix frontend run build` → correcto;
+`npm audit --prefix frontend` → 0 vulnerabilidades; `pip-audit --require-hashes -r
+requirements-prod.lock` → sin vulnerabilidades conocidas; `actionlint
+.github/workflows/security.yml` y `git -c core.safecrlf=false diff --check` → correctos.
+`docker build` construyó backend y panel. Dos builds sin caché produjeron hashes de contenido
+idénticos para aplicación/dependencias y assets del panel. Exportaciones OCI normalizadas con y
+sin caché dieron los mismos digests: backend
+`sha256:95f0bdb39196bdf7b26c235927cb0fddd07b1eed8e55ce6838eb7338e2d2fe4a` y panel
+`sha256:32eb0aca50fa285f630cc18eb1761d9ca1df6a4171b347cceecc9bde1aac0bac`.
+`docker compose config` validó dos proyectos sintéticos con mismas imágenes y sucursal,
+instancia y volúmenes distintos. `docker compose up -d`, `alembic upgrade head`, `docker
+inspect` y `curl` confirmaron ambos healthchecks saludables, migración en volumen, UID 10001,
+raíz de solo lectura, capacidades eliminadas, `no-new-privileges`, HTTPS `/health` 200, panel
+200 con CSP/HSTS y HTTP 308. Los contenedores y volúmenes de prueba se retiraron con
+`docker compose down -v`.
+
+**Seguridad:** las imágenes no contienen variables de secreto o sucursal, perfiles, DB ni
+archivos `.env`; solo el backend monta secretos externos en solo lectura. No se usaron
+credenciales reales. El puerto 8000 no se publica; el proxy local exacto conserva el control
+de `X-Forwarded-Proto`. El panel no comparte el montaje de secretos. Caddy usa un binario sin
+capability de puerto privilegiado.
+
+**Riesgos y pendientes:** el CI alojado, certificados públicos y las siete instalaciones reales
+no se ejecutaron aquí. Los IDs de `docker build` local pueden variar por metadatos de capas;
+usar exportación OCI con normalización temporal cuando se requiera digest bit a bit estable.
+Las etiquetas locales son mutables: fijar digests al publicar. La revisión automática rechazó
+`Remove-Item` por política, sin motivo adicional, al intentar eliminar archivos temporales con
+valores **sintéticos** en
+`C:\Users\brand\AppData\Local\Temp\sanangel-f106-smoke`; permanecen fuera del repositorio.
+
+**Siguiente:** F10.7 — Backup/restore y continuidad (`⬜ PENDIENTE`), no iniciada.
 
 ---
 

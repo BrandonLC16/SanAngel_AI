@@ -55,6 +55,7 @@ jobs:
           ruff check .
           ruff format --check .
           python -m pip_audit --local --progress-spinner off
+          python -m pip_audit --require-hashes --progress-spinner off -r requirements-prod.lock
 
   frontend:
     runs-on: ubuntu-24.04
@@ -72,3 +73,18 @@ jobs:
           npm --prefix frontend test
           npm --prefix frontend run build
           npm audit --prefix frontend
+
+  containers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build both branch-independent images
+        run: |
+          docker build --build-arg SOURCE_DATE_EPOCH=0 --platform linux/amd64 -f Dockerfile -t sanangel-backend:ci .
+          docker build --build-arg SOURCE_DATE_EPOCH=0 --platform linux/amd64 -f Dockerfile.frontend -t sanangel-panel:ci .
+          test "$(docker image inspect sanangel-backend:ci --format '{{.Config.User}}')" = '10001:10001'
+          test "$(docker image inspect sanangel-panel:ci --format '{{.Config.User}}')" = '10001:10001'
+          test "$(docker image inspect sanangel-backend:ci --format '{{json .Config.Healthcheck}}')" != 'null'
+          test "$(docker image inspect sanangel-panel:ci --format '{{json .Config.Healthcheck}}')" != 'null'

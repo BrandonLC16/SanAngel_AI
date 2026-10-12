@@ -527,6 +527,11 @@ F10.5 incorpora [escaneo de dependencias y secretos en CI](docs/fase_10_scanning
 el lockfile del panel y la historia Git. Dependabot propone actualizaciones semanales sin merge
 automático. El escaneo de secretos solo publica un resultado genérico y no conserva hallazgos.
 
+F10.6 añade [imágenes Docker comunes y despliegue por sucursal](docs/fase_10_docker.md): backend y
+panel/Caddy corren sin root, con healthchecks, bases fijadas por digest, dependencias bloqueadas y
+contexto de build restringido. Cada una de las siete instalaciones aporta su propia configuración,
+secretos montados y volúmenes fuera de las imágenes.
+
 ## Servicio OpenAI y chat interno
 
 `OpenAIService` encapsula el cliente asíncrono oficial de Responses API. El modelo, timeout,
