@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-09-25
+**Última actualización:** 2026-10-10
 **Fase activa:** Fase 9 — Atención humana desde el panel (`🟨 EN_PROGRESO`)
-**Subfase activa:** F9.3 — Respuesta humana por WhatsApp (`⛔ BLOQUEADO`, inicio 2026-09-25)
-**Estado global:** ⛔ BLOQUEADO — F9.3 requiere prueba de recepción en un WhatsApp autorizado
+**Subfase activa:** F9.3 — Respuesta humana por WhatsApp (`✅ COMPLETADO`, 2026-10-10)
+**Estado global:** 🟨 EN_PROGRESO — F9.3 completada; F9.4 permanece pendiente y no iniciada
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 
@@ -3286,7 +3286,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 **Objetivo:** Permitir que un empleado tome una conversación de WhatsApp y responda sin que la IA compita con él.
 
-**Estado:** 🟨 EN_PROGRESO
+**Estado:** ⛔ BLOQUEADO
 **Fecha de inicio:** 2026-09-25
 
 **Documento guía:** `plan_de_trabajo.md`
@@ -3383,8 +3383,9 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F9.3 — Respuesta humana por WhatsApp
 
-**Estado:** ⛔ BLOQUEADO
+**Estado:** ✅ COMPLETADO
 **Fecha de inicio:** 2026-09-25
+**Fecha de reanudación:** 2026-10-10
 
 
 ### Alcance
@@ -3404,7 +3405,7 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ### Criterios de aceptación
 
-- [ ] mensaje manual llega por el mismo canal.
+- [x] mensaje manual llega por el mismo canal (confirmación del destinatario, 2026-10-09).
 
 
 ### Seguridad
@@ -8732,6 +8733,497 @@ no debe exponerse a internet antes de F10.
 
 Siguiente: terminar la validación F9.3 con un chat de prueba autorizado. F9.4 — Handoff
 automático/manual permanece `⬜ PENDIENTE` y no se inició.
+
+---
+
+## 2026-10-09 — F9.3 Preparación local de prueba real
+
+**Fase/subfase:** Fase 9 / F9.3, `⛔ BLOQUEADO` (reanudada 2026-10-09; preparación local realizada).
+**Estado:** `⛔ BLOQUEADO` → `🟨 EN_PROGRESO` → `⛔ BLOQUEADO`.
+
+Preparación: Git estaba limpio; puertos 8000, 8001 y 5173 estaban libres. Python 3.14.6,
+dependencias frontend instaladas y Alembic head `20260925_0012`. El `.env` de la raíz es una
+configuración anterior: no define sucursal, clave de identidad ni clave administrativa, y su
+token de webhook no supera la validación actual. No se identificó una base SQLite operativa en
+la raíz. Se solicitó la ruta de configuración y base vigentes, sin pedir secretos por chat.
+No se cambió ni regeneró `CONVERSATION_IDENTITY_KEY`; no se migró ninguna base.
+En la continuación del 2026-10-09 se añadieron al `.env` ignorado los campos vacíos
+`ASSISTANT_BRANCH_CODE`, `CONVERSATION_IDENTITY_KEY` y `ADMIN_AUTH_KEY`, y se fijó
+`DATABASE_URL=sqlite+pysqlite:///./carniceria.db` para esta instalación nueva. No se creó
+ni migró la base. El token de webhook existente tiene longitud válida, pero contiene `/`, `+`
+y `=` de Base64 estándar; la validación exige caracteres URL-safe `[A-Za-z0-9_-]`. No se
+modificó ese token sin poder sincronizarlo con GreenAPI. Faltan valores locales para los tres
+campos vacíos y reemplazar el token de webhook por uno URL-safe independiente.
+
+Se creó un certificado local para `127.0.0.1` y se agregó a la confianza del usuario. FastAPI
+escucha en `https://127.0.0.1:8000`, el panel Vite en `https://127.0.0.1:5173` con validación
+TLS de su proxy, y una puerta local en `127.0.0.1:8001` permite solo POST a
+`/api/v1/whatsapp/webhook`. Health y HTML del panel devuelven 200. La sesión administrativa
+devuelve 500 mientras falta la configuración vigente. La puerta devuelve 404 para panel, health,
+chat y administración, y 403 para webhook sin `Authorization`. El arranque de `cloudflared`
+fue rechazado por la política de ejecución del entorno; no existe acceso público ni se modificó
+el webhook de GreenAPI. No se envió ningún mensaje.
+
+Archivos: `scripts/f93_webhook_gate.py`, `plan_de_trabajo.md` y `.env` ignorado. Certificado, clave y logs están
+fuera del repositorio, bajo el perfil local del usuario.
+
+Validación ejecutada: `pytest` → 614 aprobadas; pruebas focales backend → 31 aprobadas;
+`ruff check .` y `ruff format --check .` → aprobados; `pip check` → sin conflictos;
+pruebas frontend → 32 aprobadas (8 focales); `npm run build` → aprobado;
+`npm audit --audit-level=high` → una vulnerabilidad alta de la dependencia transitiva `source-map-js`;
+`git diff --check` → aprobado.
+
+Seguridad: servicios ligados a loopback, HTTPS local confiable, cookies Secure y CSRF sin cambios,
+TLS del proxy validado, puerta con ruta y método exactos, sin cuerpos ni tokens en logs. La
+prueba real sigue pendiente: identificar instalación y empleado vigentes, autorizar instancia,
+publicar solo el webhook, recibir mensaje nuevo, tomar el chat, enviar una vez y obtener
+confirmación de recepción del destinatario. Mantener los servicios locales activos mientras se
+espera la información. F9.4 no iniciada.
+
+Continuación del 2026-10-09: el usuario identificó la sucursal como «1». El código de
+configuración se fijó a `sucursal-1` porque el validador exige una letra inicial y al menos dos
+caracteres. Se creó `carniceria.db` desde cero y se aplicó Alembic hasta `20260925_0012`;
+`integrity_check=ok`, sin violaciones de claves foráneas. Se cargó un perfil local ignorado por
+Git con datos comerciales explícitamente no confirmados y sin teléfono. GreenAPI respondió
+`authorized`, conserva `incomingWebhook=yes` y su token de webhook coincide con el local; la
+URL remota está vacía. OpenAI Responses API devolvió texto no vacío en una comprobación real.
+No se envió ningún WhatsApp. Todavía no existe usuario administrativo. Las claves locales de
+identidad y autenticación tienen seis caracteres cada una y son rechazadas por sus validadores
+de 32–256 caracteres URL-safe. Se pidió sustituirlas localmente por claves de prueba válidas e
+independientes; no se cambiaron, imprimieron ni copiaron al plan. Permanece también el bloqueo
+de ejecución del túnel público. Archivos locales adicionales: `.env`,
+`sucursal-1.assistant-profile.json` y `carniceria.db`, todos ignorados por Git.
+
+Continuación posterior del 2026-10-09: el usuario configuró claves nuevas; `Settings`,
+`ConversationIdentitySettings`, `AdminAuthSettings` y `DatabaseSettings` validan sin exponer
+valores. El usuario creó `operador-prueba` con rol `owner` mediante la CLI interactiva local.
+El panel por HTTPS devuelve 401 para una sesión anónima, y la puerta del webhook devuelve 403
+sin autenticación y 200 para un evento no utilizado autenticado. Las validaciones repetidas
+fueron: `pytest` → 614 aprobadas; `ruff check .` y `ruff format --check .` → aprobados;
+`pip check` → sin conflictos; pruebas frontend → 32 aprobadas; build → aprobado;
+`npm audit --audit-level=high` → una vulnerabilidad alta transitiva de `source-map-js`.
+No existe aún sesión administrativa activa ni túnel. La política del entorno rechazó el arranque
+del túnel y la apertura automatizada del navegador; se pidió al usuario iniciar sesión en el
+panel local y abrir un túnel nuevo hacia la puerta `127.0.0.1:8001`, comunicando solo la URL.
+La sesión administrativa fue iniciada después y la base confirma una sesión activa del usuario
+propietario; no se expusieron cookie, token CSRF ni contraseña. El webhook remoto sigue sin URL
+y no se ha enviado ningún WhatsApp. F9.3 continúa bloqueada a
+la espera de la prueba entrante y confirmación de recepción real.
+
+La puerta se publicó finalmente mediante un túnel nuevo supervisado en primer plano. La URL
+temporal `https://lasting-leg-lines-answer.trycloudflare.com/api/v1/whatsapp/webhook` devuelve
+200 para un evento no utilizado autenticado y 403 sin token; `/`, `/health`, panel, admin y chat
+interno devuelven 404. `SetSettings` de GreenAPI confirmó el guardado; después de un 429
+transitorio, `GetSettings` confirmó URL exacta, token coincidente e `incomingWebhook=yes`.
+La sucursal `sucursal-1` tenía cero conversaciones, recibos y mensajes antes de solicitar el
+primer mensaje de prueba. Se pasó F9.3 a `🧪 VALIDACION`. El túnel y servicios locales siguen
+activos; al cerrar la prueba hay que retirar la URL de GreenAPI y detener solo el acceso público.
+
+Continuación de F9.3: el usuario envió un mensaje nuevo desde su WhatsApp de prueba. El diario
+de GreenAPI muestra un evento reciente, pero la base local sigue sin conversaciones, mensajes ni
+recibos entrantes. `GetWebhooksCount` muestra cinco notificaciones pendientes. La primera es un
+mensaje entrante anterior de otro remitente, no el evento reciente de prueba; procesar la cola sin
+filtrar podría generar respuestas automáticas a otros contactos, contrario al alcance autorizado.
+Se dejó `webhookUrl` remoto vacío mientras se resuelve la cola; `incomingWebhook=yes` permanece y
+el token remoto se ajustó al formato explícito `Bearer <token>` documentado por GreenAPI, sin
+exponer el valor. `ReceiveNotification` confirmó el tipo del primer evento sin borrarlo. Se solicitó
+al usuario decidir si pueden retirarse cuatro notificaciones antiguas sin respuesta. No se borró
+ninguna notificación ni recibo, no se envió WhatsApp y F9.3 sigue en `🧪 VALIDACION` sin evidencia
+de recepción. Backend y panel locales continúan en HTTPS, la puerta pública solo expone el webhook,
+y el túnel permanece activo; la URL de GreenAPI está pausada.
+
+Continuación final del 2026-10-09 — F9.3 `⛔ BLOQUEADO`: con autorización explícita del usuario,
+se compararon los identificadores y remitentes en memoria con el diario de GreenAPI y se retiraron
+cuatro notificaciones antiguas de otros contactos mediante `ReceiveNotification` y
+`DeleteNotification`, sin procesarlas ni responderles. Quedaron dos mensajes reales del mismo
+WhatsApp de prueba. Se reactivó la URL temporal con token `Bearer` e `incomingWebhook=yes`;
+`GetSettings` confirmó la configuración, pero durante más de diez minutos GreenAPI no hizo ninguna
+solicitud al túnel (métricas de `cloudflared` sin nuevas peticiones). Por tanto, **no se verificó
+una entrega push directa de GreenAPI**. Para no atribuirla falsamente, se pausó la URL remota y se
+extrajo cada evento real de la cola HTTP de GreenAPI, entregando su cuerpo una sola vez a la ruta
+HTTPS pública autenticada; esta entrega fue iniciada por el operador de la prueba, no por GreenAPI.
+Los dos recibos entrantes locales quedaron `completed` y las notificaciones se retiraron de la
+cola solo después de procesarse. La conversación #1 quedó en la sucursal `sucursal-1`, con
+destinatario cifrado desde el mensaje entrante; no se reconstruyó desde su HMAC.
+
+El primer evento produjo una respuesta automática de IA solamente al WhatsApp de prueba. El
+usuario `operador-prueba`, propietario activo de `sucursal-1`, tomó la conversación desde el panel:
+la base confirmó `HUMAN` y asignación a ese mismo usuario. El segundo evento se procesó en HUMAN
+sin una nueva salida de IA al destinatario (diario saliente: una antes y una después; contador de
+respuestas IA activas: cero). El usuario redactó, revisó y confirmó desde el panel **una sola vez**
+la respuesta humana. `manual_send_receipts` contiene un único recibo `accepted`, actor y sucursal
+correctos, sin `pending`/`uncertain`; el diario saliente de GreenAPI encontró el mismo ID del
+proveedor con estado `sent`. El texto registrado tiene 64 caracteres y omite el punto final del
+texto solicitado de 65 caracteres. No se reintentó ni se envió una corrección, respetando el límite
+de un único envío manual. El usuario confirmó explícitamente que el texto llegó al teléfono; esa
+confirmación, y no `idMessage`, `accepted` ni `sent`, prueba recepción real por WhatsApp.
+
+Validaciones finales: `pytest -q` → 614 aprobadas; `ruff check .` → aprobado;
+`ruff format --check .` → 185 archivos formateados; `pip check` → sin conflictos;
+`npm test` → 32 aprobadas; `npm run build` → aprobado; `npm ls --depth=0` → dependencias presentes;
+`npm audit --audit-level=high` → una vulnerabilidad alta transitiva en `source-map-js` (no se
+modificaron dependencias fuera de F9.3); `git diff --check` → aprobado; Alembic
+`20260925_0012 (head)`, SQLite `integrity_check=ok` y cero violaciones de claves foráneas.
+Health y HTML local respondieron 200; sesión anónima respondió 401; la puerta pública devolvió
+404 para panel, administración y chat. Seguridad: credenciales no impresas, clave de identidad
+sin cambio, cookies Secure/CSRF/TLS conservados, ningún envío manual adicional ni mensaje a
+otros contactos. Al cierre, `webhookUrl` remoto quedó vacío, `incomingWebhook=yes`, token Bearer
+configurado y cola GreenAPI en cero; el túnel y la puerta temporal se detuvieron. FastAPI HTTPS
+y React HTTPS continúan activos solo en loopback. Archivos de trabajo:
+`plan_de_trabajo.md`, `scripts/f93_webhook_gate.py`, más `.env`, perfil y SQLite locales ignorados.
+F9.3 permanece bloqueada por el push directo no probado y el texto exacto incumplido; para una
+nueva prueba habrá que diagnosticar la entrega del proveedor y obtener nueva autorización antes
+de cualquier otro envío manual. F9.4 continúa pendiente y no se inició.
+
+Diagnóstico reanudado el 2026-10-09 (solo F9.3): Git conserva los cambios previos en este plan y
+`scripts/f93_webhook_gate.py`; FastAPI HTTPS y React HTTPS siguen sanos en loopback. GreenAPI
+respondió `authorized`, `webhookUrl` vacío, token Bearer coincidente, cola en cero,
+`incomingWebhook=yes` y `stateWebhook=no`. Según la documentación oficial vigente, `SetSettings`
+puede tardar hasta cinco minutos y reinicia la instancia; se guardó temporalmente
+`incomingWebhook=no` y `stateWebhook=yes` para diagnosticar el push con eventos de estado sin
+riesgo de responder a otros contactos. Se abrió una puerta local en `127.0.0.1:8001` y un túnel
+**nuevo**, distinto del anterior:
+`https://sunshine-creation-variations-titles.trycloudflare.com/api/v1/whatsapp/webhook`.
+TLS público validó; raíz, administración, chat y GET del webhook respondieron 404; POST sin
+autorización respondió 403 y un evento de estado autenticado de prueba respondió 200. Las métricas
+del túnel solo registran esas peticiones locales de prueba, no un push de GreenAPI. La URL remota
+seguía vacía y se pidió al usuario introducir la URL en la consola de GreenAPI, conservando el
+token Bearer local, `incomingWebhook=no` y `stateWebhook=yes`. La cola permanece en cero, no se
+envió ningún WhatsApp adicional y F9.3 sigue `⛔ BLOQUEADO` hasta observar una solicitud real del
+proveedor. Al concluir este diagnóstico hay que vaciar la URL remota y detener túnel/puerta; no
+dejar la URL temporal caducada configurada.
+
+Continuación del diagnóstico F9.3, 2026-10-09: la primera configuración manual de GreenAPI
+contenía un punto final después de `/webhook`; se corrigió la ruta exacta. Ese error afectaba
+esa configuración nueva, pero no explica el intento previo, que ya tenía la ruta correcta y
+ninguna solicitud observada en el túnel. Tras más de cinco minutos, la cola conservó dos eventos
+de estado y el túnel no registró solicitudes de GreenAPI. Un túnel alternativo `localhost.run`
+rotó su hostname durante la prueba y no permitió una comparación concluyente; se retiró de la
+configuración remota. Se abrió otro túnel Cloudflare vigente en
+`https://desperate-surgeons-checks-insured.trycloudflare.com/api/v1/whatsapp/webhook` y se guardó
+esa URL exacta mediante `SetSettings`, con token Bearer coincidente, `incomingWebhook=no` y
+`stateWebhook=yes`. GreenAPI reportó la instancia `authorized`. Tras otro plazo de aplicación
+superior a cinco minutos y un reinicio de diagnóstico (`isReboot=true`), la cola aumentó de dos
+a cuatro eventos de estado, mientras el contador del túnel permaneció en ocho solicitudes,
+todas generadas por pruebas propias. Un POST público sin autenticación respondió 403 y elevó
+el contador a nueve, confirmando que la ruta pública seguía accesible y protegida. No hay
+evidencia de un intento HTTP de GreenAPI que haya alcanzado este túnel; la causa entre la
+salida del proveedor y el borde público requiere registros de entrega del proveedor o una
+prueba comparativa con un endpoint estable. No se enviaron mensajes WhatsApp ni se retiraron
+estos eventos de la cola. FastAPI y React permanecen en HTTPS local; la puerta y el túnel
+temporal siguen activos exclusivamente para diagnóstico. El webhook remoto sigue apuntando a
+esta URL vigente; antes de detener el túnel se debe vaciar `webhookUrl` para no dejar una URL
+caducada. F9.3 continúa `⛔ BLOQUEADO`; F9.4 no se inicia.
+
+Checkpoint de cierre de sesión, 2026-10-09 15:48 (America/Mexico_City) — F9.3
+`⛔ BLOQUEADO`. El usuario termina la sesión; no se reintentó el envío manual ni se envió
+ningún mensaje nuevo. La confirmación telefónica corresponde al único texto previamente
+enviado **sin el punto final**; el criterio de texto exacto y la entrega push directa siguen
+pendientes. La causa específica del fallo push no está demostrada: la URL manual con punto
+final era incorrecta, pero con URL exacta, token coincidente e instancia autorizada tampoco
+se observó solicitud de GreenAPI en el túnel. Se necesita evidencia de entrega/error del
+proveedor o una comparación con endpoint público estable, sin atribuir el fallo al backend.
+
+Se ejecutó `SetSettings` para dejar `webhookUrl` **vacío**, `incomingWebhook=no` y
+`stateWebhook=no`; `GetSettings` confirmó los tres valores y el token Bearer local permaneció
+sin cambios. `GetWebhooksCount` marcó **5** notificaciones tras esa operación; no se borraron
+ni procesaron durante este cierre. La URL `desperate-surgeons-checks-insured.trycloudflare.com`
+ya **no es vigente**. Se detuvieron `cloudflared`, la puerta local, FastAPI y Vite; los puertos
+`20241`, `8001`, `8000` y `5173` quedaron libres. Ningún acceso público temporal sigue
+abierto. La sucursal local sigue en `ASSISTANT_BRANCH_CODE=sucursal-1`; la clave
+`CONVERSATION_IDENTITY_KEY` solo se comprobó como presente y no se modificó. Alembic continúa
+en `20260925_0012 (head)`; no se migró ni eliminó la base.
+
+Validación de este cierre: salud de FastAPI y HTML del panel 200 antes de detenerlos; ruta
+administrativa pública 404; `GetSettings` y `GetWebhooksCount` 200; `alembic current` indicó
+`20260925_0012 (head)`; `git diff --check` aprobó. Las suites completas, lint, formato,
+dependencias y build ya constan en la entrada anterior de F9.3; no se repitieron porque este
+turno solo modificó el plan. Git preserva `plan_de_trabajo.md` modificado y
+`scripts/f93_webhook_gate.py` sin seguimiento, además de la configuración, perfil y SQLite
+locales ignorados; no se hizo commit. No se inició F9.4.
+
+Al reanudar: leer este checkpoint y `git status`, comprobar la configuración y las cinco
+notificaciones **sin eliminarlas ni responder a otros contactos**, y confirmar instancia
+autorizada. Levantar HTTPS local con certificados confiables; crear un **túnel nuevo** hacia
+la puerta que solo permite POST `/api/v1/whatsapp/webhook`, verificar que otras rutas estén
+bloqueadas, y configurar la URL exacta con el Bearer existente. Diagnosticar primero el push
+con `stateWebhook=yes` e `incomingWebhook=no`; obtener registro de entrega de GreenAPI o
+comparar con endpoint estable. Solo después planear una nueva prueba de mensaje entrante
+sin riesgo de respuesta a terceros. Cualquier nuevo envío manual del texto exacto requiere
+autorización nueva; no reintentar el envío previo ni eliminar recibos. Al cerrar la futura
+prueba, vaciar `webhookUrl` antes de detener el nuevo túnel.
+
+Continuación de diagnóstico F9.3, 2026-10-10 — `⛔ BLOQUEADO`:
+
+- `git status --short --branch` al inicio: `main...origin/main`, con el cambio previo en
+  `plan_de_trabajo.md` y `scripts/f93_webhook_gate.py` sin seguimiento. Se preservaron.
+- `Settings()` validó la configuración local de `sucursal-1` y la presencia de ambos secretos
+  GreenAPI sin mostrar valores. Las consultas reales de solo lectura `GetSettings`,
+  `GetStateInstance`, `GetWebhooksCount` y `ReceiveNotification` devolvieron HTTP 200.
+  `webhookUrl` continúa vacío; el token remoto con prefijo Bearer coincide con el local;
+  `incomingWebhook=no`, `stateWebhook=no` y la instancia está `authorized`.
+- La cola contenía cinco notificaciones. `ReceiveNotification` mostró únicamente que la primera
+  es `stateInstanceChanged` con timestamp `2026-10-09T21:26:08Z`; no se imprimió su cuerpo,
+  identificadores ni números, y no se llamó a `DeleteNotification` ni a
+  `ClearWebhooksQueue`. `GetStateInstanceHistory` devolvió HTTP 200 y una entrada
+  `authorized` de `2026-10-09T18:24:31Z`; esta entrada no demuestra continuidad de la
+  autorización durante cada minuto del intento anterior. GreenAPI documenta retención de
+  notificaciones de 24 horas, por lo que la cola puede disminuir por expiración sin que aquí
+  se haya borrado nada.
+- La prueba previa registró URL exacta guardada, token coincidente, instancia autorizada,
+  aumento de la cola y cero solicitudes atribuidas a GreenAPI en el túnel. Las consultas de
+  hoy corroboran el estado de cierre, pero con `webhookUrl` vacío no pueden producir ni
+  observar un push nuevo. La documentación pública consultada describe reintentos aproximadamente
+  cada minuto y ACK 200 para retirar una notificación; los métodos públicos de colas consultados
+  exponen conteo/lectura, no un registro de intentos HTTP salientes con DNS, TLS o status del
+  destino. Se buscó ese registro en la documentación; el acceso automatizado a la consola
+  falló con `Transport closed`. **No se obtuvo error de entrega del proveedor ni se demostró
+  la causa específica**. El punto final erróneo de una configuración intermedia anterior
+  tampoco explica el intento posterior con ruta correcta.
+- Comparación preparada, aún sin ejecutar: usar un dominio HTTPS estable **controlado por el
+  operador**, con una ruta diagnóstica aislada que nunca reenvíe al backend ni responda a
+  contactos. Registrar solo hora UTC, método, ruta, resultado de validación Bearer y código HTTP,
+  sin body, remitentes, texto ni token. Para solicitudes autenticadas devolver `503`, nunca
+  `200`, de modo que GreenAPI conserve la notificación y vuelva a intentar según su contrato.
+  Antes de apuntar GreenAPI al dominio, comprobar TLS, ruta exacta y respuesta `503` desde
+  internet con una petición sintética sin datos reales. Después fijar únicamente
+  `stateWebhook=yes` e `incomingWebhook=no`, verificar `GetSettings` tras el tiempo de
+  aplicación, registrar conteo antes/después y observar varios intervalos de reintento.
+  Comparar hora/código de los intentos del endpoint estable con las métricas del túnel previo.
+  Si llega al host estable, investigar el borde del túnel; si no llega y la cola sigue
+  pendiente, solicitar a GreenAPI sus trazas de salida (DNS/TLS, HTTP, hora UTC e ID de intento)
+  antes de atribuir la causa. Al terminar, vaciar `webhookUrl` y confirmar `GetSettings`
+  **antes** de retirar el endpoint. Un host externo de captura pública sin control de acceso
+  expondría payloads de clientes y no se usará. La expiración de 24 horas limita cuánto tiempo
+  pueden servir estas cinco notificaciones como muestra.
+- No se abrió túnel, no se cambió la configuración remota, no se envió mensaje ni se eliminó
+  ninguna notificación. Una segunda lectura de `GetSettings` y `GetWebhooksCount` al cierre
+  devolvió HTTP 200, `webhookUrl` vacío y cinco notificaciones. `git diff --check` aprobó.
+  `git check-ignore .env` confirmó que la configuración local sigue ignorada y la comparación
+  de los secretos configurados con el diff del plan no encontró coincidencias. No se ejecutaron
+  suites ni linters porque este diagnóstico solo cambió el checkpoint Markdown.
+  F9.4 sigue `⬜ PENDIENTE`. Cualquier envío nuevo o eliminación requiere autorización
+  específica del usuario.
+
+Fuentes oficiales revisadas:
+[Webhook Endpoint](https://green-api.com/en/docs/api/receiving/technology-webhook-endpoint/),
+[ReceiveNotification](https://green-api.com/en/docs/api/receiving/technology-http-api/ReceiveNotification/),
+[GetWebhooksCount](https://green-api.com/en/docs/api/queues/GetWebhooksCount/),
+[trabajo con webhooks](https://green-api.com/en/docs/api/recommendations/working-with-incomming-webhooks/)
+y [métodos de colas](https://green-api.com/en/docs/api/queues/).
+
+## 2026-10-10 — F9.3, sonda HTTPS temporal lista para diagnóstico push
+
+**Estado:** `⛔ BLOQUEADO` → `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `⛔ BLOQUEADO`.
+Se mantiene el bloqueo de F9.3 porque todavía no se ha observado un push directo del proveedor;
+el texto exacto del único envío manual anterior tampoco se ha vuelto a probar.
+
+**Cambios y archivos:** se añadió `scripts/f93_delivery_probe.py`, separado de
+`scripts/f93_webhook_gate.py` (que conserva sus cambios previos y no se ejecutó), y
+`backend/tests/test_f93_delivery_probe.py`. La sonda escucha únicamente en
+`https://127.0.0.1:8001`, valida exactamente un Bearer con comparación de tiempo constante
+antes de leer el body, limita la lectura a 65 536 bytes y comprueba `idInstance`. No llama al
+backend, a OpenAI ni a GreenAPI y nunca envía WhatsApp. Para eventos autenticados y válidos
+responde HTTP 503 sin ACK 200; rutas ajenas y GET responden 404, solicitudes sin Bearer o con
+Bearer inválido responden 403. Solo registra hora UTC, tipo de evento de una lista cerrada
+(o `other`/`unread`) y resultado HTTP. No guarda cuerpos, teléfonos ni tokens.
+
+Se reutilizó el certificado local existente para `127.0.0.1`; el túnel valida ese origen con
+`--origin-ca-pool`, sin desactivar TLS. Se inició un túnel Cloudflare **nuevo** con URL pública
+exacta `https://fri-salary-phil-britannica.trycloudflare.com/api/v1/whatsapp/webhook`.
+Procesos actuales: sonda Python PID `8852`, `cloudflared` PID `8024`; sus logs están fuera del
+repositorio bajo `%LOCALAPPDATA%\SanAngel_AI\f93-probe-20261010`. Esta URL es temporal y
+solo permanece válida mientras ambos procesos estén activos.
+
+**Validación ejecutada:**
+
+- `pytest backend/tests/test_f93_delivery_probe.py -q` → 5 aprobadas; `pytest -q` →
+  619 aprobadas; `ruff check .` → aprobado; `ruff format --check .` → 187 archivos correctos;
+  `python -m pip check` → sin conflictos.
+- Cliente HTTPS local con validación del certificado → POST exacto con Bearer `503`, sin Bearer
+  `403`; raíz, administración, chat, GET del webhook y ruta con punto final extra `404`.
+- Cliente a hostname público, con DNS externo y validación TLS normal → los mismos resultados:
+  `503`, `403` y `404` respectivamente. Esta comprobación salió desde la misma máquina hacia
+  la URL pública de Cloudflare; todavía no hay petición de GreenAPI.
+- Registro de la sonda: 14 entradas de pruebas sintéticas; todas tienen exactamente `utc`,
+  `event_type`, `result`; no se encontraron secretos configurados ni el texto o número de
+  prueba. `probe.err.log` vacío. Los dos procesos seguían activos al validar.
+- `GetSettings` de GreenAPI → HTTP 200, `webhookUrl` vacío, `incomingWebhook=no` y
+  `stateWebhook=no`; no se modificó configuración remota ni se retiraron notificaciones.
+
+**Seguridad y cierre:** el túnel expone solo esta sonda, nunca el panel ni el backend.
+Antes de detenerlo, si alguien configura esta URL en GreenAPI, vaciar `webhookUrl` y confirmar
+con `GetSettings` que está vacío. Después verificar que los PID anteriores siguen
+correspondiendo a `cloudflared` y a la sonda y detener primero `8024` y luego `8852`
+(`Stop-Process -Id 8024` y `Stop-Process -Id 8852`). Con la configuración actual de
+GreenAPI, `webhookUrl` ya está vacío. No se envió ningún mensaje ni se procesó evento real.
+
+**Riesgos y siguiente paso:** no atribuir un futuro `503` de esta sonda a un error del backend;
+es deliberado para conservar la notificación en la cola. Si se habilita el push en GreenAPI,
+primero mantener `incomingWebhook=no` y usar solo eventos de estado; la cola actual puede
+contener eventos anteriores de otros contactos. F9.4 sigue `⬜ PENDIENTE`.
+
+---
+
+## 2026-10-10 — F9.3, push de GreenAPI observado en sonda HTTPS
+
+**Estado:** `⛔ BLOQUEADO` → `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `⛔ BLOQUEADO`.
+El push directo **hasta la sonda pública** quedó comprobado. La sonda devuelve 503 de forma
+intencional, por lo que esta prueba no acredita entrega al backend ni resuelve la discrepancia
+del texto exacto del único mensaje manual anterior. F9.4 permanece `⬜ PENDIENTE`.
+
+**Preparación y configuración:** `git status --short --branch` al inicio mostró modificaciones
+existentes en este plan y archivos sin seguimiento `scripts/f93_delivery_probe.py`,
+`backend/tests/test_f93_delivery_probe.py` y `scripts/f93_webhook_gate.py`; se conservaron.
+La sonda Python y el túnel Cloudflare de la entrada anterior estaban activos. Antes del cambio,
+`GetStateInstance` devolvió `authorized`, `GetSettings` confirmó `webhookUrl` vacío, Bearer
+existente coincidente, `stateWebhook=no`, `incomingWebhook=no`, y `GetWebhooksCount` devolvió 5.
+El registro de la sonda tenía 15 entradas de pruebas propias previas: esa cantidad se tomó
+como línea base. No se hicieron solicitudes sintéticas nuevas durante la observación.
+
+`SetSettings` devolvió HTTP 200 y `saveSettings=true` al fijar exactamente
+`https://fri-salary-phil-britannica.trycloudflare.com/api/v1/whatsapp/webhook`, el Bearer
+existente, `stateWebhook=yes` e `incomingWebhook=no`. `GetSettings` confirmó igualdad exacta
+de URL y Bearer, y ambos flags. La instancia seguía `authorized`.
+
+**Observación verificable:** la sonda registró cuatro POST autenticados de tipo
+`stateInstanceChanged` a las 17:30:55, 17:31:55, 17:32:56 y 17:33:56 UTC. Todos recibieron
+HTTP 503. Los tres primeros se observaron en ciclos sucesivos; el cuarto apareció durante
+el cierre. La separación próxima a un minuto concuerda con reintentos, aunque el registro
+mínimo no permite probar si son cuatro intentos de una misma notificación. La línea base de
+15 entradas permite distinguir estos POST de nuestras pruebas previas; no enviamos ninguna
+petición propia a la sonda durante el intervalo. `GetWebhooksCount` permaneció en 5 en las
+lecturas antes y después de los ciclos. Se observó tráfico externo autenticado hacia la
+sonda; no se infiere entrega ni procesamiento del backend.
+
+**Cierre:** `SetSettings` para vaciar `webhookUrl` y restaurar `stateWebhook=no` e
+`incomingWebhook=no` devolvió HTTP 200 y `saveSettings=true`. Antes de parar los procesos,
+`GetSettings` confirmó URL vacía, Bearer existente sin cambio y ambos flags en `no`;
+`GetStateInstance` seguía `authorized` y `GetWebhooksCount` seguía en 5. Se verificaron los
+PID de la sonda como módulo Python (`8852`) y del túnel `cloudflared` (`8024`), y se
+detuvieron en ese orden inverso a su dependencia: túnel y luego sonda. La URL pública
+temporal ya no está activa. El registro final tenía 19 entradas con solo `utc`,
+`event_type` y `result`; `probe.err.log` quedó vacío. Una lectura posterior de
+`GetSettings` mantuvo la URL vacía y ambos flags en `no`, y `GetWebhooksCount` marcó 5.
+`git diff --check` aprobó; la comparación automatizada del plan con los dos secretos
+configurados no halló coincidencias. No se repitió `pytest` ni `ruff` porque no hubo cambios
+de código en esta continuación; las ejecuciones aprobadas de la sonda constan en la entrada
+anterior.
+
+**Seguridad y pendientes:** no se mostraron ni almacenaron tokens, cuerpos o teléfonos; no se
+ejecutó `scripts/f93_webhook_gate.py`, no hubo envío de WhatsApp ni llamadas para recibir,
+confirmar, borrar o reenviar notificaciones. Los 503 conservaron el comportamiento de no
+confirmar la entrega. F9.3 sigue bloqueada por la validación de entrega al backend y por el
+texto exacto del mensaje manual previo. Antes de cualquier nuevo mensaje o eliminación de
+notificaciones se requiere autorización específica del usuario. No reutilizar esta URL de
+túnel ni iniciar F9.4.
+
+---
+
+## 2026-10-10 — F9.3, entrada real por push hasta recibo SQLite
+
+**Estado:** `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO` (2026-10-10).
+El recorrido entrante, el único envío manual autorizado y el texto recibido en el teléfono
+quedaron comprobados. F9.4 sigue `⬜ PENDIENTE` y no se inició.
+
+**Antes de permitir HTTP 200:** `git status --short --branch` mostró el plan modificado y
+los tres archivos previos sin seguimiento; se conservaron. `GetStateInstance=authorized`,
+`GetSettings` tenía URL vacía y webhooks desactivados, y `GetWebhooksCount=5`.
+`ReceiveNotification` revisó la cabecera FIFO sin borrar ni procesar mensajes. SQLite confirmó
+que la conversación #1 es de `sucursal-1`, sigue `HUMAN`, está asignada al propietario activo
+`operador-prueba`, tiene `ai_reply_count=0`, no tiene envío manual bloqueado y el destinatario
+cifrado se recupera y valida contra su HMAC.
+
+Las cinco cabeceras antiguas inspeccionadas secuencialmente eran `stateInstanceChanged`, sin
+contacto, del 2026-10-09 a las 21:26:08, 21:26:09, 21:41:19, 21:41:20 y 21:47:05 UTC.
+El usuario autorizó **cada una por separado** antes de llamar a `DeleteNotification` para su
+recibo concreto. Cada llamada releyó y comprobó tipo y hora de la cabecera y devolvió HTTP 200
+con `result=true`. La primera comprobación de hora usó un entero incorrecto y se detuvo sin
+eliminar nada; después se calculó desde ISO UTC y se confirmó solo el evento autorizado.
+Hubo un 429 transitorio en `GetWebhooksCount`; la lectura posterior marcó cola en 0 y
+`ReceiveNotification` vacío. No se confirmó ni procesó ningún evento de otro contacto.
+
+**Puerta temporal:** se añadieron `scripts/f93_target_gate.py` y
+`backend/tests/test_f93_target_gate.py`. La puerta deriva el chat de prueba desde la
+conversación cifrada, vuelve a comprobar modo `HUMAN` y operador activo, y solo reenvía al
+backend un `incomingMessageReceived` posterior al inicio con la frase de prueba exacta.
+Los demás eventos reciben 503; rutas ajenas 404 y falta de Bearer 403. La entrada se valida
+antes de leer el cuerpo y los logs guardan únicamente hora UTC, tipo, resultado y, para el
+evento permitido, `request_id`, hash SHA-256 del ID externo y estado del backend. No se guarda
+el cuerpo, teléfono ni token. `scripts/f93_webhook_gate.py` anterior no se ejecutó.
+
+FastAPI local HTTPS respondió `/health=200` y administración anónima `401`. La puerta local
+devolvió `404`, `403` y `503` para las pruebas de rutas, autenticación y estado. Un túnel
+Cloudflare **nuevo** expuso exclusivamente la puerta en
+`https://mailto-epa-accounting-bras.trycloudflare.com/api/v1/whatsapp/webhook`; DNS, TLS
+público y las mismas respuestas `404`/`403`/`503` se verificaron desde fuera del loopback.
+Tras confirmar de nuevo cola vacía, `SetSettings` guardó esa URL exacta, el Bearer existente,
+`incomingWebhook=yes` y `stateWebhook=no`; `GetSettings` confirmó los valores.
+
+**Entrada real:** el usuario envió desde el WhatsApp de prueba la frase única acordada.
+La línea base de la puerta tenía seis solicitudes sintéticas nuestras. A las 17:46:40 UTC
+apareció un séptimo registro `incomingMessageReceived`, HTTP público 200, backend 200,
+`request_id=88a4049bf8204bcbb6ce744eeade40f5` y hash externo
+`6fc58ac4f574b439f120ac67e2e7146e8711dfa0d8fb4947a1305e7374fb58fb`.
+Las métricas de `cloudflared` marcaron cuatro solicitudes públicas totales y cero errores
+de proxy: tres pruebas nuestras y ese POST nuevo. FastAPI registró el mismo `request_id`,
+POST `/api/v1/whatsapp/webhook` 200 y procesamiento de un mensaje con cero fallos.
+SQLite añadió un recibo `completed` cuyo ID externo produce el mismo SHA-256; la conversación
+siguió `HUMAN` con `ai_reply_count=0` y el conteo de mensajes salientes no aumentó.
+`GetWebhooksCount` quedó en 0. Esto acredita GreenAPI → URL pública → backend 200 → recibo
+entrante SQLite, sin nueva respuesta automática de IA.
+
+**Cierre público:** `SetSettings` para URL vacía, `incomingWebhook=no` y `stateWebhook=no`
+devolvió HTTP 200 y `saveSettings=true`. La primera lectura todavía mostraba la configuración
+anterior; se mantuvo el túnel hasta que `GetSettings` confirmó URL vacía y ambos flags en
+`no`, Bearer sin cambio y cola en 0. Solo entonces se verificaron y detuvieron el túnel
+`cloudflared` y la puerta; FastAPI y Vite permanecen en HTTPS solo en loopback.
+
+**Validaciones:** `pytest backend/tests/test_f93_target_gate.py -q` → 3 aprobadas;
+`pytest -q` → 622 aprobadas; `ruff check .` → aprobado; `ruff format --check .` → 189
+archivos correctos; `python -m pip check` → sin conflictos; `npm test` → 32 aprobadas;
+`npm run build` → aprobado; `alembic current` → `20260925_0012 (head)`;
+SQLite `integrity_check=ok` y cero violaciones de claves foráneas.
+
+**Envío manual y teléfono:** el usuario autorizó exactamente `Prueba realizada.` (17
+caracteres, con punto final). El operador no tenía sesión administrativa activa y las
+herramientas de navegador devolvieron `Transport closed`; no se simuló login ni se omitieron
+sesión/CSRF. El usuario inició sesión en el panel local como `operador-prueba`, revisó el
+texto y confirmó un único envío; informó el resultado «Aceptado en cola». El panel genera
+un `request_id` UUID nuevo mediante `crypto.randomUUID()`. SQLite pasó de uno a dos recibos
+manuales y de uno a dos metadatos salientes. El recibo nuevo quedó `accepted`, con
+`request_id=1fac5c23-af80-42f6-a862-85356f18626b` (UUID v4, distinto del anterior),
+ID del proveedor presente, actor propietario activo, sucursal y asignación correctas;
+no hay `pending`/`uncertain` nuevo ni bloqueo del chat. `LastOutgoingMessages` (HTTP 200)
+encontró el mismo ID del proveedor, `sendByApi=true`, destino igual al de la conversación,
+estado `sent` y texto exactamente igual a `Prueba realizada.`. El usuario confirmó que el
+teléfono de prueba recibió exactamente ese texto, incluido el punto final. El ID del
+proveedor, el teléfono y los cuerpos no se escribieron en el plan ni en logs.
+
+**Validación final y seguridad:** el ajuste de la puerta para fallar cerrado ante error en
+la consulta del modo HUMAN pasó sus pruebas focalizadas (3/3). Una primera repetición de
+`pytest -q` detectó dos fallos intermitentes en tests HTTP locales que enviaban un cuerpo
+a rutas rechazadas antes de leerlo; Windows abortó esas conexiones. Se corrigieron solo esos
+tests para enviar la solicitud vacía adecuada; ambos controles siguen verificando 403/404.
+Las pruebas focalizadas de las dos puertas pasaron (8/8) y la repetición completa de
+`pytest -q` pasó (622/622). `ruff check .` y `ruff format --check .` pasaron (189 archivos),
+`git diff --check` pasó; `pip check`, `npm test` (32/32), `npm run build` y Alembic
+`20260925_0012 (head)` ya constan arriba. Tras el envío, SQLite conservó
+`integrity_check=ok`, cero violaciones de claves foráneas, tres recibos entrantes
+`completed`, dos recibos manuales en la conversación y cero `pending`/`uncertain`.
+
+Una lectura final de `GetSettings` confirmó `webhookUrl` vacío, Bearer sin cambio,
+`incomingWebhook=no` y `stateWebhook=no`; `GetStateInstance=authorized` y
+`GetWebhooksCount=0`. Se detuvieron FastAPI y Vite locales además del túnel y la puerta;
+los puertos `8000`, `8001`, `5173` y `20241` quedaron sin listeners. `.env` sigue ignorado
+por Git y la comprobación automatizada no halló token de GreenAPI ni teléfono de prueba
+en el plan o en el log de la puerta. No hubo respuesta de IA al evento de prueba ni reintento
+del envío manual; otros contactos no se procesaron.
+
+**Riesgos y siguiente paso:** el ACK 200 del backend precede a una tarea de fondo no durable;
+en esta prueba el recibo llegó a `completed`, pero ese límite operativo sigue vigente.
+La URL temporal ya está desactivada. F9.4 es la siguiente subfase recomendada y permanece
+sin iniciar; no se interpreta este cierre de F9.3 como aprobación de despliegue público.
 
 ---
 
