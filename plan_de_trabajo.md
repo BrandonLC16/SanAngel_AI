@@ -1,12 +1,14 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-10-12
+**Última actualización:** 2026-10-13
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** F10.8 — Cola/worker — decisión y adaptación (`✅ COMPLETADO`, 2026-10-12)
-**Estado global:** 🟨 EN_PROGRESO — Fase 10; F10.8 completada
+**Subfase activa:** ninguna; F10.9 — Checklist producción fue la última completada (`✅ COMPLETADO`, 2026-10-13)
+**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 pendiente
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
+**Alcance propuesto del despliegue inicial:** una sucursal piloto; las otras seis se decidirán
+después de observar el piloto y no forman parte de su autorización F10.9.
 
 > Este archivo es el checkpoint oficial. Codex debe actualizarlo después de cada avance relevante.
 
@@ -3912,38 +3914,57 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.9 — Checklist producción
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** ✅ COMPLETADO
+**Fecha de inicio:** 2026-10-13
+**Fecha de validación:** 2026-10-13
+**Fecha de bloqueo:** 2026-10-13
+**Fecha de reanudación:** 2026-10-13
+**Fecha de revalidación:** 2026-10-13
+**Fecha de cierre por excepción:** 2026-10-13
+
+**Avance local:** [checklist y acta de producción](docs/fase_10_checklist_produccion.md)
+adaptados a una sola sucursal piloto. La prueba adicional de siete scopes sintéticos rechaza
+las 42 lecturas cruzadas y se conserva para proteger la arquitectura futura. La nueva validación
+pasó (723 tests aprobados, 1 omitido; Ruff y `pip check` aprobados). La matriz y los controles
+operativos del piloto y la clasificación de riesgos críticos siguen sin evidencia verificable.
+El solicitante instruyó el 2026-10-13 aprobar los campos faltantes y cerrar F10.9 por excepción.
+Esto solo permite avanzar al despliegue controlado F10.10; no acredita seguridad productiva ni
+autoriza tráfico de clientes. Las otras seis sucursales se evaluarán tras observar el piloto.
 
 
 ### Alcance
 
-- [ ] privacy.
+- [x] privacy — documentada; evidencia operativa aceptada sin verificación por el solicitante.
 
-- [ ] WhatsApp policies vigentes.
+- [x] WhatsApp policies vigentes — revisadas; decisión del canal aceptada por declaración.
 
-- [ ] OpenAI data controls.
+- [x] OpenAI data controls — documentados; configuración de cuenta no verificada.
 
-- [ ] DNS/HTTPS.
+- [x] DNS/HTTPS — plan y controles documentados; comprobación productiva pendiente F10.10.
 
-- [ ] budgets.
+- [x] budgets — controles documentados; montos y alertas no verificados.
 
-- [ ] incidentes.
+- [x] incidentes — procedimiento documentado; entrega de alertas no verificada.
 
-- [ ] rollback.
+- [x] rollback — procedimiento documentado; ensayo del piloto no acreditado.
 
-- [ ] matriz de siete números, instancias, sucursales, DB y health checks sin registrar secretos.
+- [x] matriz del número, instancia, sucursal, DB y health checks de la instalación piloto sin
+  registrar secretos; health y referencias declarados, no verificados; seis tiendas fuera.
 
 
 ### Criterios de aceptación
 
-- [ ] go-live checklist firmado/documentado.
+- [x] checklist aprobado globalmente por el solicitante el 2026-10-13; firmas individuales y
+  evidencias no verificadas. El GO es documental para despliegue controlado, no para clientes.
 
 
 ### Seguridad
 
-- [ ] sin riesgos críticos abiertos.
+- [x] el solicitante acepta cerrar sin acreditar cero riesgos críticos abiertos; seguridad debe
+  comprobarlos antes de abrir el piloto a clientes en F10.10.
 
-- [ ] prueba negativa de acceso cruzado para las siete instalaciones.
+- [x] prueba negativa local entre siete scopes sintéticos aprobada; perfil/configuración reales
+  del piloto no comprobados y aceptados por excepción para este cierre.
 
 
 ### Prompt para Codex
@@ -3981,14 +4002,15 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 - [ ] rollback check.
 
-- [ ] smoke test independiente de cada uno de los siete números/asistentes.
+- [ ] smoke test del único número/asistente piloto; las otras seis instalaciones quedan pendientes
+  de evaluación posterior y no se activan en F10.10.
 
 
 ### Criterios de aceptación
 
 - [ ] MVP accesible de forma segura.
 
-- [ ] cada número responde únicamente con datos de su sucursal.
+- [ ] el número piloto responde únicamente con datos de su sucursal.
 
 
 ### Seguridad
@@ -4394,14 +4416,19 @@ negativas de acceso cruzado en repositorios, tools, panel y despliegue.
 # 18. Checkpoint actual
 
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`).
-**Subfase activa:** F10.1 — Rate limiting y límites de recursos (`✅ COMPLETADO`, 2026-10-12).
-**Última subfase completada:** F10.1 — Rate limiting y límites de recursos.
-**Siguiente subfase recomendada:** F10.2 — HTTPS, proxy y headers (`⬜ PENDIENTE`); no iniciada.
-**WhatsApp:** instancia GreenAPI configurada y autorizada; webhook autenticado, ACK, OpenAI,
-`sendMessage` y recepción final en WhatsApp confirmados de extremo a extremo.
+**Subfase activa:** ninguna; F10.9 — Checklist producción cerrada por aceptación expresa del
+solicitante (`✅ COMPLETADO`, 2026-10-13).
+**Última subfase completada:** F10.9 — Checklist producción (cierre documental por excepción).
+**Siguiente paso recomendado:** F10.10 permanece `⬜ PENDIENTE` y no se ha iniciado. En su
+despliegue controlado del piloto se deben comprobar los controles operativos y la ausencia de
+riesgos críticos antes de recibir tráfico de clientes.
+**WhatsApp:** una instancia de prueba GreenAPI confirmó anteriormente webhook, ACK, OpenAI,
+`sendMessage` y recepción final; esto no valida la instalación productiva piloto ni la revisión
+contractual de F10.9.
 
-**Arquitectura vigente:** siete instalaciones/números, una por sucursal, con código y prompt
-comunes; cada instalación usa identidad, credenciales, DB y perfil propios.
+**Arquitectura prevista:** capacidad para siete instalaciones/números, una por sucursal, con código
+y prompt comunes. El despliegue inicial se limita a una sucursal piloto; cada instalación futura
+requiere identidad, credenciales, DB, perfil, checklist y autorización propios.
 
 F7.1 completada el 2026-09-24 tras crear el esquema mínimo de WhatsApp y validar la migración
 desde cero y sobre revisiones previas. F7.2 completada el 2026-09-24 tras resolver la identidad
@@ -9767,6 +9794,125 @@ respuesta humana y no garantiza entrega exactamente una vez. Para migrar una ins
 La entrega externa de alertas y la operación real siguen pendientes del despliegue.
 
 **Siguiente:** F10.9 — Checklist producción (`⬜ PENDIENTE`), no iniciada.
+
+---
+
+## 2026-10-13 — F10.9 Checklist producción: validación local y bloqueo operativo
+
+**Fase/subfase:** Fase 10 / F10.9. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `⛔ BLOQUEADO`. F10.10 sigue `⬜ PENDIENTE`.
+
+**Cambios:** checklist de autorización con fuentes oficiales vigentes revisadas el 2026-10-13,
+controles de privacidad, políticas de WhatsApp, datos de OpenAI, DNS/HTTPS, presupuestos,
+incidentes y rollback; matriz segura de siete instalaciones y acta sin firmas presumidas.
+Prueba sintética en una DB compartida: siete scopes y rechazo de las 42 lecturas de precio y
+búsquedas de productos entre sucursales. README enlaza el acta en estado NO GO.
+
+**Archivos:** `docs/fase_10_checklist_produccion.md`, `backend/tests/test_commercial_query_service.py`,
+`README.md`, `plan_de_trabajo.md`.
+
+**Comandos y resultados:** `pytest backend/tests/test_commercial_query_service.py -q` no arrancó
+porque el ejecutable no estaba en PATH; `.venv\Scripts\python.exe -m pytest
+backend/tests/test_commercial_query_service.py -q` → 27 passed; `.venv\Scripts\python.exe -m
+pytest -q` → 723 passed, 1 skipped; `.venv\Scripts\python.exe -m ruff check .` → aprobado;
+`.venv\Scripts\python.exe -m ruff format --check .` → 230 archivos conformes;
+`.venv\Scripts\python.exe -m pip check` → sin dependencias rotas; `git diff --check` →
+sin errores de whitespace; `.venv\Scripts\python.exe -m pip_audit --local
+--progress-spinner off` → sin vulnerabilidades conocidas en dependencias instaladas (el
+paquete local no publicado no es auditable en PyPI); `.venv\Scripts\python.exe -m pip_audit
+--require-hashes --progress-spinner off -r requirements-prod.lock` → sin vulnerabilidades
+conocidas; `npm audit --prefix frontend --audit-level=low --json` → 0 hallazgos. No se
+ejecutaron llamadas reales a OpenAI o GreenAPI.
+
+**Seguridad:** la prueba de aislamiento es local y usa códigos/datos ficticios; ninguna
+credencial, número completo ni base real se añadió al acta. `OPENAI_STORE_RESPONSES=false` es
+el valor por defecto del código, pero cada runtime debe verificarse. La revisión de políticas
+detectó una condición de go-live sin resolver: se requiere aprobación escrita de la modalidad
+GreenAPI frente a términos de WhatsApp y al riesgo de bloqueo que GreenAPI reconoce. Los
+escaneos locales de dependencias no encontraron vulnerabilidades conocidas; no se puede
+certificar cero riesgos críticos abiertos sin inventario/firmas operativas.
+
+**Riesgos/Pendientes:** completar y comprobar la matriz de siete instalaciones reales, aviso y
+retención de privacidad, configuración real de OpenAI, consentimiento/políticas WhatsApp,
+DNS/TLS, presupuesto y alertas externas, respaldo/restauración/rollback e incidentes. Registrar
+clasificación de hallazgos y firmas de privacidad, políticas/canal, seguridad, operación y dueño
+del negocio. Hasta entonces el acta permanece NO GO y F10.9 bloqueada.
+
+**Siguiente:** resolver esos bloqueos dentro de F10.9 y repetir la validación; recomendar F10.10
+solo después de aprobar y firmar F10.9. No se inició F10.10.
+
+---
+
+## 2026-10-13 — F10.9 ajustada a una sucursal piloto
+
+**Fase/subfase:** Fase 10 / F10.9. **Estado:** `⛔ BLOQUEADO` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `⛔ BLOQUEADO`. F10.10 permanece `⬜ PENDIENTE`.
+
+**Cambios:** por instrucción del usuario, el cierre F10.9 exige evidencia y aprobación de una
+sola instalación piloto. El checklist tiene una fila para su número, instancia, sucursal, DB,
+dominio y health de preproducción. Las otras seis sucursales quedan fuera del GO del piloto y se
+evaluarán después de desplegarlo y observarlo. Se conserva la prueba sintética de siete scopes
+como defensa futura. Se ajustó únicamente la redacción del alcance previsto de F10.10 para que
+sus smoke tests se apliquen al piloto; su implementación no se inició.
+
+**Archivos:** `docs/fase_10_checklist_produccion.md`, `plan_de_trabajo.md`, `README.md`.
+Se preservó `backend/tests/test_commercial_query_service.py` del avance anterior.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest
+backend/tests/test_commercial_query_service.py backend/tests/test_branches.py -q` → 42 passed;
+`.venv\Scripts\python.exe -m pytest -q` → 723 passed, 1 skipped;
+`.venv\Scripts\python.exe -m ruff check .` → aprobado;
+`.venv\Scripts\python.exe -m ruff format --check .` → 230 archivos conformes;
+`.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+`git diff --check` → sin errores de whitespace.
+
+**Seguridad:** siguen obligatorios la aprobación de la modalidad GreenAPI, privacidad,
+configuración real de OpenAI, DNS/TLS, presupuesto, alertas, incidentes, backup y rollback del
+piloto. Ninguna firma ni resultado de producción se infirió de las pruebas sintéticas; no se
+guardaron secretos ni números completos. No se puede certificar cero riesgos críticos abiertos
+sin revisar la instalación piloto y obtener la firma de seguridad.
+
+**Riesgos/Pendientes:** completar la única fila piloto, sus pruebas de preproducción, referencias
+de evidencia y acta con responsables. El estado es NO GO por esas ausencias. La apertura a
+clientes exige además los smoke tests productivos de F10.10 tras un GO de preparación de F10.9.
+
+**Siguiente:** resolver los pendientes del piloto y revalidar F10.9. Después de su aprobación,
+iniciar F10.10 solo para el piloto cuando el usuario lo solicite. Las seis sucursales futuras
+requerirán autorización y pruebas separadas.
+
+---
+
+## 2026-10-13 — F10.9 cerrada por aceptación expresa del solicitante
+
+**Fase/subfase:** Fase 10 / F10.9. **Estado:** `⛔ BLOQUEADO` → `🟨 EN_PROGRESO` →
+`🧪 VALIDACION` → `✅ COMPLETADO`. F10.10 permanece `⬜ PENDIENTE`.
+
+**Cambios:** el solicitante instruyó tomar como aprobados los campos faltantes. Se registró
+un GO documental por excepción para una sucursal piloto, sin atribuir firmas individuales ni
+evidencias técnicas inexistentes. El checklist distingue esta aceptación de la verificación
+operativa necesaria antes de atender clientes. Las otras seis sucursales quedan pendientes de
+evaluación tras el piloto.
+
+**Archivos:** `docs/fase_10_checklist_produccion.md`, `plan_de_trabajo.md`, `README.md`;
+se preservó el test de alcance cruzado en `backend/tests/test_commercial_query_service.py`.
+
+**Comandos y resultados:** `.venv\Scripts\python.exe -m pytest -q` → 723 passed, 1 skipped;
+`.venv\Scripts\python.exe -m ruff check .` → aprobado;
+`.venv\Scripts\python.exe -m ruff format --check .` → 230 archivos conformes;
+`.venv\Scripts\python.exe -m pip check` → sin dependencias rotas;
+`git diff --check` → sin errores de whitespace.
+
+**Seguridad:** las pruebas locales de alcance entre siete sucursales pasan. La aprobación del
+solicitante no acredita que la instalación piloto carezca de riesgos críticos: privacidad,
+políticas de WhatsApp, controles de datos de OpenAI, DNS/HTTPS, presupuestos, incidentes y
+rollback requieren comprobación operativa. No se incorporaron secretos al checklist.
+
+**Riesgos/Pendientes:** faltan evidencias trazables y verificaciones productivas, incluidas las
+firmas de roles y los health checks reales. La aceptación por excepción cierra F10.9 solo como
+checkpoint documental; no autoriza tráfico de clientes. F10.10 deberá verificar esos controles
+antes de abrir el piloto. No se inició F10.10.
+
+**Siguiente:** F10.10 — Despliegue y smoke tests del piloto de una sucursal, cuando se solicite.
 
 ---
 

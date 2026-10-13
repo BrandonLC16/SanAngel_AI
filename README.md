@@ -4,6 +4,8 @@ Backend en Python para siete asistentes de atención por WhatsApp, uno por sucur
 siete usan el mismo código y las mismas instrucciones; cada instalación queda fijada a una
 sucursal y solo puede consultar sus datos comerciales determinísticos, para que el modelo no
 invente ni mezcle precios, existencias, direcciones, horarios, promociones o pedidos.
+El despliegue inicial se limitará a **una sucursal piloto**; las otras seis se evaluarán después
+de desplegarla y observar su operación.
 
 ## Estado actual
 
@@ -101,6 +103,9 @@ instalación/número 2 -> ASSISTANT_BRANCH_CODE=sucursal-2 -> DB/perfil sucursal
 instalación/número 7 -> ASSISTANT_BRANCH_CODE=sucursal-7 -> DB/perfil sucursal 7
 ```
 
+Este esquema describe la capacidad prevista. El checklist F10.9 y el primer despliegue F10.10
+abarcan únicamente la instalación piloto.
+
 El prompt base es único y no contiene datos de una tienda. La identidad de la sucursal proviene
 solo de configuración backend. Ni el cliente ni el modelo pueden enviar o cambiar un
 `branch_id`/`branch_code`; los servicios de negocio inyectan ese alcance automáticamente.
@@ -129,7 +134,7 @@ producción, usa el [montaje de un secret manager y el procedimiento de rotació
 `SECRETS_DIR` apunta a cinco archivos externos al repositorio y a la imagen. Nunca guardes
 tokens reales en archivos versionados, comandos compartidos, logs o documentación.
 
-En cada una de las siete instalaciones configura valores propios para:
+En cada instalación que se active configura valores propios para:
 
 - `ASSISTANT_BRANCH_CODE`;
 - `CONVERSATION_IDENTITY_KEY` para la identidad de conversaciones de F7.2;
@@ -539,6 +544,14 @@ almacenamiento protegido, ensayo mensual y cambio a una base nueva tras verifica
 F10.8 mide el webhook y adopta una [cola SQLite con worker](docs/fase_10_cola.md) por instalación.
 Un error al guardar trabajo devuelve 503 para conservar la reentrega; la cola cifra contenido,
 deduplica IDs y acota la capacidad sin añadir Redis.
+
+F10.9 mantiene el [checklist de autorización de producción](docs/fase_10_checklist_produccion.md)
+para privacidad, políticas de WhatsApp, controles de OpenAI, DNS/HTTPS, presupuestos, incidentes,
+rollback y la matriz de la única instalación piloto. Las otras seis sucursales se evaluarán
+después de desplegar y observar el piloto; no requieren aprovisionamiento ni firma en F10.9.
+El solicitante aprobó por excepción los campos sin evidencia para cerrar F10.9. Esa aprobación
+permite continuar a un despliegue controlado del piloto en F10.10; la apertura a clientes requiere
+sus comprobaciones productivas y resolver cualquier hallazgo crítico.
 
 ## Servicio OpenAI y chat interno
 

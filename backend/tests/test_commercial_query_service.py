@@ -299,6 +299,33 @@ def test_commercial_service_cannot_cross_branch_scope(
         )
 
 
+def test_seven_branch_scopes_reject_every_foreign_product(
+    migrated_session_factory: sessionmaker[Session],
+) -> None:
+    """Exercise all 42 directed cross-branch reads in a shared database."""
+    with migrated_session_factory.begin() as session:
+        products = {}
+        for index in range(1, 8):
+            code = f"sucursal-{index}"
+            branch = create_branch(session, code)
+            product = create_product(session, branch, name=f"Corte exclusivo {index}")
+            create_price(session, branch, product, amount=f"{100 + index}.00")
+            products[code] = product
+
+        for own_code, own_product in products.items():
+            service = make_service(session, own_code)
+            assert service.get_branch_info().name == own_code
+            assert service.get_product_price(own_product.id, unit="kg").amount == Decimal(
+                f"{100 + int(own_code.rsplit('-', 1)[1])}.00"
+            )
+            for foreign_code, foreign_product in products.items():
+                if foreign_code == own_code:
+                    continue
+                assert service.search_product(foreign_product.name) == ()
+                with pytest.raises(ProductNotFoundError):
+                    service.get_product_price(foreign_product.id, unit="kg")
+
+
 def test_commercial_query_implementation_has_no_openai_dependency() -> None:
     source_files = (
         REPOSITORY_ROOT / "backend" / "app" / "services" / "branch_scope.py",
