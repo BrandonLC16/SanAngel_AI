@@ -10042,6 +10042,20 @@ archivo temporal después de verificar personalmente el acceso al panel.
 
 ---
 
+## 2026-11-11 — Entrega de acceso owner completada
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** el usuario confirmó el acceso al panel con la contraseña recuperada; se retiró del
+Droplet el archivo temporal de contraseña. No se imprimió ni guardó la contraseña en Git.
+
+**Validación:** el archivo temporal ya no existe; backend, worker y panel continúan saludables.
+
+**Pendiente:** los smoke tests de webhook, WhatsApp y rollback, más el digest del panel corregido
+cuando GitHub Actions salga de la cola; el override externo sigue activo.
+
+---
+
 # 20. Plantilla para historial futuro
 
 ```text
