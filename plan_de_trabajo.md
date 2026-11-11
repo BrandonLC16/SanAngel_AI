@@ -3991,7 +3991,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Avance:** backend y panel publicados en GHCR desde `f8be391d2cc1444ebed472458d9871780813e973`;
 sus digests están fijados en `deploy/pilot.images.env`. La instalación única del piloto ya corre
 en el Droplet con backend, worker y panel saludables. Faltan los smoke tests de webhook,
-WhatsApp, login del panel y rollback antes de abrir tráfico de clientes. El panel usa un override
+WhatsApp, validación visual del panel y rollback antes de abrir tráfico de clientes. El login y
+logout del owner se verificaron por HTTPS. El panel usa un override
 externo temporal de Caddy mientras CI publica el digest con la ruta interna bloqueada.
 
 
@@ -10021,6 +10022,23 @@ smoke tests de webhook, WhatsApp, login y rollback. La contraseña inicial del o
 recuperada por el usuario y retirada del host.
 
 **Siguiente:** actualizar la imagen del panel cuando termine CI, luego completar F10.10.
+
+---
+
+## 2026-11-11 — Recuperación de acceso owner
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** tras informar el usuario que faltaba el archivo de contraseña inicial, se generó
+una nueva contraseña aleatoria para `brandonl` y se actualizó únicamente la cuenta `owner` de
+`sucursal-1`; sus sesiones anteriores quedaron revocadas. El archivo temporal se conserva fuera
+de Git con permisos root 0600 para entrega al usuario. Los scripts temporales se retiraron.
+
+**Validación:** login y logout por HTTPS aprobados con la nueva contraseña, sin imprimir clave,
+cookie ni token CSRF. Se confirmó existencia y permisos del archivo temporal.
+
+**Pendiente del usuario:** recuperar la contraseña por SSH, guardarla en su gestor y retirar el
+archivo temporal después de verificar personalmente el acceso al panel.
 
 ---
 
