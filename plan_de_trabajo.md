@@ -3989,16 +3989,17 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Fecha de inicio:** 2026-11-11
 
 **Avance:** backend y panel publicados en GHCR desde `f8be391d2cc1444ebed472458d9871780813e973`;
-sus digests están fijados en `deploy/pilot.images.env` y Compose los resuelve para el piloto. El
-despliegue y los smoke tests permanecen pendientes.
+sus digests están fijados en `deploy/pilot.images.env`. La instalación única del piloto ya corre
+en el Droplet con backend, worker y panel saludables. Faltan los smoke tests de webhook,
+WhatsApp, login del panel y rollback antes de abrir tráfico de clientes.
 
 
 ### Alcance
 
 - [x] construir y publicar imágenes comunes de backend y panel; fijar sus digests para el piloto.
-- [ ] deploy.
+- [x] deploy de la única instalación piloto.
 
-- [ ] health.
+- [x] health de backend, worker, panel y endpoint HTTPS.
 
 - [ ] webhook.
 
@@ -9950,6 +9951,42 @@ el host del piloto requiere autenticación de lectura. No se verificó pull desd
 despliegue, health, webhook, panel o rollback productivos.
 
 **Siguiente:** continuar F10.10 con configuración y smoke tests de la única instalación piloto.
+
+---
+
+## 2026-11-11 — Instalación del piloto en Droplet
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`; no hay GO para tráfico de
+clientes ni cierre de F10.10.
+
+**Cambios:** checkout del commit `dad614fdb27ccca41a18ebedb260b83e2a4508bb` en el host
+piloto; configuración no secreta y perfil de `sucursal-1` fuera del repositorio; cinco archivos
+de secretos externos legibles por UID/GID 10001; migración a `20261012_0015`; perfil importado;
+usuario `brandonl` con rol `owner` creado; backend, worker y panel levantados con los digests
+fijados. La contraseña inicial está en un archivo root temporal para entrega al usuario.
+
+**Archivos:** configuración y perfil solo en el host piloto, fuera de Git; ningún secreto nuevo
+en el repositorio. Este checkpoint actualiza `plan_de_trabajo.md`.
+
+**Comandos y resultados:** `docker pull` de ambos digests → aprobado sin autenticación;
+`docker compose config --quiet` → aprobado; `alembic current` → `20261012_0015 (head)`;
+`provision_assistant` → perfil válido e importado (`created`); `create_admin_user` → usuario
+creado; `docker compose up -d` y `ps` → tres servicios saludables; HTTPS `/health` y panel `/`
+→ 200 con certificado válido; HTTP → 308 a HTTPS; worker `--status` → sin jobs pendientes,
+en proceso o inciertos. El panel entrega CSP y HSTS.
+
+**Seguridad:** configuración externa root 0600; directorio de secretos root:GID 10001 0750 y
+archivos root:GID 10001 0640. Se validó lectura dentro del contenedor como UID 10001 y carga
+de settings sin imprimir valores. El backend y worker comparten solo el volumen de esa sucursal.
+
+**Riesgos/Pendientes:** sincronizar el webhook token generado con GreenAPI y probar recepción y
+envío controlados; verificar login del panel y retirar la contraseña temporal después de que el
+usuario la guarde; confirmar días de atención del perfil; ensayar backup/rollback y revisar los
+fallos CI de Python/frontend. No se configuró el webhook de GreenAPI ni se hicieron pruebas de
+mensajes reales en este paso.
+
+**Siguiente:** completar los smoke tests y la revisión operativa de F10.10 antes de abrir el
+piloto a clientes.
 
 ---
 
