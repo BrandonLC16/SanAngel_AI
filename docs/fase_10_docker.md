@@ -62,6 +62,7 @@ Ejemplo para **una** instalación, con valores no secretos en un archivo externo
 ```text
 ASSISTANT_BRANCH_CODE=<codigo-asignado>
 GREEN_API_INSTANCE_ID=<instancia-asignada>
+GREEN_API_API_URL=<url-https-del-host-api-asignado>
 SECRETS_DIR_HOST=<ruta-absoluta-del-montaje-del-secret-manager>
 PUBLIC_DOMAIN=<dominio-de-la-sucursal>
 PUBLIC_HTTP_PORT=80

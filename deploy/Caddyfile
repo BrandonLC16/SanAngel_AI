@@ -9,7 +9,7 @@
 		-Server
 	}
 
-	@backend path /api/* /health
+	@backend path /api/v1/admin /api/v1/admin/* /api/v1/whatsapp/webhook /health
 	handle @backend {
 		reverse_proxy 127.0.0.1:8000 {
 			header_up X-Forwarded-Proto https
@@ -17,6 +17,11 @@
 			header_up -X-Forwarded-Host
 			header_up -Forwarded
 		}
+	}
+
+	@blocked_api path /api/*
+	handle @blocked_api {
+		respond 404
 	}
 
 	handle {
