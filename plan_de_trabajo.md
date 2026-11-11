@@ -3988,12 +3988,14 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Estado:** 🟨 EN_PROGRESO
 **Fecha de inicio:** 2026-11-11
 
-**Avance:** preparación de las imágenes comunes de backend y panel para el piloto. Publicación y
-referencias por digest en curso. El despliegue y los smoke tests permanecen pendientes.
+**Avance:** backend y panel publicados en GHCR desde `f8be391d2cc1444ebed472458d9871780813e973`;
+sus digests están fijados en `deploy/pilot.images.env` y Compose los resuelve para el piloto. El
+despliegue y los smoke tests permanecen pendientes.
 
 
 ### Alcance
 
+- [x] construir y publicar imágenes comunes de backend y panel; fijar sus digests para el piloto.
 - [ ] deploy.
 
 - [ ] health.
@@ -9917,6 +9919,37 @@ checkpoint documental; no autoriza tráfico de clientes. F10.10 deberá verifica
 antes de abrir el piloto. No se inició F10.10.
 
 **Siguiente:** F10.10 — Despliegue y smoke tests del piloto de una sucursal, cuando se solicite.
+
+---
+
+## 2026-11-11 — Imágenes del piloto preparadas
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO`;
+la subfase completa no se cierra porque faltan despliegue y smoke tests.
+
+**Cambios:** el workflow publica backend y panel `linux/amd64` en GHCR tras compilar los
+contenedores y pasar el escaneo de secretos en pushes a `main`. El job de publicación del
+commit `f8be391d2cc1444ebed472458d9871780813e973` terminó correctamente. Se fijaron sus
+dos referencias por digest en el archivo de imágenes del piloto y se documentó su uso con Compose.
+
+**Archivos:** `.github/workflows/security.yml`, `deploy/pilot.images.env`,
+`docs/fase_10_docker.md`, `plan_de_trabajo.md`.
+
+**Comandos y resultados:** GitHub Actions `43081720389` → `containers`, `secrets` y
+`publish_images` aprobados; `python` y `frontend` fallaron. `docker compose --env-file
+deploy/pilot.images.env -p sanangel-pilot-check -f deploy/compose.branch.yml config --images`
+con valores sintéticos para las variables requeridas → panel por digest y backend por el mismo
+digest en backend y worker. `git diff --check` → sin errores.
+
+**Seguridad:** los builds no reciben secretos ni datos de sucursal; solo el job de publicación
+tiene `packages: write`. La configuración versionada contiene únicamente referencias de imagen.
+
+**Riesgos/Pendientes:** CI sigue fallando por dos tests Python y auditoría de dependencias del
+frontend; el job de publicación no depende de esos jobs. Si los paquetes GHCR están privados,
+el host del piloto requiere autenticación de lectura. No se verificó pull desde el host, ni
+despliegue, health, webhook, panel o rollback productivos.
+
+**Siguiente:** continuar F10.10 con configuración y smoke tests de la única instalación piloto.
 
 ---
 
