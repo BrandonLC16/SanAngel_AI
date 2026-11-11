@@ -3991,7 +3991,8 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Avance:** backend y panel publicados en GHCR desde `f8be391d2cc1444ebed472458d9871780813e973`;
 sus digests están fijados en `deploy/pilot.images.env`. La instalación única del piloto ya corre
 en el Droplet con backend, worker y panel saludables. Faltan los smoke tests de webhook,
-WhatsApp, login del panel y rollback antes de abrir tráfico de clientes.
+WhatsApp, login del panel y rollback antes de abrir tráfico de clientes. El panel usa un override
+externo temporal de Caddy mientras CI publica el digest con la ruta interna bloqueada.
 
 
 ### Alcance
@@ -9987,6 +9988,39 @@ mensajes reales en este paso.
 
 **Siguiente:** completar los smoke tests y la revisión operativa de F10.10 antes de abrir el
 piloto a clientes.
+
+---
+
+## 2026-11-11 — Ajuste de configuración del piloto
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** se comprobó que el token de instancia inicial no correspondía al ID asignado al
+piloto; el usuario actualizó su fuente y se instaló el token correcto. Una consulta de solo
+lectura a GreenAPI aceptó las credenciales. Compose ahora transmite la URL regional configurada
+al backend y worker. Caddy limita el proxy a health, webhook y rutas admin; el endpoint interno
+de chat se bloquea públicamente. Se reimportó el perfil con horario confirmado de lunes a domingo.
+
+**Archivos:** `deploy/compose.branch.yml`, `deploy/Caddyfile`, `docs/fase_10_docker.md`,
+`plan_de_trabajo.md`; en el host, configuración externa y override temporal de Caddy. Ningún
+token ni contraseña entró en Git.
+
+**Validación:** configuración de Caddy válida con el binario de la imagen; Compose resuelve la
+URL regional en backend y worker; GreenAPI acepta el token para la instancia piloto; perfil
+actualizado (`updated`); desde un cliente externo HTTPS `/health` y `/` → 200,
+`/api/v1/chat` → 404, `/api/v1/admin/auth/session` sin sesión → 401. Los tres contenedores
+continúan saludables.
+
+**Seguridad:** el webhook del proveedor sigue desactivado; no se activó tráfico de WhatsApp.
+El override externo mantiene bloqueado el chat interno mientras el build de la nueva imagen
+del panel espera en CI.
+
+**Riesgos/Pendientes:** GitHub Actions `43095233167` continúa en cola; falta fijar y desplegar el
+digest del panel reconstruido, retirar el override temporal y repetir las sondas. Quedan los
+smoke tests de webhook, WhatsApp, login y rollback. La contraseña inicial del owner debe ser
+recuperada por el usuario y retirada del host.
+
+**Siguiente:** actualizar la imagen del panel cuando termine CI, luego completar F10.10.
 
 ---
 
