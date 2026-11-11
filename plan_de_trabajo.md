@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-10-13
+**Última actualización:** 2026-11-11
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F10.9 — Checklist producción fue la última completada (`✅ COMPLETADO`, 2026-10-13)
-**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 pendiente
+**Subfase activa:** F10.10 — Despliegue y smoke tests (`🟨 EN_PROGRESO`, desde 2026-11-11; preparación de imágenes del piloto)
+**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 iniciada solo para preparar las imágenes del piloto
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 **Alcance propuesto del despliegue inicial:** una sucursal piloto; las otras seis se decidirán
@@ -3985,7 +3985,11 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.10 — Despliegue y smoke tests
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-11-11
+
+**Avance:** preparación de las imágenes comunes de backend y panel para el piloto. Publicación y
+referencias por digest en curso. El despliegue y los smoke tests permanecen pendientes.
 
 
 ### Alcance
