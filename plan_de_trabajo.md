@@ -10179,6 +10179,29 @@ webhook de GreenAPI y los smoke tests de WhatsApp siguen fuera de este avance.
 
 ---
 
+## 2026-11-12 — CI completa y digests renovados del piloto
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** el merge `3757a991dcfc0720daa574c5250b7a2de839c7c8` llegó a `main` y
+GitHub Actions publicó nuevas imágenes backend y panel. Se actualizaron sus referencias por
+digest en `deploy/pilot.images.env`.
+
+**Archivos:** `deploy/pilot.images.env`, `plan_de_trabajo.md`.
+
+**Validación:** workflow Security checks [#33](https://github.com/BrandonLC16/SanAngel_AI/actions/runs/43271766054)
+terminó `success`: `python`, `frontend`, `secrets`, `containers` y `publish_images` aprobados.
+Los digests se tomaron de la salida del job de publicación de ese commit.
+
+**Seguridad:** `publish_images` solo se ejecutó después de las cuatro comprobaciones. El archivo
+de imágenes contiene referencias por digest, sin credenciales ni configuración de sucursal.
+
+**Pendiente:** desplegar los digests nuevos en el Droplet, retirar el override temporal de Caddy
+y repetir las sondas de health y rutas públicas. Webhook, WhatsApp y rollback siguen pendientes
+para cerrar F10.10.
+
+---
+
 # 20. Plantilla para historial futuro
 
 ```text
