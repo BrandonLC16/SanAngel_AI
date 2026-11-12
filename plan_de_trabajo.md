@@ -4,7 +4,7 @@
 **Última actualización:** 2026-11-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
 **Subfase activa:** F10.10 — Despliegue y smoke tests (`🟨 EN_PROGRESO`, desde 2026-11-11; piloto desplegado y validación pendiente)
-**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 pendiente de CI, imágenes renovadas y smoke tests
+**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 pendiente de webhook, WhatsApp, panel visual y rollback
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 **Alcance propuesto del despliegue inicial:** una sucursal piloto; las otras seis se decidirán
@@ -3988,12 +3988,13 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 **Estado:** 🟨 EN_PROGRESO
 **Fecha de inicio:** 2026-11-11
 
-**Avance:** backend y panel publicados en GHCR desde `f8be391d2cc1444ebed472458d9871780813e973`;
-sus digests están fijados en `deploy/pilot.images.env`. La instalación única del piloto ya corre
-en el Droplet con backend, worker y panel saludables. Faltan los smoke tests de webhook,
-WhatsApp, validación visual del panel y rollback antes de abrir tráfico de clientes. El login y
-logout del owner se verificaron por HTTPS. El panel usa un override
-externo temporal de Caddy mientras CI publica el digest con la ruta interna bloqueada.
+**Avance:** backend y panel publicados en GHCR desde `3757a991dcfc0720daa574c5250b7a2de839c7c8`;
+sus digests están fijados en `deploy/pilot.images.env` y desplegados en el Droplet. Backend,
+worker y panel están saludables. El panel ya usa el Caddyfile de su imagen, sin el override
+temporal; `/api/v1/chat` devuelve 404 desde fuera. CI terminó en verde en los commits de
+integración y de digests. Faltan los smoke tests de webhook, WhatsApp, validación visual del
+panel y rollback antes de abrir tráfico de clientes. El login y logout del owner se verificaron
+por HTTPS antes de renovar las imágenes.
 
 
 ### Alcance
@@ -10199,6 +10200,34 @@ de imágenes contiene referencias por digest, sin credenciales ni configuración
 **Pendiente:** desplegar los digests nuevos en el Droplet, retirar el override temporal de Caddy
 y repetir las sondas de health y rutas públicas. Webhook, WhatsApp y rollback siguen pendientes
 para cerrar F10.10.
+
+---
+
+## 2026-11-12 — Despliegue de imágenes renovadas del piloto
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`; sin GO para tráfico de clientes.
+
+**Cambios:** el checkout limpio del Droplet avanzó a `a8ed92835c4f9b5259b2898c920cc9c7b34f280e`.
+Compose descargó y levantó backend, worker y panel con los digests fijados en
+`deploy/pilot.images.env`. El panel dejó de montar el Caddyfile temporal y usa la configuración
+incluida en su imagen.
+
+**Archivos:** solo este checkpoint en Git; configuración y secretos productivos permanecen fuera
+del repositorio.
+
+**Validación:** el workflow [#35](https://github.com/BrandonLC16/SanAngel_AI/actions/runs/43272601318)
+del commit de digests terminó `success` con los cinco jobs aprobados. En el Droplet,
+`docker compose config --quiet`, `pull`, `up -d --no-build` y `ps` aprobaron; los tres servicios
+están saludables con los digests esperados. Backend informa `certifi` 2026.10.23; worker
+`pending=0 processing=0 uncertain=0`; Alembic `20261012_0015 (head)`. Desde un cliente externo,
+HTTPS `/health` y `/` → 200 con certificado válido, `/api/v1/chat` → 404,
+`/api/v1/admin/auth/session` sin sesión → 401 y HTTP `/` → 308 a HTTPS.
+
+**Seguridad:** no se leyeron ni imprimieron valores de secretos. El montaje temporal de Caddy
+ya no figura en el contenedor; el webhook del proveedor no se activó en este avance.
+
+**Pendiente:** comprobar recepción y envío reales por WhatsApp, panel visual y rollback del
+piloto; documentar los controles operativos de F10.9 antes de abrir tráfico de clientes.
 
 ---
 
