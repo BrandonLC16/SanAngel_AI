@@ -88,3 +88,41 @@ jobs:
           test "$(docker image inspect sanangel-panel:ci --format '{{.Config.User}}')" = '10001:10001'
           test "$(docker image inspect sanangel-backend:ci --format '{{json .Config.Healthcheck}}')" != 'null'
           test "$(docker image inspect sanangel-panel:ci --format '{{json .Config.Healthcheck}}')" != 'null'
+
+  publish_images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [containers, secrets, python, frontend]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and publish pilot images to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          backend_image="ghcr.io/${owner}/sanangel-backend"
+          panel_image="ghcr.io/${owner}/sanangel-panel"
+          tag="sha-${GITHUB_SHA}"
+          printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          docker build --build-arg SOURCE_DATE_EPOCH=0 --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -f Dockerfile -t "${backend_image}:${tag}" .
+          docker build --build-arg SOURCE_DATE_EPOCH=0 --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -f Dockerfile.frontend -t "${panel_image}:${tag}" .
+          docker push "${backend_image}:${tag}"
+          docker push "${panel_image}:${tag}"
+          backend_ref="$(docker image inspect "${backend_image}:${tag}" --format '{{index .RepoDigests 0}}')"
+          panel_ref="$(docker image inspect "${panel_image}:${tag}" --format '{{index .RepoDigests 0}}')"
+          [[ "${backend_ref}" == "${backend_image}@sha256:"* ]]
+          [[ "${panel_ref}" == "${panel_image}@sha256:"* ]]
+          printf 'BACKEND_IMAGE=%s\nPANEL_IMAGE=%s\n' "${backend_ref}" "${panel_ref}" | tee -a "${GITHUB_STEP_SUMMARY}"

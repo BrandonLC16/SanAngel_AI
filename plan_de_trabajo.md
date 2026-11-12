@@ -1,10 +1,10 @@
 # plan_de_trabajo.md
 ## Siete asistentes IA para Carnicerías — uno por sucursal y número de WhatsApp
 
-**Última actualización:** 2026-10-13
+**Última actualización:** 2026-11-12
 **Fase activa:** Fase 10 — Hardening, observabilidad y despliegue (`🟨 EN_PROGRESO`)
-**Subfase activa:** ninguna; F10.9 — Checklist producción fue la última completada (`✅ COMPLETADO`, 2026-10-13)
-**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 pendiente
+**Subfase activa:** F10.10 — Despliegue y smoke tests (`🟨 EN_PROGRESO`, desde 2026-11-11; piloto desplegado y validación pendiente)
+**Estado global:** 🟨 EN_PROGRESO — F10.9 cerrada por aceptación expresa del solicitante; F10.10 pendiente de CI, imágenes renovadas y smoke tests
 **Canal principal del cliente:** WhatsApp mediante GreenAPI
 **Panel web:** administración y atención humana, no chat público del cliente.
 **Alcance propuesto del despliegue inicial:** una sucursal piloto; las otras seis se decidirán
@@ -3985,14 +3985,23 @@ Antes de cerrar ejecuta los comandos de validación aplicables definidos en AGEN
 
 ## F10.10 — Despliegue y smoke tests
 
-**Estado:** ⬜ PENDIENTE
+**Estado:** 🟨 EN_PROGRESO
+**Fecha de inicio:** 2026-11-11
+
+**Avance:** backend y panel publicados en GHCR desde `f8be391d2cc1444ebed472458d9871780813e973`;
+sus digests están fijados en `deploy/pilot.images.env`. La instalación única del piloto ya corre
+en el Droplet con backend, worker y panel saludables. Faltan los smoke tests de webhook,
+WhatsApp, validación visual del panel y rollback antes de abrir tráfico de clientes. El login y
+logout del owner se verificaron por HTTPS. El panel usa un override
+externo temporal de Caddy mientras CI publica el digest con la ruta interna bloqueada.
 
 
 ### Alcance
 
-- [ ] deploy.
+- [x] construir y publicar imágenes comunes de backend y panel; fijar sus digests para el piloto.
+- [x] deploy de la única instalación piloto.
 
-- [ ] health.
+- [x] health de backend, worker, panel y endpoint HTTPS.
 
 - [ ] webhook.
 
@@ -9916,6 +9925,137 @@ antes de abrir el piloto. No se inició F10.10.
 
 ---
 
+## 2026-11-11 — Imágenes del piloto preparadas
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `⬜ PENDIENTE` → `🟨 EN_PROGRESO`;
+la subfase completa no se cierra porque faltan despliegue y smoke tests.
+
+**Cambios:** el workflow publica backend y panel `linux/amd64` en GHCR tras compilar los
+contenedores y pasar el escaneo de secretos en pushes a `main`. El job de publicación del
+commit `f8be391d2cc1444ebed472458d9871780813e973` terminó correctamente. Se fijaron sus
+dos referencias por digest en el archivo de imágenes del piloto y se documentó su uso con Compose.
+
+**Archivos:** `.github/workflows/security.yml`, `deploy/pilot.images.env`,
+`docs/fase_10_docker.md`, `plan_de_trabajo.md`.
+
+**Comandos y resultados:** GitHub Actions `43081720389` → `containers`, `secrets` y
+`publish_images` aprobados; `python` y `frontend` fallaron. `docker compose --env-file
+deploy/pilot.images.env -p sanangel-pilot-check -f deploy/compose.branch.yml config --images`
+con valores sintéticos para las variables requeridas → panel por digest y backend por el mismo
+digest en backend y worker. `git diff --check` → sin errores.
+
+**Seguridad:** los builds no reciben secretos ni datos de sucursal; solo el job de publicación
+tiene `packages: write`. La configuración versionada contiene únicamente referencias de imagen.
+
+**Riesgos/Pendientes:** CI sigue fallando por dos tests Python y auditoría de dependencias del
+frontend; el job de publicación no depende de esos jobs. Si los paquetes GHCR están privados,
+el host del piloto requiere autenticación de lectura. No se verificó pull desde el host, ni
+despliegue, health, webhook, panel o rollback productivos.
+
+**Siguiente:** continuar F10.10 con configuración y smoke tests de la única instalación piloto.
+
+---
+
+## 2026-11-11 — Instalación del piloto en Droplet
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`; no hay GO para tráfico de
+clientes ni cierre de F10.10.
+
+**Cambios:** checkout del commit `dad614fdb27ccca41a18ebedb260b83e2a4508bb` en el host
+piloto; configuración no secreta y perfil de `sucursal-1` fuera del repositorio; cinco archivos
+de secretos externos legibles por UID/GID 10001; migración a `20261012_0015`; perfil importado;
+usuario `brandonl` con rol `owner` creado; backend, worker y panel levantados con los digests
+fijados. La contraseña inicial está en un archivo root temporal para entrega al usuario.
+
+**Archivos:** configuración y perfil solo en el host piloto, fuera de Git; ningún secreto nuevo
+en el repositorio. Este checkpoint actualiza `plan_de_trabajo.md`.
+
+**Comandos y resultados:** `docker pull` de ambos digests → aprobado sin autenticación;
+`docker compose config --quiet` → aprobado; `alembic current` → `20261012_0015 (head)`;
+`provision_assistant` → perfil válido e importado (`created`); `create_admin_user` → usuario
+creado; `docker compose up -d` y `ps` → tres servicios saludables; HTTPS `/health` y panel `/`
+→ 200 con certificado válido; HTTP → 308 a HTTPS; worker `--status` → sin jobs pendientes,
+en proceso o inciertos. El panel entrega CSP y HSTS.
+
+**Seguridad:** configuración externa root 0600; directorio de secretos root:GID 10001 0750 y
+archivos root:GID 10001 0640. Se validó lectura dentro del contenedor como UID 10001 y carga
+de settings sin imprimir valores. El backend y worker comparten solo el volumen de esa sucursal.
+
+**Riesgos/Pendientes:** sincronizar el webhook token generado con GreenAPI y probar recepción y
+envío controlados; verificar login del panel y retirar la contraseña temporal después de que el
+usuario la guarde; confirmar días de atención del perfil; ensayar backup/rollback y revisar los
+fallos CI de Python/frontend. No se configuró el webhook de GreenAPI ni se hicieron pruebas de
+mensajes reales en este paso.
+
+**Siguiente:** completar los smoke tests y la revisión operativa de F10.10 antes de abrir el
+piloto a clientes.
+
+---
+
+## 2026-11-11 — Ajuste de configuración del piloto
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** se comprobó que el token de instancia inicial no correspondía al ID asignado al
+piloto; el usuario actualizó su fuente y se instaló el token correcto. Una consulta de solo
+lectura a GreenAPI aceptó las credenciales. Compose ahora transmite la URL regional configurada
+al backend y worker. Caddy limita el proxy a health, webhook y rutas admin; el endpoint interno
+de chat se bloquea públicamente. Se reimportó el perfil con horario confirmado de lunes a domingo.
+
+**Archivos:** `deploy/compose.branch.yml`, `deploy/Caddyfile`, `docs/fase_10_docker.md`,
+`plan_de_trabajo.md`; en el host, configuración externa y override temporal de Caddy. Ningún
+token ni contraseña entró en Git.
+
+**Validación:** configuración de Caddy válida con el binario de la imagen; Compose resuelve la
+URL regional en backend y worker; GreenAPI acepta el token para la instancia piloto; perfil
+actualizado (`updated`); desde un cliente externo HTTPS `/health` y `/` → 200,
+`/api/v1/chat` → 404, `/api/v1/admin/auth/session` sin sesión → 401. Los tres contenedores
+continúan saludables.
+
+**Seguridad:** el webhook del proveedor sigue desactivado; no se activó tráfico de WhatsApp.
+El override externo mantiene bloqueado el chat interno mientras el build de la nueva imagen
+del panel espera en CI.
+
+**Riesgos/Pendientes:** GitHub Actions `43095233167` continúa en cola; falta fijar y desplegar el
+digest del panel reconstruido, retirar el override temporal y repetir las sondas. Quedan los
+smoke tests de webhook, WhatsApp, login y rollback. La contraseña inicial del owner debe ser
+recuperada por el usuario y retirada del host.
+
+**Siguiente:** actualizar la imagen del panel cuando termine CI, luego completar F10.10.
+
+---
+
+## 2026-11-11 — Recuperación de acceso owner
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** tras informar el usuario que faltaba el archivo de contraseña inicial, se generó
+una nueva contraseña aleatoria para `brandonl` y se actualizó únicamente la cuenta `owner` de
+`sucursal-1`; sus sesiones anteriores quedaron revocadas. El archivo temporal se conserva fuera
+de Git con permisos root 0600 para entrega al usuario. Los scripts temporales se retiraron.
+
+**Validación:** login y logout por HTTPS aprobados con la nueva contraseña, sin imprimir clave,
+cookie ni token CSRF. Se confirmó existencia y permisos del archivo temporal.
+
+**Pendiente del usuario:** recuperar la contraseña por SSH, guardarla en su gestor y retirar el
+archivo temporal después de verificar personalmente el acceso al panel.
+
+---
+
+## 2026-11-11 — Entrega de acceso owner completada
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** el usuario confirmó el acceso al panel con la contraseña recuperada; se retiró del
+Droplet el archivo temporal de contraseña. No se imprimió ni guardó la contraseña en Git.
+
+**Validación:** el archivo temporal ya no existe; backend, worker y panel continúan saludables.
+
+**Pendiente:** los smoke tests de webhook, WhatsApp y rollback, más el digest del panel corregido
+cuando GitHub Actions salga de la cola; el override externo sigue activo.
+
+---
+
 ## 2026-11-12 — Aislamiento de pruebas CI de F10.1 y F10.2
 
 **Fase/subfase:** Fase 10 / mantenimiento de pruebas de F10.1 y F10.2. **Estado:** ambas
@@ -10007,6 +10147,35 @@ GitHub Actions y reconstruir/publicar las imágenes de despliegue. No se probó 
 productivo con secretos montados.
 
 **Siguiente:** F10.10 según su autorización y criterios operativos existentes.
+
+---
+
+## 2026-11-12 — Integración de correcciones CI y bloqueo de publicación
+
+**Fase/subfase:** Fase 10 / F10.10. **Estado:** `🟨 EN_PROGRESO`.
+
+**Cambios:** se integraron los registros del piloto y el commit local que corrige las pruebas y
+renueva las dependencias auditadas. `publish_images` ahora espera también a `python` y
+`frontend`, además de `containers` y `secrets`; ninguna imagen se publica si fallan los tests o
+auditorías de esos jobs.
+
+**Archivos:** `.github/workflows/security.yml`, `plan_de_trabajo.md` y archivos incluidos en los
+dos historiales integrados.
+
+**Validación local:** entorno Python limpio equivalente al job de CI: 723 pruebas aprobadas y
+1 omitida; Ruff lint y formato aprobados; `pip check` y ambas auditorías de `pip-audit` sin
+vulnerabilidades conocidas. Frontend: 34 pruebas aprobadas, build correcto y `npm audit` con
+0 vulnerabilidades. Ambas imágenes `linux/amd64` se construyeron localmente con usuario
+`10001:10001` y healthcheck; el backend contiene `certifi` 2026.10.23 y Caddy validó su
+configuración. `git diff --check` aprobado.
+
+**Seguridad:** el entorno Python antiguo del desarrollador conservaba paquetes vulnerables;
+se descartó ese resultado al reproducir el job en un entorno limpio. Las comprobaciones Docker
+no usaron red ni secretos en contenedores de prueba.
+
+**Pendiente:** subir la integración, obtener el workflow completo en verde, fijar los nuevos
+digests de GHCR, desplegarlos en el piloto y verificar health, rutas públicas y rollback. El
+webhook de GreenAPI y los smoke tests de WhatsApp siguen fuera de este avance.
 
 ---
 

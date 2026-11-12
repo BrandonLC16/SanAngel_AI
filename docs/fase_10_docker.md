@@ -30,8 +30,10 @@ producción, regenerar el lock con `uv pip compile` para Python 3.14 y Linux x86
 hashes; revisar el diff, auditarlo con `pip-audit --require-hashes -r requirements-prod.lock` y
 reconstruir. Al cambiar dependencias del panel,
 actualizar su lockfile y ejecutar `npm audit --prefix frontend`. CI compila ambas imágenes y
-comprueba usuario y healthcheck. Las imágenes se fijan por digest en despliegues reales tras
-publicarlas en un registro controlado; la etiqueta de ejemplo es local y mutable.
+comprueba usuario y healthcheck. En pushes a `main`, el job `publish_images` publica ambos
+artefactos `linux/amd64` en GHCR con una etiqueta de commit y registra sus referencias por digest
+en el resumen del job. La etiqueta es mutable; el piloto usa los digests de
+`deploy/pilot.images.env`.
 
 Comando de regeneración usado con `uv==0.12.24`:
 
@@ -50,13 +52,17 @@ el flujo de importación ya existente, comprobando que su código coincida con e
 instalación. La DB vive en `branch_data`, fuera de la imagen; certificados de Caddy en
 `caddy_data` y `caddy_config`.
 
+Las dos referencias de imagen del piloto están versionadas en `deploy/pilot.images.env`; el resto
+de la configuración no secreta de esa instalación vive en un archivo externo al repositorio. Si
+los paquetes GHCR son privados, el host necesita autenticación de solo lectura al registro antes
+de `docker compose pull`. Mantener esa credencial fuera del repositorio y del archivo de imágenes.
+
 Ejemplo para **una** instalación, con valores no secretos en un archivo externo al repositorio:
 
 ```text
-BACKEND_IMAGE=registry.example/sanangel-backend@sha256:<digest-revisado>
-PANEL_IMAGE=registry.example/sanangel-panel@sha256:<digest-revisado>
 ASSISTANT_BRANCH_CODE=<codigo-asignado>
 GREEN_API_INSTANCE_ID=<instancia-asignada>
+GREEN_API_API_URL=<url-https-del-host-api-asignado>
 SECRETS_DIR_HOST=<ruta-absoluta-del-montaje-del-secret-manager>
 PUBLIC_DOMAIN=<dominio-de-la-sucursal>
 PUBLIC_HTTP_PORT=80
@@ -64,9 +70,10 @@ PUBLIC_HTTPS_PORT=443
 ```
 
 ```powershell
-docker compose --env-file <archivo-externo> -p <proyecto-unico> -f deploy/compose.branch.yml config --quiet
-docker compose --env-file <archivo-externo> -p <proyecto-unico> -f deploy/compose.branch.yml up -d
-docker compose --env-file <archivo-externo> -p <proyecto-unico> -f deploy/compose.branch.yml ps
+docker compose --env-file <archivo-externo> --env-file deploy/pilot.images.env -p <proyecto-unico> -f deploy/compose.branch.yml config --quiet
+docker compose --env-file <archivo-externo> --env-file deploy/pilot.images.env -p <proyecto-unico> -f deploy/compose.branch.yml pull
+docker compose --env-file <archivo-externo> --env-file deploy/pilot.images.env -p <proyecto-unico> -f deploy/compose.branch.yml up -d
+docker compose --env-file <archivo-externo> --env-file deploy/pilot.images.env -p <proyecto-unico> -f deploy/compose.branch.yml ps
 ```
 
 El gestor de secretos debe montar archivos legibles por UID 10001 y no incluirlos en variables de
