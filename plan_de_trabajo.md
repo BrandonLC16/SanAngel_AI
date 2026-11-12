@@ -9916,6 +9916,100 @@ antes de abrir el piloto. No se inició F10.10.
 
 ---
 
+## 2026-11-12 — Aislamiento de pruebas CI de F10.1 y F10.2
+
+**Fase/subfase:** Fase 10 / mantenimiento de pruebas de F10.1 y F10.2. **Estado:** ambas
+permanecen `✅ COMPLETADO`; F10.10 permanece `⬜ PENDIENTE` en este checkout.
+
+**Cambios:** las pruebas de límites HTTP y de cabeceras administrativas ahora sustituyen solo
+sus dependencias de chat y autenticación con objetos de prueba. El checkout de CI no incluye
+`.env`; esas dependencias requerían credenciales antes de producir las respuestas `422` y `401`
+que las pruebas verifican. No cambió el comportamiento de la aplicación.
+
+**Archivos:** `backend/tests/test_resource_limits.py`,
+`backend/tests/test_transport_security.py`, `plan_de_trabajo.md`.
+
+**Comandos y resultados:** dos pruebas focales sin `.env` → 2 aprobadas;
+suite completa sin `.env` → 723 aprobadas, 1 omitida;
+`ruff check --no-cache` → aprobado;
+`ruff format --check --no-cache` → 230 archivos conformes;
+`git diff --check` → aprobado.
+
+**Seguridad:** las pruebas usan una clave marcada explícitamente como ficticia y un generador
+simulado; no incorporan secretos reales ni realizan llamadas externas.
+
+**Riesgos/Pendientes:** la validación se ejecutó en Windows; falta comprobar el nuevo commit en
+GitHub Actions sobre Ubuntu. El job `frontend` sigue fallando por `npm audit` y no formó parte de
+esta corrección de pruebas.
+
+**Siguiente:** F10.10 según su autorización y criterios operativos existentes.
+
+---
+
+## 2026-11-12 — Renovación de dependencias vulnerables de F10.5
+
+**Fase/subfase:** Fase 10 / F10.5. **Estado:** `✅ COMPLETADO` → `↩️ REABIERTO` por
+avisos nuevos → `🟨 EN_PROGRESO` → `🧪 VALIDACION` → `✅ COMPLETADO`.
+F10.10 permanece `⬜ PENDIENTE` en este checkout.
+
+**Cambios:** se actualizaron Vite 8.3.1 → 8.3.8 y Vitest 5.0.1 → 5.1.0; el lockfile
+resolvió `undici` 8.12.4. El lock de producción de Python se regeneró para Linux x86_64 y
+Python 3.14 con hashes, actualizando solo `certifi` 2026.7.22 → 2026.10.23. No se redujo
+el nivel de auditoría ni se ignoraron avisos.
+
+**Archivos:** `frontend/package.json`, `frontend/package-lock.json`,
+`requirements-prod.lock`, `plan_de_trabajo.md`.
+
+**Comandos y resultados:** `npm ci --prefix frontend --ignore-scripts --no-audit` → correcto;
+`npm --prefix frontend test` → 34 aprobadas; `npm --prefix frontend run build` → correcto;
+`npm audit --prefix frontend` → 0 vulnerabilidades. En un entorno Python limpio con
+`pip==26.2.0`, `pip-audit==2.10.1` y el proyecto `[dev]`: `pip check` → sin conflictos;
+`pytest -q` sin `.env` → 723 aprobadas, 1 omitida; Ruff lint y formato → aprobados;
+`pip-audit --local` → sin vulnerabilidades conocidas. La auditoría del lock Python con
+`--require-hashes` también terminó sin hallazgos; `git diff --check` → aprobado.
+
+**Seguridad:** las versiones y hashes de producción siguen fijados; la instalación npm se
+validó con scripts desactivados. No se añadieron credenciales ni excepciones a los escáneres.
+
+**Riesgos/Pendientes:** falta ejecutar el nuevo commit en GitHub Actions sobre Ubuntu. El daemon
+local de Docker no está disponible, así que no se reconstruyeron las imágenes en esta sesión.
+Las imágenes desplegadas requieren nueva compilación y publicación para incorporar `certifi`.
+
+**Siguiente:** F10.10 según su autorización y criterios operativos existentes.
+
+---
+
+## 2026-11-12 — Verificación Docker de la corrección F10.5
+
+**Fase/subfase:** Fase 10 / validación complementaria de F10.5. **Estado:** permanece
+`✅ COMPLETADO`; F10.10 permanece `⬜ PENDIENTE` en este checkout.
+
+**Cambios:** ninguno en código o dependencias; se registró la verificación de ambas imágenes.
+
+**Archivos:** `plan_de_trabajo.md`.
+
+**Comandos y resultados:** `docker build --build-arg SOURCE_DATE_EPOCH=0 --platform
+linux/amd64` con ambos Dockerfiles → imágenes locales `sanangel-backend:ci-verify`
+(`sha256:7531119e837e0d7231416da9486c96c0e18ca0d984ad36ac921fb535f8f260de`) y
+`sanangel-panel:ci-verify`
+(`sha256:b4413279353d99bf059de0f010a805ecc2a458e1396608eb4ab3a5951657b156`).
+`docker image inspect` → ambas `linux/amd64`, usuario `10001:10001` y healthcheck declarado.
+En el backend, `certifi` instalado = 2026.10.23. En el panel, `index.html` y assets presentes;
+`caddy validate` → configuración válida. Se iniciaron ambos contenedores y sus comandos de
+healthcheck pasaron.
+
+**Seguridad:** smoke tests con `--network none`, sin puertos publicados ni credenciales de
+producción. El backend usó `APP_ENV=testing`; el panel usó `PUBLIC_DOMAIN=localhost`.
+Los contenedores temporales se detuvieron y retiraron.
+
+**Riesgos/Pendientes:** las imágenes verificadas son locales; falta ejecutar el nuevo commit en
+GitHub Actions y reconstruir/publicar las imágenes de despliegue. No se probó arranque
+productivo con secretos montados.
+
+**Siguiente:** F10.10 según su autorización y criterios operativos existentes.
+
+---
+
 # 20. Plantilla para historial futuro
 
 ```text

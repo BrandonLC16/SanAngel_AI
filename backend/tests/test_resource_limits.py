@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -62,6 +63,9 @@ def test_admin_and_chat_limits_ignore_untrusted_forwarded_headers() -> None:
             internal_requests_per_minute=1,
             _env_file=None,
         )
+    )
+    app.dependency_overrides[get_chat_service] = lambda: ChatService(
+        AsyncMock(), max_message_chars=2000
     )
 
     async def exercise() -> tuple[list[int], int, int, int]:

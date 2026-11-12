@@ -5,9 +5,12 @@ import httpx
 import pytest
 from fastapi import Request
 from pydantic import ValidationError
+from sqlalchemy.orm import sessionmaker
 
-from backend.app.core.config import HttpSettings
+from backend.app.api.routes.admin_auth import get_admin_auth_service
+from backend.app.core.config import AdminAuthSettings, HttpSettings
 from backend.app.main import create_app
+from backend.app.services.admin_auth_service import AdminAuthService
 from scripts.run_backend import server_config
 
 
@@ -20,6 +23,14 @@ async def _request(
 ) -> httpx.Response:
     app = create_app(
         HttpSettings(app_env="production", trusted_proxy_ips=("127.0.0.1",), _env_file=None)
+    )
+    app.dependency_overrides[get_admin_auth_service] = lambda: AdminAuthService(
+        sessionmaker(),
+        settings=AdminAuthSettings(
+            assistant_branch_code="test-branch",
+            admin_auth_key="test-only-admin-auth-key-0000000000001",
+            _env_file=None,
+        ),
     )
 
     @app.get("/test-peer")
